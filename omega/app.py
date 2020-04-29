@@ -45,7 +45,7 @@ class Application:
     @classmethod
     async def start_quotes_fetchers(cls):
         cfg: Config = cfg4py.get_instance()
-        for fetcher in cfg.fetchers:
+        for fetcher in cfg.quotes_fetchers:
             await AbstractQuotesFetcher.create_instance(fetcher, executors=cls.executors)
 
     @classmethod
@@ -54,10 +54,10 @@ class Application:
         cfg4py.init(cls.get_config_path(), False)
         cfg: Config = cfg4py.get_instance()
         cls.executors = ThreadPoolExecutor(max_workers=cfg.concurrency.threads)
-        await cache.create_instance()
+        await cache.init()
 
         # 启动 emits 事件监听
-        await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn, exchange='omega', start_server=True)
+        await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn, exchange='zillionare-omega', start_server=True)
         await cls.start_quotes_fetchers()
 
         # 每日清理一次过期股吧排名数据

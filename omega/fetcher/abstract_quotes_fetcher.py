@@ -49,7 +49,7 @@ class AbstractQuotesFetcher(QuotesFetcher):
     @classmethod
     async def get_security_list(cls) -> np.ndarray:
         """
-                    display_name 	name 	start_date 	end 	type
+                    display_name 	name 	start_date 	end_date 	type
         000001.XSHE 	平安银行 	PAYH 	1991-04-03 	2200-01-01 	stock
         000002.XSHE 	万科A 	    WKA 	1991-01-29 	2200-01-01 	stock
         :return:
