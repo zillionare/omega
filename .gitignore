@@ -106,3 +106,4 @@ ENV/
 .github
 .eggs
 .emtpy
+.idea/workspace.xml
