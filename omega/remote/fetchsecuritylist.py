@@ -28,6 +28,6 @@ class FetchSecurityList(Remote):
         secs = await AbstractQuotesFetcher.get_security_list()
         await super().respond(secs)
 
-    async def execute(self) -> np.array:
-        # just for type hint
-        return await super().execute()
+    async def invoke(self) -> np.array:
+        # just for type hint, no special implementation needed
+        return await super().invoke()
