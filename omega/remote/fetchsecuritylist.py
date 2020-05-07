@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 class FetchSecurityList(Remote):
     def __init__(self):
-        super().__init__()
+        super().__init__(timeout=20)
 
     async def server_impl(self):
         secs = await AbstractQuotesFetcher.get_security_list()

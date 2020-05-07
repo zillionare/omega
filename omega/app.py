@@ -5,17 +5,27 @@
     管理应用程序生命期、全局对象、任务、全局消息响应
         """
 import asyncio
+import atexit
+import datetime
 import logging
 import os
 import platform
+import shutil
+import socket
 from concurrent.futures.thread import ThreadPoolExecutor
 from typing import TYPE_CHECKING
 
+import arrow
 import cfg4py
+import omicron
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from omicron.core import Events
+from omicron.core.lang import async_run
 from omicron.dal import cache
 from pyemit import emit
 
+from omega import app_name
+from omicron.core.timeframe import tf
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher
 
 if TYPE_CHECKING:
@@ -25,9 +35,11 @@ logger = logging.getLogger(__name__)
 
 
 class Application:
-    exit_calls = []
-    scheduler = AsyncIOScheduler(timezone='Asia/Shanghai')
+    scheduler = None
     executors = None
+    worker_id = None
+    is_leader = False
+    check_worker_interval = 10
 
     @classmethod
     def add_job(cls, func, trigger=None, *args, **kwargs):
@@ -43,22 +55,30 @@ class Application:
             return os.path.join(src_dir, 'config')
 
     @classmethod
-    async def start_quotes_fetchers(cls):
+    async def create_quotes_fetcher(cls):
         cfg: Config = cfg4py.get_instance()
         for fetcher in cfg.quotes_fetchers:
             await AbstractQuotesFetcher.create_instance(fetcher, executors=cls.executors)
 
     @classmethod
     async def start(cls):
+        atexit.register(cls.on_exit)
         logger.info("starting solo quotes server...")
         cfg4py.init(cls.get_config_path(), False)
         cfg: Config = cfg4py.get_instance()
         cls.executors = ThreadPoolExecutor(max_workers=cfg.concurrency.threads)
-        await cache.init()
+        cls.scheduler = AsyncIOScheduler(timezone=cfg.tz)
+
+        # 初始化omicron
+        await omicron.init()
 
         # 启动 emits 事件监听
-        await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn, exchange='zillionare-omega', start_server=True)
-        await cls.start_quotes_fetchers()
+        emit.register(Events.OMEGA_WORKER_LEAVE, cls.on_worker_leave, app_name)
+        await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn, start_server=True)
+
+        # 创建fetchers
+        await cls.create_quotes_fetcher()
+
 
         # 每日清理一次过期股吧排名数据
         # scheduler.add_job(guba_crawler.purge_aged_records, 'cron', hour=2)
@@ -70,7 +90,89 @@ class Application:
 
         # 启动任务
         cls.scheduler.start()
-        logger.info("solo quotes server started.")
+        await cls.join()
+        logger.info("%s server started.", app_name)
+
+    @classmethod
+    async def check_worker_status(cls):
+        logger.debug("checking worker status %s", cls.worker_id)
+        cfg = cfg4py.get_instance()
+        await cache.sys.hmset_dict(f"workers:{app_name}:{cls.worker_id}", {
+            "last_seen": arrow.now(cfg.tz).timestamp,
+            "pid":       os.getpid(),
+            "host":      socket.gethostname()
+        })
+
+        await cache.sys.sadd(f"workers:{app_name}", cls.worker_id)
+
+        workers = await cache.sys.smembers(f"workers:{app_name}")
+        pl = cache.sys.pipeline()
+        # clean worker that no response
+        alive_workers = [cls.worker_id]
+        for worker_id in workers:
+            status = await cache.sys.hgetall(f"workers:{app_name}:{worker_id}")
+            if len(status) == 0:
+                pl.srem(f"workers:{app_name}", worker_id)
+                pl.delete(f"workers:{app_name}:{worker_id}")
+                logger.warning("%s is removed due to status is not clear", worker_id)
+                continue
+
+            since_last_seen = arrow.now(cfg.tz).timestamp - int(status['last_seen'])
+            if since_last_seen > cls.check_worker_interval * 1.3:
+                # if the worker failed to update its status in an interval or more
+                logger.warning("%s is removed, due to last_seen is %s seconds earlier", worker_id, since_last_seen)
+                pl.srem(f"workers:{app_name}", worker_id)
+                pl.delete(f"workers:{app_name}:{worker_id}")
+                continue
+            alive_workers.append(worker_id)
+
+        await pl.execute()
+
+        # check if this is leader
+        workers = [int(x) for x in set(alive_workers)]
+        workers.sort()
+
+        if cls.worker_id == str(workers[0]):
+            if not cls.is_leader:
+                msg = f"worker({cls.worker_id})[{os.getpid()}] becomes leader, {len(workers)} workers alive"
+            else:
+                msg = f"this({cls.worker_id})[{os.getpid()}] is leader, {len(workers)} workers alive"
+            cls.is_leader = True
+        else:
+            cls.is_leader = False
+            msg = f"this ({cls.worker_id})[{os.getpid()}] is not a leader, {len(workers)} workers alive"
+
+        logger.debug(msg)
+
+    @classmethod
+    async def join(cls):
+        cls.worker_id = str(await cache.sys.incr(f"id:workers:{app_name}"))
+        logger.info("%s joined, worker_id is %s", os.getpid(), cls.worker_id)
+        cfg = cfg4py.get_instance()
+        cls.scheduler.add_job(cls.check_worker_status, 'interval', seconds=cls.check_worker_interval,
+                              next_run_time=arrow.now(cfg.tz).naive)
+
+    @classmethod
+    async def on_worker_leave(cls, worker_id):
+        """
+        if other workers leave, we need to select the new leader
+        """
+        logger.info("%s worker(%s) is leaving us", app_name, worker_id)
+        if worker_id != cls.worker_id:
+            await cls.check_worker_status()
+
+    @classmethod
+    async def leave(cls):
+        await cache.sys.srem(f"workers:{app_name}", cls.worker_id)
+        await emit.emit(Events.OMEGA_WORKER_LEAVE, cls.worker_id, exchange=app_name)
+
+    @classmethod
+    def on_exit(cls):
+        logger.info("on_exit called")
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(cls.leave())
+        loop.run_until_complete(emit.stop())
+        logger.info("application %s exited", app_name)
 
 
 def main():

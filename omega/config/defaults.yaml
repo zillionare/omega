@@ -18,6 +18,11 @@ logging:
       formatter: simple
       level: INFO
       maxBytes: 10485760
+  loggers:
+    apscheduler:
+      level: WARNING
+    pyemit:
+      level: DEBUG
   root:
     handlers:
       - file
