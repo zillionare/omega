@@ -70,7 +70,7 @@ class Application:
         cls.scheduler = AsyncIOScheduler(timezone=cfg.tz)
 
         # 初始化omicron
-        await omicron.init()
+        await omicron.init(cfg)
 
         # 启动 emits 事件监听
         emit.register(Events.OMEGA_WORKER_LEAVE, cls.on_worker_leave, app_name)

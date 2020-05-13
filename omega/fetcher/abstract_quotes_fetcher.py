@@ -69,3 +69,10 @@ class AbstractQuotesFetcher(QuotesFetcher):
         bars = await cls.get_instance().get_bars(sec, end, n_bars, frame_type)
         await security_cache.save_bars(sec, bars, frame_type)
         return bars
+
+    @classmethod
+    async def get_all_trade_days(cls):
+        days = await cls.get_instance().get_all_trade_days()
+        await security_cache.save_calendar('day_frames', map(tf.date2int, days))
+        return days
+

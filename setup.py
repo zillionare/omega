@@ -19,7 +19,8 @@ requirements = [
     'hiredis==1.0.1',
     'pyemit>=0.4.0',
     'numpy>=1.18.1',
-    'Click==7.0'
+    'Click==7.0',
+    'numba==0.49.1'
 ]
 
 setup_requirements = []

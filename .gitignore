@@ -107,3 +107,7 @@ ENV/
 .eggs
 .emtpy
 .idea/workspace.xml
+/omega/config/dev.yaml
+/omega/config/production.yaml
+/omega/config/test.yaml
+/omega/config/cfg4py_auto_gen.py
