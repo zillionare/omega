@@ -6,32 +6,29 @@
         """
 import asyncio
 import atexit
-import datetime
 import logging
 import os
 import platform
-import shutil
 import socket
 from concurrent.futures.thread import ThreadPoolExecutor
-from typing import TYPE_CHECKING
 
 import arrow
 import cfg4py
 import omicron
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from omicron.core import Events
-from omicron.core.lang import async_run
+from omicron.core.events import Events
 from omicron.dal import cache
 from pyemit import emit
 
 from omega import app_name
-from omicron.core.timeframe import tf
+from omega.config.cfg4py_auto_gen import Config
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher
-
-if TYPE_CHECKING:
-    from omega.config.cfg4py_auto_gen import Config
+from omega.jobs.synccalendar import sync_calendar
+from omega.jobs.syncquotes import sync_all_bars
 
 logger = logging.getLogger(__name__)
+
+cfg: Config = cfg4py.get_instance()
 
 
 class Application:
@@ -56,21 +53,17 @@ class Application:
 
     @classmethod
     async def create_quotes_fetcher(cls):
-        cfg: Config = cfg4py.get_instance()
         for fetcher in cfg.quotes_fetchers:
-            await AbstractQuotesFetcher.create_instance(fetcher, executors=cls.executors)
+            await AbstractQuotesFetcher.create_instance(fetcher,
+                                                        executors=cls.executors)
 
     @classmethod
     async def start(cls):
         atexit.register(cls.on_exit)
         logger.info("starting solo quotes server...")
         cfg4py.init(cls.get_config_path(), False)
-        cfg: Config = cfg4py.get_instance()
         cls.executors = ThreadPoolExecutor(max_workers=cfg.concurrency.threads)
         cls.scheduler = AsyncIOScheduler(timezone=cfg.tz)
-
-        # 初始化omicron
-        await omicron.init(cfg)
 
         # 启动 emits 事件监听
         emit.register(Events.OMEGA_WORKER_LEAVE, cls.on_worker_leave, app_name)
@@ -78,25 +71,35 @@ class Application:
 
         # 创建fetchers
         await cls.create_quotes_fetcher()
-
+        await omicron.init(cfg)
 
         # 每日清理一次过期股吧排名数据
         # scheduler.add_job(guba_crawler.purge_aged_records, 'cron', hour=2)
         # 每2小时取一次贴吧数据
-        # scheduler.add_job(guba_crawler.start_crawl, 'cron', hour='1-23/2', minute=0, misfire_grace_time=300)
+        # scheduler.add_job(guba_crawler.start_crawl, 'cron', hour='1-23/2',
+        # minute=0, misfire_grace_time=300)
         # scheduler.add_job(ths_realtime_news.start_crawl, 'interval', seconds=7)
         # scheduler.add_job(eastmoney_news.start_crawl, 'interval', seconds = 7)
         # scheduler.add_job(xsg.start_crawl)
 
         # 启动任务
+        await cls.create_sync_jobs()
         cls.scheduler.start()
+
         await cls.join()
         logger.info("%s server started.", app_name)
 
     @classmethod
+    async def create_sync_jobs(cls):
+        hour, minute = map(int, cfg.omega.sync.time.split(":"))
+        logger.info("quotes sync is scheduled at %s:%s", hour, minute)
+        cls.add_job(sync_all_bars, 'cron', [cls], hour=hour, minute=minute)
+
+        asyncio.create_task(sync_calendar())
+
+    @classmethod
     async def check_worker_status(cls):
         logger.debug("checking worker status %s", cls.worker_id)
-        cfg = cfg4py.get_instance()
         await cache.sys.hmset_dict(f"workers:{app_name}:{cls.worker_id}", {
             "last_seen": arrow.now(cfg.tz).timestamp,
             "pid":       os.getpid(),
@@ -120,7 +123,8 @@ class Application:
             since_last_seen = arrow.now(cfg.tz).timestamp - int(status['last_seen'])
             if since_last_seen > cls.check_worker_interval * 1.3:
                 # if the worker failed to update its status in an interval or more
-                logger.warning("%s is removed, due to last_seen is %s seconds earlier", worker_id, since_last_seen)
+                logger.warning("%s is removed, due to last_seen is %s seconds earlier",
+                               worker_id, since_last_seen)
                 pl.srem(f"workers:{app_name}", worker_id)
                 pl.delete(f"workers:{app_name}:{worker_id}")
                 continue
@@ -134,22 +138,26 @@ class Application:
 
         if cls.worker_id == str(workers[0]):
             if not cls.is_leader:
-                msg = f"worker({cls.worker_id})[{os.getpid()}] becomes leader, {len(workers)} workers alive"
+                msg = f"worker({cls.worker_id})[{os.getpid()}] becomes leader, " \
+                      f"{len(workers)} workers alive"
+                logger.info(msg)
             else:
-                msg = f"this({cls.worker_id})[{os.getpid()}] is leader, {len(workers)} workers alive"
+                msg = f"this({cls.worker_id})[{os.getpid()}] is leader, " \
+                      f"{len(workers)} workers alive"
             cls.is_leader = True
         else:
             cls.is_leader = False
-            msg = f"this ({cls.worker_id})[{os.getpid()}] is not a leader, {len(workers)} workers alive"
+            msg = f"this ({cls.worker_id})[{os.getpid()}] is not a leader, " \
+                  f"{len(workers)} workers alive"
+            logger.info(msg)
 
-        logger.debug(msg)
 
     @classmethod
     async def join(cls):
         cls.worker_id = str(await cache.sys.incr(f"id:workers:{app_name}"))
         logger.info("%s joined, worker_id is %s", os.getpid(), cls.worker_id)
-        cfg = cfg4py.get_instance()
-        cls.scheduler.add_job(cls.check_worker_status, 'interval', seconds=cls.check_worker_interval,
+        cls.scheduler.add_job(cls.check_worker_status, 'interval',
+                              seconds=cls.check_worker_interval,
                               next_run_time=arrow.now(cfg.tz).naive)
 
     @classmethod
@@ -182,7 +190,9 @@ def main():
             import uvloop
             asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
         except ModuleNotFoundError:
-            logger.warning('uvloop is required for better performance, continuing with degraded service.')
+            logger.warning(
+                'uvloop is required for better performance, continuing with degraded '
+                'service.')
 
     loop = asyncio.get_event_loop()
     loop.create_task(Application.start())

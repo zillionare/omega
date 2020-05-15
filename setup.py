@@ -20,7 +20,9 @@ requirements = [
     'pyemit>=0.4.0',
     'numpy>=1.18.1',
     'Click==7.0',
-    'numba==0.49.1'
+    'numba==0.49.1',
+    'aiohttp==3.6.2',
+    'pytz==2019.3'
 ]
 
 setup_requirements = []

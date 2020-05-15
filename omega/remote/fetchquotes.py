@@ -25,9 +25,11 @@ class FetchQuotes(Remote):
         self.n_bars = n_bars
         self.frame_type = frame_type
 
-
     async def server_impl(self):
-        logger.debug(">>>fetcher %s (%s, %s, %s)", self.sec, self.end, self.n_bars, self.frame_type)
-        result = await AbstractQuotesFetcher.get_bars(self.sec, self.end, self.n_bars, self.frame_type)
-        logger.debug("<<<fetcher %s (%s, %s, %s) returns: %s", self.sec, self.end, self.n_bars, self.frame_type, result)
+        logger.debug(">>>fetcher %s (%s, %s, %s)", self.sec, self.end, self.n_bars,
+                     self.frame_type)
+        result = await AbstractQuotesFetcher.get_bars(self.sec, self.end, self.n_bars,
+                                                      self.frame_type)
+        logger.debug("<<<fetcher %s (%s, %s, %s) returns: %s", self.sec, self.end,
+                     self.n_bars, self.frame_type, result)
         await super().respond(result)

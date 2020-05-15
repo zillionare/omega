@@ -6,13 +6,9 @@ Author: Aaron-Yang [code@jieyu.ai]
 Contributors:
 
 """
-import datetime
-import json
 import logging
+
 import aiohttp
-import arrow
-from omicron.core import FrameType
-import numpy as np
 from omicron.dal import security_cache
 
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher

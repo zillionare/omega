@@ -7,9 +7,9 @@ from unittest import mock
 import arrow
 import cfg4py
 import omicron
-from omicron import cache
-from omicron import security_cache
-from omicron.core import FrameType
+from omicron.dal import cache
+from omicron.dal import security_cache
+from omicron.core.types import FrameType
 from omicron.core.lang import async_run
 from omicron.core.timeframe import tf
 
@@ -20,6 +20,7 @@ from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
+
 
 class MyTestCase(unittest.TestCase):
     def get_config_path(self):
@@ -32,7 +33,6 @@ class MyTestCase(unittest.TestCase):
 
         logger.info("starting solo quotes server...")
         cfg4py.init(self.get_config_path(), False)
-        cfg = cfg4py.get_instance()
 
         await omicron.init(cfg)
         app.is_leader = True
@@ -159,6 +159,10 @@ class MyTestCase(unittest.TestCase):
         with mock.patch('omega.fetcher.abstract_quotes_fetcher.AbstractQuotesFetcher'
                         '.get_all_trade_days', side_effects=[fut]):
             await sc.sync_calendar()
+
+    @async_run
+    async def test_003_init_sync_scope(self):
+        await sq.init_sync_scope(['stock', 'index'], FrameType.DAY)
 
 
 if __name__ == '__main__':

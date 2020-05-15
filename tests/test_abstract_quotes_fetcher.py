@@ -1,16 +1,15 @@
+import logging
 import os
 import unittest
 from concurrent.futures.thread import ThreadPoolExecutor
 
 import arrow
 import cfg4py
-from omicron.core import Events, FrameType
+from omicron.core.events import Events
+from omicron.core.types import FrameType
+from omicron.core.lang import async_run
 from omicron.dal import cache
 from pyemit import emit
-
-import logging
-
-from omicron.core.lang import async_run
 
 from omega.config.cfg4py_auto_gen import Config
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher
@@ -41,7 +40,8 @@ class MyTestCase(unittest.TestCase):
         await cache.init()
 
         # 启动 emits 事件监听
-        await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn, exchange='omega', start_server=True)
+        await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn, exchange='omega',
+                         start_server=True)
         await self.start_quotes_fetchers()
 
     @async_run

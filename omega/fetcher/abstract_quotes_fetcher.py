@@ -5,12 +5,12 @@
         python script!"""
 import importlib
 import logging
-from typing import List
 
 import numpy as np
 from arrow import Arrow
-from omicron.core import FrameType, tf
 from omicron.core.lang import static_vars
+from omicron.core.timeframe import tf
+from omicron.core.types import FrameType
 from omicron.dal import cache
 from omicron.dal import security_cache
 
@@ -50,9 +50,8 @@ class AbstractQuotesFetcher(QuotesFetcher):
     @classmethod
     async def get_security_list(cls) -> np.ndarray:
         """
-                    display_name 	name 	start_date 	end_date 	type
+           code         display_name name 	start_date 	end_date 	type
         000001.XSHE 	平安银行 	PAYH 	1991-04-03 	2200-01-01 	stock
-        000002.XSHE 	万科A 	    WKA 	1991-01-29 	2200-01-01 	stock
         :return:
         """
         securities = await cls.get_instance().get_security_list()
@@ -60,12 +59,15 @@ class AbstractQuotesFetcher(QuotesFetcher):
         await cache.security.delete(key)
         pipeline = cache.security.pipeline()
         for code, display_name, name, start, end, _type in securities:
-            pipeline.rpush(key, f"{code},{display_name},{name},{start.date()},{end.date()},{_type}")
+            pipeline.rpush(key,
+                           f"{code},{display_name},{name},{start},"
+                           f"{end},{_type}")
         await pipeline.execute()
         return securities
 
     @classmethod
-    async def get_bars(cls, sec: str, end: Arrow, n_bars: int, frame_type: FrameType) -> np.ndarray:
+    async def get_bars(cls, sec: str, end: Arrow, n_bars: int,
+                       frame_type: FrameType) -> np.ndarray:
         bars = await cls.get_instance().get_bars(sec, end, n_bars, frame_type)
         await security_cache.save_bars(sec, bars, frame_type)
         return bars
@@ -75,4 +77,3 @@ class AbstractQuotesFetcher(QuotesFetcher):
         days = await cls.get_instance().get_all_trade_days()
         await security_cache.save_calendar('day_frames', map(tf.date2int, days))
         return days
-

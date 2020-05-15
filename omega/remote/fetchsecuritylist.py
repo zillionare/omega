@@ -7,14 +7,13 @@ Contributors:
 
 """
 import logging
-
-import cfg4py
-from pyemit.remote import Remote
-import numpy as np
-
 from typing import TYPE_CHECKING
+
+import numpy as np
+from pyemit.remote import Remote
+
 if TYPE_CHECKING:
-    from omega.config.cfg4py_auto_gen import Config
+    pass
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher
 
 logger = logging.getLogger(__name__)

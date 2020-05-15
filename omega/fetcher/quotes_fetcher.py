@@ -8,7 +8,7 @@ from abc import ABC
 
 import numpy
 from arrow import Arrow
-from omicron.core import FrameType
+from omicron.core.types import FrameType
 
 
 class QuotesFetcher(ABC):
@@ -17,9 +17,11 @@ class QuotesFetcher(ABC):
         fetch security list from server. The returned list is a numpy.ndarray,
         which each elements
         should look like:
-                            display_name 	name 	start_date 	end 	type
+        code           display_name name 	start_date 	end_date 	type
         000001.XSHE 	平安银行 	PAYH 	1991-04-03 	2200-01-01 	stock
         000002.XSHE 	万科A 	    WKA 	1991-01-29 	2200-01-01 	stock
+
+        all fields are string type
         Returns:
 
         """

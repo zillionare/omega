@@ -2,21 +2,20 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="9d315cbc-a8db-4353-8626-19fd45be9e4a" name="Default Changelist" comment="1. sync days passed&#10;2. sync calendar&#10;3. add get_all_trade_days func">
-      <change afterPath="$PROJECT_DIR$/.idea/codeStyles/codeStyleConfig.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/webResources.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/omega/jobs/synccalendar.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_jobs.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/omega.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/omega.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/omega/app.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/app.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/omega/config/cfg4py_auto_gen.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/config/cfg4py_auto_gen.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/omega/config/defaults.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/omega/config/defaults.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/omega/config/test.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/omega/config/test.yaml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/omega/fetcher/abstract_quotes_fetcher.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/fetcher/abstract_quotes_fetcher.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/omega/fetcher/quotes_fetcher.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/fetcher/quotes_fetcher.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/omega/jobs/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/jobs/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/omega/jobs/synccalendar.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/jobs/synccalendar.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/omega/jobs/syncquotes.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/jobs/syncquotes.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/omega/remote/fetchquotes.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/remote/fetchquotes.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/omega/remote/fetchsecuritylist.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/remote/fetchsecuritylist.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/setup.py" beforeDir="false" afterPath="$PROJECT_DIR$/setup.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_abstract_quotes_fetcher.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_abstract_quotes_fetcher.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_jobs.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_jobs.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -183,6 +182,7 @@
       <workItem from="1588854850522" duration="7834000" />
       <workItem from="1588917130871" duration="58469000" />
       <workItem from="1589341260312" duration="19000000" />
+      <workItem from="1589503525116" duration="168000" />
     </task>
     <task id="LOCAL-00001" summary="1. omicron refactors cache, now move all save_bars to cache&#10;2. timeout for jq remote set to 20, sometimes still not enough&#10;3. omega work lead select mesh">
       <created>1588863976311</created>
@@ -216,10 +216,10 @@
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="3455" y="399" key="ANALYSIS_DLG_com.intellij.analysis.BaseAnalysisAction$1/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1588165528739" />
-    <state x="2931" y="9" width="1527" height="1016" key="CommitChangelistDialog2" timestamp="1589380473178">
+    <state x="2931" y="9" width="1527" height="1016" key="CommitChangelistDialog2" timestamp="1589503620226">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
-    <state x="2931" y="9" width="1527" height="1016" key="CommitChangelistDialog2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1589380473178" />
+    <state x="2931" y="9" width="1527" height="1016" key="CommitChangelistDialog2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1589503620226" />
     <state x="3430" y="284" key="EnvironmentVariablesDialog" timestamp="1588172067422">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
@@ -274,11 +274,11 @@
     </state>
     <state x="502" y="173" key="PyMappingSimpleResolveDialog/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1588815821047" />
     <state x="3441" y="206" key="PyMappingSimpleResolveDialog/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1589368903165" />
-    <state x="3088" y="108" key="SettingsEditor" timestamp="1589363530632">
+    <state x="3088" y="108" key="SettingsEditor" timestamp="1589503655360">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="241" y="95" key="SettingsEditor/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1588746396970" />
-    <state x="3088" y="108" key="SettingsEditor/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1589363530632" />
+    <state x="3088" y="108" key="SettingsEditor/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1589503655360" />
     <state x="3288" y="256" key="Vcs.Push.Dialog.v2" timestamp="1588863978661">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
