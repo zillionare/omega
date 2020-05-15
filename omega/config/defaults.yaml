@@ -4,7 +4,7 @@ logging:
   formatters:
     simple:
       #format: '%(asctime)s %(levelname)-1.1s %(filename)s:%(funcName)s:%(lineno)s | %(message)s'
-      format: '%(asctime)s %(levelname)-1.1s %(name)s:%(funcName)s:%(lineno)s | %(message)s'
+      format: '%(asctime)s %(levelname)-1.1s %(process)d %(name)s:%(funcName)s:%(lineno)s | %(message)s'
   handlers:
     console:
       class: logging.StreamHandler
@@ -32,8 +32,6 @@ logging:
     level: INFO
   version: 1
 tz: Asia/Chongqing
-concurrency:
-  threads: 4
 redis:
   dsn: redis://localhost:6379
 quotes_fetchers:
@@ -44,6 +42,10 @@ quotes_fetchers:
       password:
       max_workers: 3
 omega:
+  concurrency:
+    threads: 4
+    processes: 2
+    heartbeat_interval: 10
   sync:
     max_bars: 50
     type:

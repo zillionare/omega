@@ -13,13 +13,14 @@ from typing import List
 import arrow
 import cfg4py
 from arrow import Arrow
+from omicron import Events
 from omicron.core.errors import FetcherQuotaError
 from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
 from omicron.dal import cache
 from omicron.dal import security_cache
 from omicron.models.securities import Securities
-from omicron.models.security import Security
+from pyemit import emit
 
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher
 
@@ -50,14 +51,11 @@ async def init_sync_scope(sec_types: List[str], frame_type: FrameType):
     await pl.execute()
 
 
-async def sync_all_bars(app):
+async def sync_all_bars():
     for frame_type in map(FrameType, cfg.omega.sync.frames):
-        if app.is_leader:
-            await init_sync_scope(cfg.omega.sync.type, frame_type)
-        else:
-            # wait leader to init sync tasks
-            await asyncio.sleep(2)
+        await init_sync_scope(cfg.omega.sync.type, frame_type)
         await sync_bars(frame_type, max_bars=cfg.omega.sync.max_bars)
+        await emit.emit(Events.OMEGA_DO_SYNC)
 
 
 async def sync_bars(frame_type: FrameType, sync_to: Arrow = None, max_bars: int = 1000):
@@ -76,32 +74,7 @@ async def sync_bars(frame_type: FrameType, sync_to: Arrow = None, max_bars: int 
     # noinspection PyPep8
     while code := await cache.sys.lpop(key_scope):
         try:
-            logger.debug("syncing %s for %s", frame_type, code)
-            head, tail = await security_cache.get_bars_range(code, frame_type)
-            if not all([head, tail]):
-                await security_cache.clear_bars_range(code, frame_type)
-                bars = await AbstractQuotesFetcher.get_bars(code, end, max_bars, frame_type)
-                logger.debug("sync %s to %s: expected: %s, actual %s", code, end,
-                             max_bars, len(bars))
-                continue
-
-            start = tf.shift(end, -max_bars + 1, frame_type)
-            if start < head:
-                n = tf.count_frames(start, head, frame_type) - 1
-                if n > 0:
-                    _end_at = tf.shift(head, -1, frame_type)
-                    bars = await AbstractQuotesFetcher.get_bars(code, _end_at, n,
-                                                                frame_type)
-                    logger.debug("sync %s to %s: expected: %s, actual %s", code, _end_at,
-                                 n, len(bars))
-            if end > tail:
-                n = tf.count_frames(tail, end, frame_type) - 1
-                if n > 0:
-                    bars = await AbstractQuotesFetcher.get_bars(code, end, n, frame_type)
-                    logger.debug("sync %s to %s: expected: %s, actual %s", code, end,
-                                 n, len(bars))
-                    # todo: remove me
-                    assert bars['frame'][0] == tf.shift(tail, 1, frame_type)
+            await sync_for_sec(code, end, max_bars)
         except FetcherQuotaError as e:
             logger.warning("When syncing %s, quota is reached", code)
             logger.exception(e)
@@ -119,6 +92,41 @@ async def sync_bars(frame_type: FrameType, sync_to: Arrow = None, max_bars: int 
     await pl.execute()
     logger.info("syncing %s finished in %s seconds", frame_type, elapsed)
 
+
+async def sync_for_sec(code: str, end: Arrow, max_bars: int):
+    for frame_type in cfg.omega.sync.frames:
+        logger.debug("syncing %s for %s", frame_type, code)
+        head, tail = await security_cache.get_bars_range(code, frame_type)
+        if not all([head, tail]):
+            await security_cache.clear_bars_range(code, frame_type)
+            bars = await AbstractQuotesFetcher.get_bars(code, end, max_bars,
+                                                        frame_type)
+            logger.debug("sync %s to %s: expected: %s, actual %s", code, end,
+                         max_bars, len(bars))
+            continue
+
+        start = tf.shift(end, -max_bars + 1, frame_type)
+        if start < head:
+            n = tf.count_frames(start, head, frame_type) - 1
+            if n > 0:
+                _end_at = tf.shift(head, -1, frame_type)
+                bars = await AbstractQuotesFetcher.get_bars(code, _end_at, n,
+                                                            frame_type)
+                logger.debug("sync %s to %s: expected: %s, actual %s", code,
+                             _end_at,
+                             n, len(bars))
+        if end > tail:
+            n = tf.count_frames(tail, end, frame_type) - 1
+            if n > 0:
+                bars = await AbstractQuotesFetcher.get_bars(code, end, n,
+                                                            frame_type)
+                logger.debug("sync %s to %s: expected: %s, actual %s", code, end,
+                             n, len(bars))
+                # todo: remove me
+                assert bars['frame'][0] == tf.shift(tail, 1, frame_type)
+
+
+
 async def validate():
     """
     SYS validation {
@@ -132,4 +140,3 @@ async def validate():
 
     """
     pass
-

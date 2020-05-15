@@ -32,9 +32,20 @@ class Config(object):
         raise TypeError('Do NOT instantiate this class')
     tz: Optional[str] = None
 
-    class concurrency:
-        threads: Optional[int] = None
-
     class redis:
         dsn: Optional[str] = None
     quotes_fetchers: Optional[list] = None
+
+    class omega:
+
+        class concurrency:
+            threads: Optional[int] = None
+            processes: Optional[int] = None
+            heartbeat_interval: Optional[int] = None
+
+        class sync:
+            max_bars: Optional[int] = None
+            type: Optional[list] = None
+            time: Optional[str] = None
+            frames: Optional[list] = None
+        validation = None

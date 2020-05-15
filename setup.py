@@ -22,7 +22,8 @@ requirements = [
     'Click==7.0',
     'numba==0.49.1',
     'aiohttp==3.6.2',
-    'pytz==2019.3'
+    'pytz==2019.3',
+    'aiomultiprocess==0.7.0'
 ]
 
 setup_requirements = []
@@ -41,12 +42,7 @@ setup(
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
     ],
-    description="Quotation fetcher adaptor framework for zillionare",
-    entry_points={
-        'console_scripts': [
-            'omega=omega.cli:main',
-        ],
-    },
+    description="Data fetcher framework for zillionare",
     install_requires=requirements,
     license="MIT license",
     long_description=readme + '\n\n' + history,

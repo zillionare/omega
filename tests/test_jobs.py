@@ -15,7 +15,7 @@ from omicron.core.timeframe import tf
 
 import omega.jobs.synccalendar as sc
 import omega.jobs.syncquotes as sq
-from omega.app import Application as app
+from omega.main import Application as app
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher
 
 logger = logging.getLogger(__name__)
