@@ -5,17 +5,24 @@ logging:
     simple:
       #format: '%(asctime)s %(levelname)-1.1s %(filename)s:%(funcName)s:%(lineno)s | %(message)s'
       format: '%(asctime)s %(levelname)-1.1s %(process)d %(name)s:%(funcName)s:%(lineno)s | %(message)s'
+    report:
+      format: '%(message)s'
   handlers:
     console:
       class: logging.StreamHandler
       formatter: simple
       level: DEBUG
-    file:
+    syslog:
+      class: logging.handlers.SysLogHandler
+      address: /dev/log
+      facility: local6
+      formatter: simple
+    validation_report:
       backupCount: 7
       class: logging.handlers.RotatingFileHandler
       encoding: utf-8
-      filename: /tmp/cfg4py.log
-      formatter: simple
+      filename: /var/log/zillionare/validation.log
+      formatter: report
       level: INFO
       maxBytes: 10485760
   loggers:
@@ -23,38 +30,24 @@ logging:
       level: WARNING
     pyemit:
       level: WARNING
-    omega.jobs.syncquotes:
-      level: DEBUG
+    validation_report:
+      handlers:
+        - validation_report
   root:
     handlers:
-      - file
+      - syslog
       - console
     level: INFO
   version: 1
 tz: Asia/Chongqing
 redis:
   dsn: redis://localhost:6379
-quotes_fetchers:
-  - name: 'jqdatasdk'
-    module: 'jqadaptor'     # there must be a create_instance method in this module
-    parameters:
-      account: ''
-      password:
-      max_workers: 3
 omega:
+  home: ~/zillionare/omgea
+  urls:
+    calendar: http://stock.jieyu.ai/calendar.json
+    checksum: http://stock.jieyu.ai/chksum
   concurrency:
     threads: 4
     processes: 2
     heartbeat_interval: 10
-  sync:
-    max_bars: 50
-    type:
-      - stock
-      - index
-    time: 21:37
-    frames:
-     - 1d
-     - 1w
-     - 60m
-     - 30m
-  validation:

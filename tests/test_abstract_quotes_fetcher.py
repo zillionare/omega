@@ -36,7 +36,7 @@ class MyTestCase(unittest.TestCase):
         cfg: Config = cfg4py.get_instance()
         if len(cfg.quotes_fetchers) == 0:
             raise ValueError("please config quotes fetcher before test.")
-        self.executors = ThreadPoolExecutor(max_workers=cfg.concurrency.threads)
+        self.executors = ThreadPoolExecutor(max_workers=cfg.omega.concurrency.threads)
         await cache.init()
 
         # 启动 emits 事件监听
