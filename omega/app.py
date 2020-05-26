@@ -8,6 +8,7 @@ Contributors:
 """
 import asyncio
 import functools
+import importlib
 import logging
 import os
 import signal
@@ -18,7 +19,7 @@ from concurrent.futures.thread import ThreadPoolExecutor
 from multiprocessing import Process, Queue
 from pathlib import Path
 from threading import Thread
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Optional
 
 import arrow
 import cfg4py
@@ -42,7 +43,7 @@ cfg: Config = cfg4py.get_instance()
 @singleton
 class Application:
     def __init__(self):
-        self.scheduler = None
+        self.scheduler: Optional[AsyncIOScheduler] = None
         self.thread_executors = None
         self.procs = []
         self.queue = None
@@ -57,7 +58,7 @@ class Application:
             src_dir = os.path.dirname(__file__)
             return os.path.join(src_dir, 'config')
         else:
-            path = Path('~/zillionare/omega/config')
+            path = Path('~/zillionare/omega/config').expanduser()
             if path.exists():
                 return path
             else:
@@ -112,45 +113,48 @@ class Application:
         logger.info("zillionare-omega %s process(%s) started.", role, os.getpid())
 
     async def check_worker_status(self):
-        logger.debug("checking worker status %s", self.worker_id)
-        await cache.sys.hmset_dict(f"workers:{app_name}:{self.worker_id}", {
-            "last_seen": arrow.now(cfg.tz).timestamp,
-            "pid":       os.getpid(),
-            "host":      socket.gethostname()
-        })
+        try:
+            logger.debug("checking worker status %s", self.worker_id)
+            await cache.sys.hmset_dict(f"workers:{app_name}:{self.worker_id}", {
+                "last_seen": arrow.now(cfg.tz).timestamp,
+                "pid":       os.getpid(),
+                "host":      socket.gethostname()
+            })
 
-        await cache.sys.sadd(f"workers:{app_name}", self.worker_id)
+            await cache.sys.sadd(f"workers:{app_name}", self.worker_id)
 
-        workers = await cache.sys.smembers(f"workers:{app_name}")
-        pl = cache.sys.pipeline()
-        # clean worker that no response
-        alive_workers = [self.worker_id]
-        for worker_id in workers:
-            status = await cache.sys.hgetall(f"workers:{app_name}:{worker_id}")
-            if len(status) == 0:
-                pl.srem(f"workers:{app_name}", worker_id)
-                pl.delete(f"workers:{app_name}:{worker_id}")
-                logger.warning("%s is removed due to status is not clear", worker_id)
-                continue
+            workers = await cache.sys.smembers(f"workers:{app_name}")
+            pl = cache.sys.pipeline()
+            # clean worker that no response
+            alive_workers = [self.worker_id]
+            for worker_id in workers:
+                status = await cache.sys.hgetall(f"workers:{app_name}:{worker_id}")
+                if len(status) == 0:
+                    pl.srem(f"workers:{app_name}", worker_id)
+                    pl.delete(f"workers:{app_name}:{worker_id}")
+                    logger.warning("%s is removed due to status is not clear", worker_id)
+                    continue
 
-            since_last_seen = arrow.now(cfg.tz).timestamp - int(status['last_seen'])
-            if since_last_seen > cfg.omega.concurrency.heartbeat_interval * 1.3:
-                # if the worker failed to update its status in an interval or more
-                try:
-                    pid = int(status['pid'])
-                    os.kill(pid, signal.SIGTERM)
-                except Exception:
-                    pass
+                since_last_seen = arrow.now(cfg.tz).timestamp - int(status['last_seen'])
+                if since_last_seen > cfg.omega.concurrency.heartbeat_interval * 1.3:
+                    # if the worker failed to update its status in an interval or more
+                    try:
+                        pid = int(status['pid'])
+                        os.kill(pid, signal.SIGTERM)
+                    except Exception:
+                        pass
 
-                logger.warning("worker %s is removed, last seen is %s second ago",
-                               worker_id, since_last_seen)
-                pl.srem(f"workers:{app_name}", worker_id)
-                pl.delete(f"workers:{app_name}:{worker_id}")
-                continue
-            alive_workers.append(worker_id)
+                    logger.warning("worker %s is removed, last seen is %s second ago",
+                                   worker_id, since_last_seen)
+                    pl.srem(f"workers:{app_name}", worker_id)
+                    pl.delete(f"workers:{app_name}:{worker_id}")
+                    continue
+                alive_workers.append(worker_id)
 
-        await pl.execute()
-        return len(alive_workers)
+            await pl.execute()
+            return len(alive_workers)
+        except Exception as e:
+            logger.exception(e)
 
     async def join(self):
         self.worker_id = str(await cache.sys.incr(f"id:workers:{app_name}"))
@@ -198,7 +202,8 @@ class Application:
             await self.leave()
             await emit.stop()
             asyncio.get_event_loop().stop()
-            logger.info("zillionare-omega %s process stopped.", role)
+            logger.info("zillionare-omega %s process %s stopped.", role, os.getpid())
+            sys.exit(-1)
         except Exception as e:
             logger.exception(e)
 
@@ -222,12 +227,39 @@ class Application:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         logger.info("%s: loop is %s", os.getpid(), loop)
+        loop.set_exception_handler(self.global_exception_handler)
         loop.create_task(self.sub_main())
+
         loop.run_forever()
 
+    def global_exception_handler(self, loop, context):
+        msg = context.get("exception", context["message"])
+        logger.error(f"Unhandled exception:%s", msg)
+        if context.get('exception'):
+            logger.exception(context.get('exception'))
+
+        logger.info("shutting down worker %s(%s)...", self.worker_id, os.getpid())
+
+        loop.create_task(self.stop())
+
+    def load_additional_jobs(self):
+        """从配置文件创建自定义的插件任务。
+        :param
+        """
+        for job in cfg.omega.jobs:
+            try:
+                module = importlib.import_module(job['module'])
+                entry = getattr(module, job['entry'])
+                self.add_job(entry, trigger=job['trigger'], args=job['params'], **job['trigger_params'])
+            except Exception as e:
+                logger.exception(e)
+                logger.info("failed to create job: %s", job)
+
     async def start(self):
-        self.register_exit_handler((signal.SIGINT, signal.SIGTERM, signal.SIGHUP),
-                                   self.stop)
+        loop = asyncio.get_running_loop()
+        loop.set_exception_handler(self.global_exception_handler)
+
+        self.register_exit_handler((signal.SIGINT, signal.SIGTERM, signal.SIGHUP), self.stop)
 
         cfg4py.init(self.get_config_path(), False)
 
@@ -239,13 +271,14 @@ class Application:
 
         emit.register(Events.OMEGA_WORKER_JOIN, self.on_worker_join, app_name)
         emit.register(Events.OMEGA_WORKER_LEAVE, self.on_worker_leave, app_name)
-        self.add_job(sq.do_checksum, 'cron', hour=0, minute=5)
         self.add_job(functools.partial(sq.start_job, 'validation'), 'cron', hour=2)
 
         hour, minute = map(int, cfg.omega.sync.time.split(":"))
         self.add_job(functools.partial(sq.start_job, 'sync'), 'cron', hour=hour,
                      minute=minute)
 
+        # load additional jobs
+        self.load_additional_jobs()
         # check if we need sync quotes right now
         last_sync = await cache.sys.get("jobs.bars_sync.stop")
         if last_sync: last_sync = arrow.get(last_sync, tzinfo=cfg.tz).timestamp

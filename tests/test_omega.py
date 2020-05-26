@@ -1,7 +1,7 @@
 import unittest
 from unittest import mock
 
-from omega.main import update_config, config_sync, config_syslog
+from omega.main import update_config, config_sync
 
 
 class MyTestCase(unittest.TestCase):
@@ -63,7 +63,6 @@ class MyTestCase(unittest.TestCase):
             frames, sync_time = config_sync()
             self.assertDictEqual(expected_frames, frames)
             self.assertEqual('15:00', sync_time)
-
 
 if __name__ == '__main__':
     unittest.main()

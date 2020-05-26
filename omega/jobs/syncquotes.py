@@ -15,7 +15,6 @@ from typing import Optional, Union, List
 import aiohttp
 import arrow
 import cfg4py
-import sh
 import xxhash
 from arrow import Arrow
 from omicron.core.errors import FetcherQuotaError
@@ -152,7 +151,7 @@ async def sync_for_sec(code: str, end: Arrow):
                 counters[frame_type.value] += len(bars)
                 logger.debug("sync %s level bars of %s to %s: expected: %s, actual %s",
                              frame_type, code, _end_at, n, len(bars))
-                if bars['frame'][-1] != _end_at:
+                if len(bars) and bars['frame'][-1] != _end_at:
                     logger.warning("incontinuous frames found: bars[-1](%s), "
                                    "head(%s)", bars['frame'][-1], head)
 
@@ -198,7 +197,7 @@ def get_start_frame(frame_type: FrameType) -> Union[datetime.date, datetime.date
 
 
 async def get_checksum(day: int) -> Optional[List]:
-    save_to = (Path(cfg.omega.home)/"data/chksum").expanduser()
+    save_to = (Path(cfg.omega.home) / "data/chksum").expanduser()
     chksum_file = os.path.join(save_to, f"chksum-{day}.csv")
     try:
         with open(chksum_file, 'r') as f:
@@ -264,41 +263,10 @@ async def do_validation():
     logger.info('%s stop validation in %s seconds', os.getpid(), elapsed)
 
 
-async def do_checksum():
-    """
-    按天生成校验和。起始日期由cache.sys.checksum.cursor指定。
-
-    文件名 checksum-date.csv,内容为：
-        code,frame_type,checksum
-
-    """
-    logger.info("starting calc checksum...")
-    now = tf.date2int(arrow.now().date())
-    cursor = int(await cache.sys.get('checksum.cursor') or tf.day_frames[0])
-
-    days = tf.day_frames[(tf.day_frames > cursor) & (tf.day_frames <= now)]
-
-    save_to = os.path.expanduser(cfg.omega.chksum.folder)
-    secs = Securities()
-    codes = secs.choose(['stock', 'index'])
-    for day in days:
-        logger.info("calc checksum for day %s", day)
-        rst = await calc_checksums(day, codes)
-        logger.info("done with calc checksum for day %s", day)
-        save_to_file = os.path.join(save_to, f"chksum-{day}.csv")
-        with open(save_to_file, "w") as f:
-            f.writelines(map(lambda line: line + "\n", rst))
-
-    logger.info("end checksum calc, start uploading...")
-    repo = sh.git.bake(_cwd=save_to)
-    repo.add(".")
-    repo.commit("-m", str(now))
-    repo.push()
-
-
 async def calc_checksums(day: int, codes: List):
+    global _time_zone
     end_dt = tf.int2date(day)
-    end_tm = arrow.get(end_dt, tzinfo=cfg.tz).replace(hour=15)
+    end_tm = arrow.get(end_dt, tzinfo=_time_zone).replace(hour=15)
 
     result = []
     for i, code in enumerate(codes):

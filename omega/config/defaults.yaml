@@ -27,7 +27,7 @@ logging:
       maxBytes: 10485760
   loggers:
     apscheduler:
-      level: WARNING
+      level: INFO
     pyemit:
       level: WARNING
     validation_report:
