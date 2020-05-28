@@ -23,19 +23,18 @@ class AbstractQuotesFetcher(QuotesFetcher):
     _instances = []
 
     @classmethod
-    async def create_instance(cls, fetcher: dict, **kwargs):
+    async def create_instance(cls, module_name, **kwargs):
         # todo: check if implementor has implemented all the required methods
         # todo: check duplicates
 
-        module = importlib.import_module(fetcher['module'])
+        module = importlib.import_module(module_name)
         factory_method = getattr(module, 'create_instance')
         if not callable(factory_method):
-            raise TypeError(f"Bad omega adaptor implementation {fetcher}")
+            raise TypeError(f"Bad omega adaptor implementation {module_name}")
 
-        kwargs.update(fetcher['parameters'])
         impl: QuotesFetcher = await factory_method(**kwargs)
         cls._instances.append(impl)
-        logger.info('add one quotes fetcher implementor: %s', fetcher['name'])
+        logger.info('add one quotes fetcher implementor: %s', module_name)
 
     @classmethod
     @static_vars(i=0)

@@ -7,23 +7,22 @@ Contributors:
 
 """
 import asyncio
-import functools
 import importlib
 import logging
 import os
+import platform
 import signal
 import socket
 import sys
 import time
 from concurrent.futures.thread import ThreadPoolExecutor
-from multiprocessing import Process, Queue
 from pathlib import Path
-from threading import Thread
 from typing import Callable, Iterable, Optional
 
 import arrow
 import cfg4py
 import omicron
+from aiomultiprocess import Process
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from omicron.core.events import Events
 from omicron.core.lang import singleton
@@ -65,56 +64,25 @@ class Application:
                 print("Please init omega by running command `omega setup`")
                 sys.exit(-1)
 
-    async def create_quotes_fetcher(self):
-        for fetcher in cfg.quotes_fetchers:
-            await aq.create_instance(fetcher, executors=self.thread_executors)
+    async def update_worker_status(self):
+        """for long-lived worker process, it should update self-status periodically
+        so that main process can manage it.
+        :param"""
+        logger.info("update: %s %s", self.worker_id, os.getpid())
+        await cache.sys.hmset_dict(f"workers:{app_name}:{self.worker_id}", {
+            "last_seen": arrow.now(cfg.tz).timestamp,
+            "pid":       os.getpid(),
+            "host":      socket.gethostname()
+        })
 
-    async def sub_main(self):
-        """
-        entry of sub process
-        Returns:
-
-        """
-        role = "worker" if self.is_worker else "main"
-        logger.info("starting zillionare-omega %s process: (%s) ...", role, os.getpid())
-        if self.is_worker:
-            self.register_exit_handler((signal.SIGINT, signal.SIGTERM), self.stop)
-
-        cfg4py.init(self.get_config_path(), False)
-        self.thread_executors = ThreadPoolExecutor(
-            max_workers=cfg.omega.concurrency.threads)
-        self.scheduler = AsyncIOScheduler(timezone=cfg.tz)
-
-        # 启动 emits 事件监听
-        emit.register(Events.OMEGA_DO_SYNC, sq.do_sync, app_name)
-        emit.register(Events.OMEGA_DO_VALIDATION, sq.do_validation, app_name)
-        await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn, start_server=True)
-
-        # 创建fetchers
-        await self.create_quotes_fetcher()
-        try:
-            await omicron.init(cfg)
-        except Exception as e:
-            logger.exception(e)
-
-        # 每日清理一次过期股吧排名数据
-        # scheduler.add_job(guba_crawler.purge_aged_records, 'cron', hour=2)
-        # 每2小时取一次贴吧数据
-        # scheduler.add_job(guba_crawler.start_crawl, 'cron', hour='1-23/2',
-        # minute=0, misfire_grace_time=300)
-        # scheduler.add_job(ths_realtime_news.start_crawl, 'interval', seconds=7)
-        # scheduler.add_job(eastmoney_news.start_crawl, 'interval', seconds = 7)
-        # scheduler.add_job(xsg.start_crawl)
-
-        # 启动任务
-        self.scheduler.start()
-
-        await self.join()
-        logger.info("zillionare-omega %s process(%s) started.", role, os.getpid())
+        await cache.sys.sadd(f"workers:{app_name}", self.worker_id)
 
     async def check_worker_status(self):
+        """
+        main process to check if subprocess are online
+        :param"""
         try:
-            logger.debug("checking worker status %s", self.worker_id)
+            logger.info("checking worker status %s", self.worker_id)
             await cache.sys.hmset_dict(f"workers:{app_name}:{self.worker_id}", {
                 "last_seen": arrow.now(cfg.tz).timestamp,
                 "pid":       os.getpid(),
@@ -132,16 +100,17 @@ class Application:
                 if len(status) == 0:
                     pl.srem(f"workers:{app_name}", worker_id)
                     pl.delete(f"workers:{app_name}:{worker_id}")
-                    logger.warning("%s is removed due to status is not clear", worker_id)
+                    logger.warning("%s is removed due to status is not clear",
+                                   worker_id)
                     continue
 
                 since_last_seen = arrow.now(cfg.tz).timestamp - int(status['last_seen'])
-                if since_last_seen > cfg.omega.concurrency.heartbeat_interval * 1.3:
+                if since_last_seen > cfg.omega.heartbeat * 1.3:
                     # if the worker failed to update its status in an interval or more
                     try:
                         pid = int(status['pid'])
                         os.kill(pid, signal.SIGTERM)
-                    except Exception:
+                    except (ValueError, KeyError, ProcessLookupError):
                         pass
 
                     logger.warning("worker %s is removed, last seen is %s second ago",
@@ -159,14 +128,17 @@ class Application:
     async def join(self):
         self.worker_id = str(await cache.sys.incr(f"id:workers:{app_name}"))
         logger.info("worker %s joined, process id is %s", self.worker_id, os.getpid())
-        self.scheduler.add_job(self.check_worker_status, 'interval',
-                               seconds=cfg.omega.concurrency.heartbeat_interval,
-                               next_run_time=arrow.now(cfg.tz).naive)
-        await emit.emit(Events.OMEGA_WORKER_JOIN, exchange=app_name)
+        try:
+            self.scheduler.add_job(self.check_worker_status, 'interval',
+                                   seconds=cfg.omega.heartbeat,
+                                   next_run_time=arrow.now(cfg.tz).naive)
+            await emit.emit(Events.OMEGA_WORKER_JOIN, exchange=app_name)
+        except Exception as e:
+            logger.exception(e)
 
-    async def on_worker_join(self):
+    async def on_worker_join(self, msg=None):
         alive = await self.check_worker_status()
-        logger.info("%s of %s workers online", alive, cfg.omega.concurrency.processes)
+        logger.info("%s workers online", alive)
 
     async def on_worker_leave(self, worker_id):
         """
@@ -175,8 +147,7 @@ class Application:
         logger.info("omega worker(%s) is leaving us", worker_id)
         if worker_id != self.worker_id:
             alive = await self.check_worker_status()
-            logger.info("%s of %s workers online", alive,
-                        cfg.omega.concurrency.processes)
+            logger.info("%s workers online", alive)
 
     async def leave(self):
         await cache.sys.srem(f"workers:{app_name}", self.worker_id)
@@ -201,36 +172,17 @@ class Application:
 
             await self.leave()
             await emit.stop()
-            asyncio.get_event_loop().stop()
+            # todo: remove me
+            # asyncio.get_event_loop().stop()
             logger.info("zillionare-omega %s process %s stopped.", role, os.getpid())
             sys.exit(-1)
         except Exception as e:
             logger.exception(e)
 
-    def create_workers(self, n_workers: int):
-        self.queue = Queue()
-        for i in range(n_workers):
-            proc = Process(target=self._sub_entry)
-            self.procs.append(proc)
-            proc.start()
-
-        for proc in self.procs:
-            proc.join()
-
     def register_exit_handler(self, signals: Iterable, handler: Callable):
         loop = asyncio.get_event_loop()
         for s in signals:
             loop.add_signal_handler(s, lambda s=s: asyncio.create_task(handler()))
-
-    def _sub_entry(self):
-        self.is_worker = True
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        logger.info("%s: loop is %s", os.getpid(), loop)
-        loop.set_exception_handler(self.global_exception_handler)
-        loop.create_task(self.sub_main())
-
-        loop.run_forever()
 
     def global_exception_handler(self, loop, context):
         msg = context.get("exception", context["message"])
@@ -250,32 +202,65 @@ class Application:
             try:
                 module = importlib.import_module(job['module'])
                 entry = getattr(module, job['entry'])
-                self.add_job(entry, trigger=job['trigger'], args=job['params'], **job['trigger_params'])
+                self.add_job(entry, trigger=job['trigger'], args=job['params'],
+                             **job['trigger_params'])
             except Exception as e:
                 logger.exception(e)
                 logger.info("failed to create job: %s", job)
 
-    async def start(self):
-        loop = asyncio.get_running_loop()
-        loop.set_exception_handler(self.global_exception_handler)
+    def set_uv_loop(self):
+        if platform.system() in "Linux":
+            try:
+                # noinspection PyPackageRequirements
+                import uvloop
 
-        self.register_exit_handler((signal.SIGINT, signal.SIGTERM, signal.SIGHUP), self.stop)
+                asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+            except ModuleNotFoundError:
+                logger.warning(
+                        'uvloop is required to achieve better performance, continuing '
+                        'with degraded service.')
 
-        cfg4py.init(self.get_config_path(), False)
+    async def init_fetcher_process(self, module, **kwargs):
+        """
+        quotes fetcher进程入口
+        """
+        logger.info(">>> init fetcher process %s", os.getpid())
+        self.scheduler = AsyncIOScheduler(timezone=cfg.tz)
 
-        # create sub process
-        t = Thread(target=self.create_workers, args=(cfg.omega.concurrency.processes
-                                                     - 1,))
-        t.start()
-        await self.sub_main()
+        self.thread_executors = ThreadPoolExecutor(kwargs.get("sessions"))
+        await omicron.init(cfg)
 
+        # 实例化 fetcherImpl
+        await aq.create_instance(module, executors=self.thread_executors, **kwargs)
+        await self.join()
+
+        # 等待主进程初始化任务后再同步
+        emit.register(Events.OMEGA_DO_SYNC, sq.do_sync, app_name)
+        await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn, start_server=True)
+        self.scheduler.add_job(self.update_worker_status, 'interval',
+                               seconds=cfg.omega.heartbeat)
+        self.scheduler.start()
+        logger.info("<<< leave fetcher_entry %s", os.getpid())
+
+    async def init(self):
+        """
+        管理子进程，任务调度
+        :param"""
+        logger.info(">>> main process %s initializing", os.getpid())
+        self.thread_executors = ThreadPoolExecutor()
+        self.scheduler = AsyncIOScheduler(timezone=cfg.tz)
+
+        # subprocess管理
         emit.register(Events.OMEGA_WORKER_JOIN, self.on_worker_join, app_name)
         emit.register(Events.OMEGA_WORKER_LEAVE, self.on_worker_leave, app_name)
-        self.add_job(functools.partial(sq.start_job, 'validation'), 'cron', hour=2)
+        await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn, start_server=True)
 
-        hour, minute = map(int, cfg.omega.sync.time.split(":"))
-        self.add_job(functools.partial(sq.start_job, 'sync'), 'cron', hour=hour,
-                     minute=minute)
+        await omicron.init(cfg)
+
+        self.scheduler.add_job(sq.start_job, 'cron', args=('validation',), hour=2)
+        h, m = map(int, cfg.omega.sync.time.split(":"))
+        self.scheduler.add_job(sq.start_job, 'cron', args=('sync',), hour=h, minute=m)
+        self.scheduler.start()
 
         # load additional jobs
         self.load_additional_jobs()
@@ -285,3 +270,26 @@ class Application:
         if not last_sync or time.time() - last_sync >= 24 * 3600:
             logger.info("start catch-up quotes sync")
             asyncio.create_task(sq.start_job('sync'))
+
+        logger.info("<<< main process init")
+
+    async def start_worker(self):
+        # create quotes fetcher dedicated process
+        for fetcher_info in cfg.quotes_fetchers:
+            module = fetcher_info['module']
+            for params in fetcher_info.get('workers'):
+                proc = Process(target=self.init_fetcher_process,
+                               args=(module,),
+                               kwargs=params)
+                self.procs.append(proc)
+                await proc
+
+    async def start(self):
+        cfg4py.init(self.get_config_path(), False)
+        self.register_exit_handler((signal.SIGINT, signal.SIGTERM, signal.SIGHUP),
+                                   self.stop)
+
+        await self.start_worker()
+        await self.init()
+
+        logger.info("Zillionare-omega started")

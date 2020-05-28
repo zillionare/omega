@@ -74,6 +74,7 @@ async def stop_job_timer(job_name: str) -> int:
 
 
 async def start_job(job: str):
+    # todo: for validation, use ProcessPoolExecutor来实现
     key_scope = f"jobs.bars_{job}.scope"
 
     secs = Securities()

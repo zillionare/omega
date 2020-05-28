@@ -8,7 +8,6 @@ import asyncio
 import logging
 import os
 import pathlib
-import platform
 import re
 import signal
 import sys
@@ -22,6 +21,7 @@ import psutil
 import sh
 from ruamel.yaml import YAML
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 git_url = 'https://github.com/zillionare/omega'
 
@@ -203,7 +203,8 @@ def config_jq_fetcher():
     try:
         import jqadaptor as jq
     except ModuleNotFoundError:
-        check_call([sys.executable, '-m', 'pip', 'install', 'zillionare-omega-adaptors-jq'])
+        check_call([sys.executable, '-m', 'pip', 'install',
+                    'zillionare-omega-adaptors-jq'])
 
 
 def get_input(prompt: str, validation_func: Union[List, callable], default: Any,
@@ -280,9 +281,9 @@ def config_redis():
     password = get_input("请输入Redis服务器密码，", None, None)
 
     if password:
-        cmd = f"redis-cli -h {host} -p {port} -a {password} ping".split(" ")
+        cmd = f"redis-main -h {host} -p {port} -a {password} ping".split(" ")
     else:
-        cmd = f"redis-cli -h {host} -p {port} ping".split(" ")
+        cmd = f"redis-main -h {host} -p {port} ping".split(" ")
 
     try:
         print(f"正在测试Redis连接: {' '.join(cmd)}")
@@ -296,7 +297,7 @@ def config_redis():
     except EarlyJumpError:
         return
     except FileNotFoundError:
-        print("未在本机找到命令redis-cli，无法运行检测。安装程序将继续。")
+        print("未在本机找到命令redis-main，无法运行检测。安装程序将继续。")
     except CalledProcessError as e:
         print(f"错误信息:{e}")
         msg = "无法连接指定服务器。忽略错误继续安装[C](default)，重新输入(R),退出安装(Q):"
@@ -341,6 +342,8 @@ def setup(reset_factory=False):
 
 
 def start():
+    logger.info("starting zillionare-omega main process(%s)...", os.getpid())
+
     if os.environ.get('dev_mode'):
         pid_file = Path('~/.zillionare/omega.pid').expanduser()
     else:
@@ -360,27 +363,19 @@ def start():
     except Exception as e:
         pass
 
-    from omega import app_name
+    try:
+        from omega.app import Application
+        app = Application()
+        app.set_uv_loop()
+        loop = asyncio.get_event_loop()
+        loop.set_debug(True)
 
-    logger.info("starting zillionare %s main process...", app_name)
-    from omega.app import Application
-
-    if platform.system() in "Linux":
-        try:
-            # noinspection PyPackageRequirements
-            import uvloop
-
-            asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-        except ModuleNotFoundError:
-            logger.warning(
-                'uvloop is required for better performance, continuing with '
-                'degraded service.')
-
-    app = Application()
-    loop = asyncio.get_event_loop()
-    loop.create_task(app.start())
-    loop.run_forever()
-    logger.info("zillionare-omega exited")
+        loop.create_task(app.start())
+        loop.run_forever()
+    except Exception as e:
+        logger.exception(e)
+        logger.warning("Zillionare-omega exit abnormally.")
+    logger.info("Zillionare-omega main process (%s) exited.", os.getpid())
 
 
 def stop():
@@ -396,12 +391,13 @@ def stop():
         pass
 
 
-def cli():
+def main():
     fire.Fire({
         'start': start,
-        'setup': setup
+        'setup': setup,
+        'stop':  stop
     })
 
 
 if __name__ == "__main__":
-    cli()
+    main()

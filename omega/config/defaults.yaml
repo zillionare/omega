@@ -27,7 +27,7 @@ logging:
       maxBytes: 10485760
   loggers:
     apscheduler:
-      level: INFO
+      level: WARNING
     pyemit:
       level: WARNING
     validation_report:
@@ -47,7 +47,4 @@ omega:
   urls:
     calendar: http://stock.jieyu.ai/calendar.json
     checksum: http://stock.jieyu.ai/chksum
-  concurrency:
-    threads: 4
-    processes: 2
-    heartbeat_interval: 10
+  heartbeat: 10

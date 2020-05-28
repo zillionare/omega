@@ -1,7 +1,7 @@
 import unittest
 from unittest import mock
 
-from omega.main import update_config, config_sync
+from omega.cli import update_config, config_sync
 
 
 class MyTestCase(unittest.TestCase):

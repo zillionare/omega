@@ -87,6 +87,6 @@ setup(
         'install': InstallCommand
     },
     entry_points={
-        'console_scripts': ['omega=omega.main:cli']
+        'console_scripts': ['omega=omega.main:main']
     }
 )
