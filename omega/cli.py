@@ -342,6 +342,13 @@ def setup(reset_factory=False):
 
 
 def start():
+    """
+        code = f'from {cls.__module__} import {cls.__name__}; {cls.__name__}.process_entry()'
+
+        opts = " ".join([f"--{k}={v}" for k, v in kwargs.items()])
+        return subprocess.Popen([sys.executable, '-c', code, opts])
+
+    """
     logger.info("starting zillionare-omega main process(%s)...", os.getpid())
 
     if os.environ.get('dev_mode'):
@@ -366,7 +373,7 @@ def start():
     try:
         from omega.app import Application
         app = Application()
-        app.set_uv_loop()
+        # app.set_uv_loop()
         loop = asyncio.get_event_loop()
         loop.set_debug(True)
 

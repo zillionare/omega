@@ -29,7 +29,7 @@ logging:
     apscheduler:
       level: WARNING
     pyemit:
-      level: WARNING
+      level: INFO
     validation_report:
       handlers:
         - validation_report
@@ -42,9 +42,20 @@ logging:
 tz: Asia/Chongqing
 redis:
   dsn: redis://localhost:6379
+pickle:
+  ver: 4
 omega:
   home: ~/zillionare/omgea
   urls:
     calendar: http://stock.jieyu.ai/calendar.json
     checksum: http://stock.jieyu.ai/chksum
   heartbeat: 10
+  sync:
+    type:
+      - stock
+      - index
+    time: 15:05
+    frames:
+      - 30m: 10
+  validation:
+    time: 02:00

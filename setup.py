@@ -29,7 +29,8 @@ requirements = [
     'aiohttp==3.6.2',
     'pytz==2019.3',
     'xxhash==1.4.3',
-    'zillionare-omicron>=0.1.2'
+    'zillionare-omicron>=0.1.2',
+    'aiocache==0.11.1'
 ]
 
 setup_requirements = []

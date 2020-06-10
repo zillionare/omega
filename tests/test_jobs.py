@@ -3,6 +3,7 @@ import logging
 import os
 import unittest
 from asyncio import Future
+from pathlib import Path
 from unittest import mock
 
 import arrow
@@ -21,11 +22,8 @@ from pyemit import emit
 
 import omega.jobs.synccalendar as sc
 import omega.jobs.syncquotes as sq
-from omega import app_name
 from omega.config.cfg4py_auto_gen import Config
-from omega.fetcher.abstract_quotes_fetcher import (
-    AbstractQuotesFetcher as fetcher,
-    AbstractQuotesFetcher)
+from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as fetcher
 
 logger = logging.getLogger(__name__)
 cfg: Config = cfg4py.get_instance()
@@ -43,12 +41,16 @@ class MyTestCase(unittest.TestCase):
         logger.info("starting solo quotes server...")
         cfg4py.init(self.get_config_path(), False)
 
-        await omicron.init(cfg)
+        await emit.start(engine=emit.Engine.REDIS, dsn=cfg.redis.dsn, start_server=True)
+
+        await omicron.dal.cache.init(cfg)
+        home = Path(cfg.omega.home).expanduser()
+        os.makedirs(str(home / "data/chksum"), exist_ok=True)
 
         for fetcher_info in cfg.quotes_fetchers:
-            await fetcher.create_instance(fetcher_info)
-
-        await emit.start(engine=emit.Engine.REDIS, dsn=cfg.redis.dsn)
+            module = fetcher_info.get('module')
+            for params in fetcher_info.get('workers'):
+                await fetcher.create_instance(module, **params)
 
     async def sync_and_check(self, code, end, frame_type, n_fetched, expected_head,
                              n_cached):
@@ -185,14 +187,13 @@ class MyTestCase(unittest.TestCase):
             errors.add(msg)
 
         emit.register(Events.OMEGA_VALIDATION_ERROR,
-                      functools.partial(collect_error, errors),
-                      exchange=app_name)
+                      functools.partial(collect_error, errors))
 
-        secs = Securities()
-        with mock.patch.object(secs, 'choose', return_value=['000001.XSHE']):
-            tf.day_frames = np.array([20200511, 20200512, 20201513])
-            await sq.do_validation()
-            self.assertSetEqual(set(), set(errors))
+        codes = ['000001.XSHE']
+        await cache.sys.set('jobs.bars_validation.range.start', '20200511')
+        await cache.sys.set('jobs.bars_validation.range.stop', '20200513')
+        await sq.do_validation(codes, 0)
+        self.assertSetEqual(set(), set(errors))
 
         mock_checksum = ['000001.XSHE,1d,7918c38d', '000001.XSHE,1m,15311c54',
                          '000001.XSHE,5m,54f9ac0a', '000001.XSHE,15m,3c2cd435',
@@ -202,15 +203,23 @@ class MyTestCase(unittest.TestCase):
                          '000001.XSHG,30m,e5db84ef', '000001.XSHG,60m,af4be47d'
                          ]
 
+        await cache.sys.set('jobs.bars_validation.range.start', '20200511')
+        await cache.sys.set('jobs.bars_validation.range.stop', '20200513')
+        with mock.patch('omega.jobs.syncquotes.calc_checksums',
+                        side_effect=[mock_checksum]):
+            tf.day_frames = np.array([20200512])
+            await sq.do_validation(codes, 0)
+            self.assertSetEqual({'20200512,000001.XSHE:1d,7918c38d,7918c38c',
+                                 '20200512,000001.XSHG:1m,d37d8742,d37d8741'},
+                                errors)
+
+    @async_run
+    async def test_201_start_job_validation(self):
+        await cache.sys.set('jobs.bars_validation.range.start', '20200511')
+        await cache.sys.set('jobs.bars_validation.range.stop', '20200513')
+        secs = Securities()
         with mock.patch.object(secs, 'choose', return_value=['000001.XSHE']):
-            tf.day_frames = np.array([20200511, 20200512, 20201513])
-            with mock.patch('omega.jobs.syncquotes.calc_checksums',
-                            side_effect=[mock_checksum]):
-                tf.day_frames = np.array([20200512])
-                await sq.do_validation()
-                self.assertSetEqual({'20200512,000001.XSHE:1d,7918c38d,7918c38c',
-                                     '20200512,000001.XSHG:1m,d37d8742,d37d8741'},
-                                    errors)
+            await sq.start_validation()
 
     async def prepare_checksum_data(self):
         end = arrow.get('2020-05-12 15:00')
@@ -236,35 +245,6 @@ class MyTestCase(unittest.TestCase):
                     '000001.XSHG,30m,e5db84ef', '000001.XSHG,60m,af4be47d'
                     }
         return end, expected
-
-    @async_run
-    async def test_do_checksum(self):
-        end, expected = await self.prepare_checksum_data()
-
-        save_to = os.path.expanduser(cfg.omega.chksum.folder)
-        secs = Securities()
-        with mock.patch('arrow.now', return_value=end):
-            with mock.patch.object(secs, 'choose', side_effect=[['000001.XSHE',
-                                                                 '000001.XSHG']]):
-                try:
-                    with mock.patch('sh.git.add', return_value=True):  # disable git.add
-                        await sq.do_checksum()
-                except sh.ErrorReturnCode_1 as e:
-                    if "nothing to commit" in e.stdout.decode('utf-8'):
-                        self.assertTrue(True)
-                    else:
-                        logger.exception(e)
-                except Exception as e:
-                    logger.exception(e)
-
-        chksum_file = os.path.join(save_to, 'chksum-20200512.csv')
-        with open(chksum_file, 'r') as f:
-            actual = f.read().split("\n")[:-1]
-            self.assertSetEqual(expected, set(actual))
-
-        # revert the change after test
-        repo = sh.git.bake(_cwd=save_to)
-        repo.checkout('chksum-20200512.csv')
 
     @async_run
     async def test_get_checksum(self):
@@ -301,8 +281,8 @@ class MyTestCase(unittest.TestCase):
     @async_run
     async def test_memory(self):
         await cache.security.flushall()
-        await AbstractQuotesFetcher.get_bars('000001.XSHE', arrow.now(), 1000,
-                                             FrameType.DAY)
+        await fetcher.get_bars('000001.XSHE', arrow.now(), 1000,
+                               FrameType.DAY)
         data = await cache.security.hgetall('000001.XSHE:1d')
         for i in range(5000):
             await cache.security.hmset_dict(i, data)
