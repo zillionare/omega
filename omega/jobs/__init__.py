@@ -43,7 +43,8 @@ async def init(config_dir: str, app, loop):
 
     scheduler = AsyncIOScheduler(timezone=cfg.tz)
 
-    # validation
+    # do validation daily
+    # todo: don't start at non-trade day
     h, m = map(int, cfg.omega.validation.time.split(":"))
     scheduler.add_job(sq.start_validation, 'cron', hour=h, minute=m)
 
@@ -74,16 +75,16 @@ async def start_sync(request):
     return response.text('sync task scheduled')
 
 
-def load_additional_jobs(self):
+def load_additional_jobs():
     """从配置文件创建自定义的插件任务, for example, zillionare-checksum
-    :param
     """
+    global scheduler
     for job in cfg.omega.jobs:
         try:
             module = importlib.import_module(job['module'])
             entry = getattr(module, job['entry'])
-            self.add_job(entry, trigger=job['trigger'], args=job['params'],
-                         **job['trigger_params'])
+            scheduler.add_job(entry, trigger=job['trigger'], args=job['params'],
+                              **job['trigger_params'])
         except Exception as e:
             logger.exception(e)
             logger.info("failed to create job: %s", job)

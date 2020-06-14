@@ -21,12 +21,13 @@ omega:
   server:
     url: http://localhost:3181
   jobs:
-    - checksum:
+    - name: checksum
       module: zilliontools.checksum
-      entry: do_checksum
+      entry: checksum_job_entry
       params:
-        - ~/.zillionare/omega/server_data/chksum
-        - Asia/Shanghai
+        save_to: ~/.zillionare/omega/server_data/chksum
+        start_date: '2020-01-01'
+        end_date: None
       trigger: cron
       trigger_params:
         hour: 0

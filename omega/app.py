@@ -50,6 +50,7 @@ class Application(object):
         # register route here
         app.add_route(self.get_security_list, '/quotes/security_list')
         app.add_route(self.get_bars, '/quotes/bars')
+        app.add_route(self.get_all_trade_days, '/quotes/all_trade_days')
 
         logger.info("<<< init %s process done", self.__class__.__name__)
 
@@ -75,6 +76,12 @@ class Application(object):
 
         body = pickle.dumps(days, protocol=cfg.pickle.ver)
         return response.raw(body)
+
+    async def sync_bars(self, request):
+        secs = request.json.get('secs')
+        frames_to_sync = request.json.get('frames_to_sync')
+
+        await sq.start_sync(secs, frames_to_sync)
 
 
 def start(port: int, impl: str, workers: int = 1, config_dir: str = None, **kwargs):

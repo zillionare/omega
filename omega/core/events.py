@@ -11,3 +11,11 @@ class Events:
     OMEGA_VALIDATION_PROGRESS = "omega/do_validation"
     OMEGA_DO_CHECKSUM = "omega/do_checksum"
     OMEGA_VALIDATION_ERROR = "omega/validation_error"
+
+
+class ValidationError:
+    NO_CHECKSUM = 0
+    REMOTE_MISS = 1
+    LOCAL_MISS = 2
+    MISMATCH = 3
+    UNKNOWN = 4

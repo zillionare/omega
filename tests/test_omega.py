@@ -13,6 +13,7 @@ import cfg4py
 from omicron.core.lang import async_run
 
 from omega.cli import update_config, config_sync
+from omega.core import get_config_dir
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +21,8 @@ logger = logging.getLogger(__name__)
 class MyTestCase(unittest.TestCase):
     def setUp(self) -> None:
         os.environ[cfg4py.envar] = 'TEST'
-        self.config_dir = os.path.normpath(os.path.join(os.path.dirname(__file__),
-                                                        "../omega/config"))
+
+        self.config_dir = get_config_dir()
 
         cfg4py.init(self.config_dir)
 

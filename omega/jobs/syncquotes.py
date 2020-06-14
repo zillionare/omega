@@ -8,16 +8,21 @@ Contributors:
 """
 import asyncio
 import datetime
+import json
 import logging
 import os
+import signal
+import subprocess
+import sys
 import time
-from concurrent.futures.process import ProcessPoolExecutor
+from collections import ChainMap
 from pathlib import Path
-from typing import Optional, Union, List
+from typing import Optional, List, Union
 
 import aiohttp
 import arrow
 import cfg4py
+import omicron
 import psutil
 import xxhash
 from aiocache import cached
@@ -32,12 +37,15 @@ from omicron.models.securities import Securities
 from pyemit import emit
 
 from omega.config.cfg4py_auto_gen import Config
-from omega.core.events import Events
+from omega.core import get_config_dir
+from omega.core.events import Events, ValidationError
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 
 logger = logging.getLogger(__name__)
 
 cfg: Config = cfg4py.get_instance()
+validation_errors = []
+no_validation_error_days = set()
 
 
 async def start_job_timer(job_name: str):
@@ -75,27 +83,47 @@ async def stop_job_timer(job_name: str) -> int:
     return elapsed
 
 
-async def start_sync(codes: List[str] = None, sync_to: Arrow = None):
+async def start_sync(secs: List[str] = None, frames_to_sync: dict = None):
+    """
+    初始化bars_sync的任务，并发信号给各后台quotes_fetcher进程以启动同步。
+
+    同步的时间范围指定均为日期。如果是非交易日，自动对齐到上一个已收盘的交易日，使用两端闭合区
+    间（截止frame直到已收盘frame)。
+
+    如果未指定同步结束日期，则同步到当前已收盘的交易日。
+
+    Args:
+        secs (List[str]): 将同步的证券代码
+            如果为None，则使用``omega.sync.type``定义的类型来选择要同步的证券代码。
+        frames_to_sync (dict): frames and range(start, end)
+            ::
+                {
+                    '30m': '2018-01-01,2019-01-01'
+                }
+            表明要同步从2018年1月1日到2019年1月1日的30分钟线数据
+
+    Returns:
+
+    """
     key_scope = f"jobs.bars_sync.scope"
 
-    secs = Securities()
+    if secs is None:
+        secs = Securities()
+        secs = secs.choose(cfg.omega.sync.type)
+
+    if frames_to_sync is None:
+        frames_to_sync = dict(ChainMap(*cfg.omega.sync.frames))
+
     await cache.sys.delete(key_scope)
 
-    codes = codes or secs.choose(cfg.omega.sync.type)
-    logger.info("add %s securities into sync queue", len(codes))
+    logger.info("add %s securities into sync queue", len(secs))
     pl = cache.sys.pipeline()
     pl.delete(key_scope)
-
-    pl.lpush(key_scope, *codes)
+    pl.lpush(key_scope, *secs)
     await pl.execute()
 
     await start_job_timer('sync')
-    await emit.emit(Events.OMEGA_DO_SYNC, sync_to)
-
-
-async def on_validation_progress(status: dict, progress: tuple):
-    worker, cursor = progress
-    status[worker] = cursor
+    await emit.emit(Events.OMEGA_DO_SYNC, frames_to_sync)
 
 
 async def start_validation():
@@ -105,55 +133,208 @@ async def start_validation():
     结束后，将jobs.bars_validation.range.start更新为校验截止的最后交易日。如果各个子进程报告
     的截止交易日不一样（比如发生了异常），则使用最小的交易日。
     """
-    logger.info("start validation job.")
+    global validation_errors, no_validation_error_days
+    validation_errors = []
+
     secs = Securities()
+
     cpu_count = psutil.cpu_count()
 
     # to check if the range is right
-    start = (await cache.sys.get('jobs.bars_validation.range.start')) or \
-            tf.day_frames[0]
-    end = await cache.sys.get('jobs.bars_validation.range.end')
+    pl = cache.sys.pipeline()
+    pl.get('jobs.bars_validation.range.start')
+    pl.get('jobs.bars_validation.range.end')
+    start, end = await pl.execute()
 
-    if end and start and int(end) < int(start):
-        await cache.sys.delete('jobs.bars_validation.range.end')
+    if start is None:
+        start = cfg.omega.validation.start
+        end = cfg.omega.validation.end
+    elif end is None:
+        end = tf.date2int(arrow.now().date())
 
+    start, end = int(start), int(end)
+    assert start <= end
+
+    no_validation_error_days = set(
+            tf.day_frames[(tf.day_frames >= start) & (tf.day_frames <= end)])
+
+    codes = secs.choose(cfg.omega.sync.type)
     await cache.sys.delete("jobs.bars_validation.scope")
-    await cache.sys.lpush("jobs.validation.scope", secs.choose(cfg.omega.sync.type))
+    await cache.sys.lpush("jobs.bars_validation.scope", *codes)
+
+    logger.info("start validation %s secs from %s to %s.", len(codes), start, end)
+    emit.register(Events.OMEGA_VALIDATION_ERROR, on_validation_error)
 
     t0 = time.time()
-    async with ProcessPoolExecutor() as executor:
-        loop = asyncio.get_running_loop()
-        futures = [loop.run_in_executor(executor, do_validation) for i in range(
-                cpu_count)]
 
-        done, pending = await asyncio.wait(futures, timeout=3600 * 3)
+    code = f"from omega.jobs.syncquotes import do_validation_with_multiprocessing; " \
+           f"do_validation_with_multiprocessing()"
 
-        if len(pending):
-            logger.info("Validation timeout for %s", pending)
-        else:
-            elapsed = time.time() - t0
-            logger.info("Validation all done in %s seconds", elapsed)
+    procs = []
+    for i in range(cpu_count):
+        proc = subprocess.Popen([sys.executable, '-c', code], env=os.environ)
+        procs.append(proc)
 
-    # todo: adjust validation range
+    timeout = 3600
+    while timeout > 0:
+        await asyncio.sleep(2)
+        timeout -= 2
+        for proc in procs:
+            proc.poll()
+
+        if all([proc.returncode is not None for proc in procs]):
+            break
+
+    if timeout <= 0:
+        for proc in procs:
+            try:
+                os.kill(proc.pid, signal.SIGTERM)
+            except Exception:
+                pass
+
+    # set next start point
+    validation_days = set(tf.day_frames[(tf.day_frames >= start) & (tf.day_frames <=
+                                                                    end)])
+    last_no_error_day = min(validation_days - no_validation_error_days)
+
+    await cache.sys.set('jobs.bars_validation.range.start', last_no_error_day)
+    elapsed = time.time() - t0
+    logger.info("Validation cost %s seconds, validation will start at %s next time",
+                elapsed, last_no_error_day)
 
 
-async def do_sync(sync_to: Arrow = None):
+async def on_validation_error(report: tuple):
     """
-    worker's sync job
+    Args:
+        report: object like ::
+            (reason, day, code, frame, local, remote)
     Returns:
 
     """
-    logger.info("received %s signal", Events.OMEGA_DO_SYNC)
+    global validation_errors, no_validation_error_days
+
+    # todo: raise no checksum issue
+    if report[0] == ValidationError.UNKNOWN:
+        no_validation_error_days = set()
+    else:
+        validation_errors.append(report)
+        if report[1] is not None:
+            no_validation_error_days -= {report[1]}
+
+
+async def do_validation(secs: List[str] = None, start: str = None, end: str = None):
+    """
+    对列表secs中指定的证券行情数据按start到end指定的时间范围进行校验
+    Args:
+        secs:
+        start:
+        end:
+
+    Returns:
+
+    """
+    logger.info("start validation...")
+    report = logging.getLogger('validation_report')
+
+    logger.info("starting solo quotes server...")
+    cfg = cfg4py.init(get_config_dir(), False)
+
+    await emit.start(engine=emit.Engine.REDIS, dsn=cfg.redis.dsn, start_server=True)
+    await omicron.init()
+    start = int(start or await cache.sys.get('jobs.bars_validation.range.start'))
+    if end is None:
+        end = tf.date2int(arrow.now().date())
+    else:
+        end = int(end or await cache.sys.get('jobs.bars_validation.range.stop'))
+
+    if secs is None:
+        async def get_sec():
+            return await cache.sys.lpop('jobs.bars_validation.scope')
+    else:
+        async def get_sec():
+            return secs.pop() if len(secs) else None
+
+    errors = 0
+    while code := await get_sec():
+        try:
+            for day in tf.day_frames[(tf.day_frames >= start) & (tf.day_frames <= end)]:
+                expected = await get_checksum(day)
+                if expected and expected.get(code):
+                    actual = await calc_checksums(tf.int2date(day), [code])
+                    d1 = actual.get(code)
+                    d2 = expected.get(code)
+
+                    missing1 = d2.keys() - d1  # local has no checksum
+                    missing2 = d1.keys() - d2  # remote has no checksum
+                    mismatch = {k for k in d1.keys() & d2 if d1[k] != d2[k]}
+
+                    for k in missing1:
+                        info = (
+                            ValidationError.LOCAL_MISS, day, code, k, d1.get(k),
+                            d2.get(k))
+                        report.info("%s,%s,%s,%s,%s,%s", *info)
+                        await emit.emit(Events.OMEGA_VALIDATION_ERROR, info)
+                    for k in missing2:
+                        info = (
+                            ValidationError.REMOTE_MISS, day, code, k, d1.get(k),
+                            d2.get(k)
+                        )
+                        report.info("%s,%s,%s,%s,%s,%s", *info)
+                        await emit.emit(Events.OMEGA_VALIDATION_ERROR, info)
+                    for k in mismatch:
+                        info = (
+                            ValidationError.MISMATCH, day, code, k, d1.get(k),
+                            d2.get(k)
+                        )
+                        report.info("%s,%s,%s,%s,%s,%s", *info)
+                        await emit.emit(Events.OMEGA_VALIDATION_ERROR, info)
+
+                else:
+                    logger.error("checksum for %s not found.", day)
+                    info = (
+                        ValidationError.NO_CHECKSUM, day, None, None, None, None
+                    )
+                    report.info("%s,%s,%s,%s,%s,%s", *info)
+                    await emit.emit(Events.OMEGA_VALIDATION_ERROR, info)
+        except Exception as e:
+            logger.exception(e)
+            errors += 1
+
+    await emit.emit(Events.OMEGA_VALIDATION_ERROR, (ValidationError.UNKNOWN, errors))
+    logger.warning("do_validation meet %s unknown errors", errors)
+
+
+def do_validation_with_multiprocessing():
+    try:
+        t0 = time.time()
+        asyncio.run(do_validation())
+        logger.info('validation finished in %s seconds', time.time() - t0)
+        return 0
+    except Exception as e:
+        logger.warning('validation exit due to exception:')
+        logger.exception(e)
+        return -1
+
+
+async def do_sync(sync_frames: dict = None, secs: List[str] = None):
+    """
+    worker's sync job
+    """
+    logger.info("signal: %s with params: %s", Events.OMEGA_DO_SYNC, sync_frames)
+
     key_scope = "jobs.bars_sync.scope"
 
-    if sync_to is None:
-        today = arrow.now().date()
-        sync_to = arrow.get(today).replace(hour=15)
+    if secs is not None:
+        async def get_sec():
+            return secs.pop() if len(secs) else None
+    else:
+        async def get_sec():
+            return await cache.sys.lpop(key_scope)
 
     # noinspection PyPep8
-    while code := await cache.sys.lpop(key_scope):
+    while code := await get_sec():
         try:
-            await sync_for_sec(code, sync_to)
+            await sync_for_sec(code, sync_frames)
         except FetcherQuotaError as e:
             logger.warning("When syncing %s, quota is reached", code)
             logger.exception(e)
@@ -166,26 +347,61 @@ async def do_sync(sync_to: Arrow = None):
     logger.info('%s finished quotes sync in %s seconds', os.getpid(), elapsed)
 
 
-async def sync_for_sec(code: str, end: Arrow):
-    frames = {}
-    for item in cfg.omega.sync.frames:
-        frames.update(**item)
+def get_closed_frame(stop: Union[Arrow, datetime.date, datetime.datetime],
+                     frame_type: FrameType):
+    """
+    同步时间范围按天来指定，以符合人类习惯。但具体操作时，需要确定到具体的时间帧上。对截止时间，
+    如果是周线、月线、日线，取上一个收盘交易日所在的日、周、月线。如果是分钟线，取上一个收盘交
+    易日的最后一根K线。
+    Args:
+        stop: 用户指定的截止日期
+        frame_type:
 
-    counters = {frame: 0 for frame in frames.keys()}
+    Returns:
+
+    """
+    stop = arrow.get(stop).date()
+    now = arrow.now()
+    if stop == now.date() and tf.is_trade_day(now.date()) \
+            and now.hour * 60 + now.minute <= 900:
+        # 如果截止日期正处在交易时间，则只能同步到上一交易日
+        stop = tf.day_shift(stop, -1)
+
+    if frame_type in [FrameType.WEEK, FrameType.MONTH]:
+        stop = tf.shift(stop, 0, frame_type)
+
+    if frame_type in tf.minute_level_frames:
+        stop = tf.ceil(stop, frame_type)
+
+    return stop
+
+
+async def sync_for_sec(code: str, sync_frames: dict = None):
+    counters = {frame: 0 for frame in sync_frames.keys()}
     logger.info("syncing quotes for %s", code)
 
-    for frame, max_bars in frames.items():
+    for frame, start_stop in sync_frames.items():
         frame_type = FrameType(frame)
+        now = arrow.now()
+        if ',' in start_stop:
+            start, stop = map(lambda x: x.strip(' '), start_stop.split(','))
+        else:
+            start, stop = start_stop, now.date()
+
+        start = tf.floor(start, frame_type)
+        stop = get_closed_frame(stop, frame_type)
+
+        # 取数据库中该frame_type下该code的k线起始点
         head, tail = await sc.get_bars_range(code, frame_type)
         if not all([head, tail]):
             await sc.clear_bars_range(code, frame_type)
-            bars = await aq.get_bars(code, end, max_bars, frame_type)
+            n_bars = tf.count_frames(start, stop, frame_type)
+            bars = await aq.get_bars(code, stop, n_bars, frame_type)
             counters[frame_type.value] = len(bars)
             logger.debug("sync %s level bars of %s to %s: expected: %s, actual %s",
-                         frame_type, code, end, max_bars, len(bars))
+                         frame_type, code, stop, n_bars, len(bars))
             continue
 
-        start = tf.shift(end, -max_bars + 1, frame_type)
         if start < head:
             n = tf.count_frames(start, head, frame_type) - 1
             if n > 0:
@@ -198,12 +414,12 @@ async def sync_for_sec(code: str, end: Arrow):
                     logger.warning("incontinuous frames found: bars[-1](%s), "
                                    "head(%s)", bars['frame'][-1], head)
 
-        if tf.shift(end, 0, frame_type) > tail:
-            n = tf.count_frames(tail, end, frame_type) - 1
+        if stop > tail:
+            n = tf.count_frames(tail, stop, frame_type) - 1
             if n > 0:
-                bars = await aq.get_bars(code, end, n, frame_type)
+                bars = await aq.get_bars(code, stop, n, frame_type)
                 logger.debug("sync %s level bars of %s to %s: expected: %s, actual %s",
-                             frame_type, code, end, n, len(bars))
+                             frame_type, code, stop, n, len(bars))
                 counters[frame_type.value] += len(bars)
                 if bars['frame'][0] != tf.shift(tail, 1, frame_type):
                     logger.warning("incontinuous frames found: tail(%s), bars[0]("
@@ -213,43 +429,17 @@ async def sync_for_sec(code: str, end: Arrow):
                 ",".join([f"{k}:{v}" for k, v in counters.items()]))
 
 
-def get_start_frame(frame_type: FrameType) -> Union[datetime.date, datetime.datetime]:
-    if frame_type == FrameType.DAY:
-        return tf.int2date(tf.day_frames[0])
-    elif frame_type == FrameType.WEEK:
-        return tf.int2date(tf.week_frames[0])
-    elif frame_type == FrameType.MONTH:
-        return tf.int2date(tf.month_frames[0])
-    elif frame_type == FrameType.MIN1:
-        day = datetime.date(2020, 1, 2)
-        return datetime.datetime(day.year, day.month, day.day, hour=9, minute=31)
-    elif frame_type == FrameType.MIN5:
-        day = datetime.date(2019, 1, 2)
-        return datetime.datetime(day.year, day.month, day.day, hour=9, minute=35)
-    elif frame_type == FrameType.MIN15:
-        day = datetime.date(2008, 1, 2)
-        return datetime.datetime(day.year, day.month, day.day, hour=9, minute=45)
-    elif frame_type == FrameType.MIN30:
-        day = datetime.date(2008, 1, 2)
-        return datetime.datetime(day.year, day.month, day.day, hour=10)
-    elif frame_type == FrameType.MIN60:
-        day = datetime.date(2008, 1, 2)
-        return datetime.datetime(day.year, day.month, day.day, hour=10, minute=30)
-    else:
-        raise ValueError(f"{frame_type} not supported")
-
-
 @cached(ttl=3600)
 async def get_checksum(day: int) -> Optional[List]:
     save_to = (Path(cfg.omega.home) / "data/chksum").expanduser()
-    chksum_file = os.path.join(save_to, f"chksum-{day}.csv")
+    chksum_file = os.path.join(save_to, f"chksum-{day}.json")
     try:
         with open(chksum_file, 'r') as f:
-            return f.read().split("\n")[:-1]
+            return json.load(f)
     except (FileNotFoundError, Exception):
         pass
 
-    url = cfg.omega.urls.checksum + f"/chksum-{day}.csv"
+    url = cfg.omega.urls.checksum + f"/chksum-{day}.json"
     async with aiohttp.ClientSession() as client:
         for i in range(3):
             try:
@@ -258,99 +448,59 @@ async def get_checksum(day: int) -> Optional[List]:
                         logger.warning("failed to fetch checksum from %s", url)
                         return None
 
-                    checksum = await resp.text(encoding='utf-8')
+                    checksum = await resp.json(encoding='utf-8')
                     with open(chksum_file, "w+") as f:
-                        f.writelines(checksum)
+                        json.dump(checksum, f, indent=2)
 
-                    return checksum.split("\n")[:-1]
+                    return checksum
             except ClientError:
                 continue
 
 
-async def do_validation():
+async def calc_checksums(day: datetime.date, codes: List) -> dict:
     """
-    SYS validation {
-        sec:frame_type:start:end checksum
-    }
-    日线 按年 2005, 2006, ...
-    周线 按年
-    60m 按半年 250 * 4
-    30m 按季  250 * 8 / 4
+
+    Args:
+        day:
+        codes:
+
     Returns:
-
+        返回值为以code为键，该证券对应的{周期：checksum}的集合为值的集合
     """
-    logger.info("start validation...")
+    end_time = arrow.get(day, tzinfo=cfg.tz).replace(hour=15)
 
-    report = logging.getLogger('validation_report')
+    checksums = {}
+    for i, code in enumerate(codes):
+        try:
+            checksum = {}
+            d = await sc.get_bars_raw_data(code, day, 1, FrameType.DAY)
+            if d:
+                checksum[f"{FrameType.DAY.value}"] = xxhash.xxh32_hexdigest(d)
+            d = await sc.get_bars_raw_data(code, end_time, 240, FrameType.MIN1)
+            if d:
+                checksum[f"{FrameType.MIN1.value}"] = xxhash.xxh32_hexdigest(d)
 
-    pl = cache.sys.pipeline()
-    pl.get('jobs.bars_validation.range.start')
-    pl.get('jobs.bars_validation.range.stop')
-    start, end = await pl.execute()
+            d = await sc.get_bars_raw_data(code, end_time, 48, FrameType.MIN5)
+            if d:
+                checksum[f"{FrameType.MIN5.value}"] = xxhash.xxh32_hexdigest(d)
 
-    start = tf.day_frames[0] if not start else int(start)
-    end = tf.date2int(arrow.now().date()) if not end else int(end)
+            d = await sc.get_bars_raw_data(code, end_time, 16, FrameType.MIN15)
+            if d:
+                checksum[f"{FrameType.MIN15.value}"] = xxhash.xxh32_hexdigest(d)
 
-    t0 = time.time()
-    while code := await cache.sys.lpop('jobs.bars_validation.scope'):
-        for day in tf.day_frames[(tf.day_frames > start) & (tf.day_frames <= end)]:
-            expected = await get_checksum(day)
-            if expected:
-                expected = set(expected)
-                actual = await calc_checksums(day, code)
-                actual = set(actual)
+            d = await sc.get_bars_raw_data(code, end_time, 8, FrameType.MIN30)
+            if d:
+                checksum[f"{FrameType.MIN30.value}"] = xxhash.xxh32_hexdigest(d)
 
-                diff_exp = expected.difference(actual)
-                diff_act = actual.difference(expected)
+            d = await sc.get_bars_raw_data(code, end_time, 4, FrameType.MIN60)
+            if d:
+                checksum[f"{FrameType.MIN60.value}"] = xxhash.xxh32_hexdigest(d)
 
-                # report diff
-                dict_diff_act = {f"{code}:{ft}": chksum for
-                                 code, ft, chksum in
-                                 map(lambda x: x.split(","), diff_act)}
-                dict_diff_exp = {f"{code}:{ft}": chksum for
-                                 code, ft, chksum in
-                                 map(lambda x: x.split(","), diff_exp)}
+            checksums[code] = checksum
+        except Exception as e:
+            logger.exception(e)
 
-                for k, v in dict_diff_act.items():
-                    report.info("%s,%s,%s,%s", day, k, v, dict_diff_exp.get(k))
-                    await emit.emit(Events.OMEGA_VALIDATION_ERROR, f"{day},{k},{v},"
-                                                                   f"{dict_diff_exp.get(k)}")
-            else:
-                # todo: how to report this event?
-                pass
+        if (i + 1) % 500 == 0:
+            logger.info("calc checksum progress: %s/%s", i + 1, len(codes))
 
-    # todo: report progress
-    elapsed = time.time() - t0
-    logger.info('%s stop validation in %s seconds', os.getpid(), elapsed)
-
-
-async def calc_checksums(day: int, code: str):
-    end_dt = tf.int2date(day)
-    end_tm = arrow.get(end_dt, tzinfo=cfg.tz).replace(hour=15)
-
-    result = []
-    d = await sc.get_bars_raw_data(code, end_dt, 1, FrameType.DAY)
-    if d:
-        result.append(f"{code},{FrameType.DAY.value},{xxhash.xxh32_hexdigest(d)}")
-
-    d = await sc.get_bars_raw_data(code, end_tm, 240, FrameType.MIN1)
-    if d:
-        result.append(f"{code},{FrameType.MIN1.value},{xxhash.xxh32_hexdigest(d)}")
-
-    d = await sc.get_bars_raw_data(code, end_tm, 48, FrameType.MIN5)
-    if d:
-        result.append(f"{code},{FrameType.MIN5.value},{xxhash.xxh32_hexdigest(d)}")
-
-    d = await sc.get_bars_raw_data(code, end_tm, 16, FrameType.MIN15)
-    if d:
-        result.append(f"{code},{FrameType.MIN15.value},{xxhash.xxh32_hexdigest(d)}")
-
-    d = await sc.get_bars_raw_data(code, end_tm, 8, FrameType.MIN30)
-    if d:
-        result.append(f"{code},{FrameType.MIN30.value},{xxhash.xxh32_hexdigest(d)}")
-
-    d = await sc.get_bars_raw_data(code, end_tm, 4, FrameType.MIN60)
-    if d:
-        result.append(f"{code},{FrameType.MIN60.value},{xxhash.xxh32_hexdigest(d)}")
-
-    return result
+    return checksums

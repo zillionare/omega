@@ -14,19 +14,3 @@ quotes_fetchers:
 #        - account: '13986740680'
 #          password: '2Nk&9w6bkW60'
 #          sessions: 2
-omega:
-  home: ~/.zillionare/omega
-  server:
-    url: http://localhost:3181
-  jobs:
-    - checksum:
-      module: zilliontools.checksum
-      entry: do_checksum
-      params:
-        - ~/.zillionare/omega/server_data/chksum
-        - Asia/Shanghai
-      trigger: cron
-      trigger_params:
-        hour: 0
-        minute: 5
-
