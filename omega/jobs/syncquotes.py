@@ -195,7 +195,11 @@ async def start_validation():
     # set next start point
     validation_days = set(tf.day_frames[(tf.day_frames >= start) & (tf.day_frames <=
                                                                     end)])
-    last_no_error_day = min(validation_days - no_validation_error_days)
+    diff = validation_days - no_validation_error_days
+    if len(diff):
+        last_no_error_day = min(diff)
+    else:
+        last_no_error_day = end
 
     await cache.sys.set('jobs.bars_validation.range.start', last_no_error_day)
     elapsed = time.time() - t0
@@ -236,7 +240,6 @@ async def do_validation(secs: List[str] = None, start: str = None, end: str = No
     logger.info("start validation...")
     report = logging.getLogger('validation_report')
 
-    logger.info("starting solo quotes server...")
     cfg = cfg4py.init(get_config_dir(), False)
 
     await emit.start(engine=emit.Engine.REDIS, dsn=cfg.redis.dsn, start_server=True)

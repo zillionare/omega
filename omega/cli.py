@@ -13,7 +13,7 @@ import signal
 import sys
 from pathlib import Path
 from subprocess import CalledProcessError, check_output, check_call
-from typing import Any, Union, List
+from typing import Any, Union, List, Callable
 
 import fire
 import pkg_resources
@@ -207,7 +207,7 @@ def config_jq_fetcher():
                     'zillionare-omega-adaptors-jq'])
 
 
-def get_input(prompt: str, validation_func: Union[List, callable], default: Any,
+def get_input(prompt: str, validation_func: Union[List, Callable], default: Any,
               op_hint: str = None):
     if op_hint is None: op_hint = "直接回车接受默认值，忽略此项(C)，退出(Q):"
     value = input(format_msg(prompt + op_hint))
@@ -217,7 +217,7 @@ def get_input(prompt: str, validation_func: Union[List, callable], default: Any,
             is_valid_input = True
         elif validation_func is None:
             is_valid_input = True
-        elif isinstance(validation_func, callable):
+        elif isinstance(validation_func, Callable):
             is_valid_input = validation_func(value)
         else:
             is_valid_input = True
@@ -265,7 +265,7 @@ def config_sync():
     if sync_time:
         update_config('omega.sync.time', sync_time)
 
-    os.makedirs(Path('~/zillionare/omega/data/chksum', exist_ok=True))
+    os.makedirs(Path('~/zillionare/omega/data/chksum'), exist_ok=True)
     # for unittest
     return frames, sync_time
 

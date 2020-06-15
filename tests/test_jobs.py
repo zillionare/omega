@@ -26,6 +26,7 @@ import omega.jobs.synccalendar as sc
 import omega.jobs.syncquotes as sq
 from omega.config.cfg4py_auto_gen import Config
 from omega.core import get_config_dir
+from omega.core.events import ValidationError
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as fetcher
 from omega.jobs import load_additional_jobs
 
@@ -62,7 +63,8 @@ class MyTestCase(unittest.TestCase):
         account = os.environ.get("jqsdk_account")
         password = os.environ.get("jqsdk_password")
         code = f"from omega.app import start; start(config_dir='{self.config_dir}', " \
-               f"port=3180, impl='jqadaptor', account='{account}', password='{password}')"
+               f"port=23180, impl='jqadaptor', account='{account}', password=" \
+               f"'{password}')"
         self.server_process = subprocess.Popen([sys.executable, '-c', code],
                                                env=os.environ)
 
@@ -207,8 +209,9 @@ class MyTestCase(unittest.TestCase):
 
         errors = set()
 
-        def collect_error(errors: set, msg):
-            errors.add(msg)
+        def collect_error(errors: set, report: tuple):
+            if report[0] != ValidationError.UNKNOWN:
+                errors.add(report)
 
         emit.register(Events.OMEGA_VALIDATION_ERROR,
                       functools.partial(collect_error, errors))
@@ -216,23 +219,34 @@ class MyTestCase(unittest.TestCase):
         codes = ['000001.XSHE']
         await cache.sys.set('jobs.bars_validation.range.start', '20200511')
         await cache.sys.set('jobs.bars_validation.range.stop', '20200513')
-        await sq.do_validation(codes, 0)
+        await sq.do_validation(codes, '20200511', '20200512')
         self.assertSetEqual(set(), set(errors))
 
-        mock_checksum = ['000001.XSHE,1d,7918c38d', '000001.XSHE,1m,15311c54',
-                         '000001.XSHE,5m,54f9ac0a', '000001.XSHE,15m,3c2cd435',
-                         '000001.XSHE,30m,0cfbf775', '000001.XSHE,60m,d21018b3',
-                         '000001.XSHG,1d,3a24582f', '000001.XSHG,1m,d37d8742',
-                         '000001.XSHG,5m,7bb329ad', '000001.XSHG,15m,7c4e48a5',
-                         '000001.XSHG,30m,e5db84ef', '000001.XSHG,60m,af4be47d'
-                         ]
+        mock_checksum = {
+            '000001.XSHE': {
+                '1d':  '7918c38d',
+                '1m':  '15311c54',
+                '5m':  '54f9ac0a',
+                '15m': '3c2cd435',
+                '30m': '0cfbf775',
+                '60m': 'd21018b3'
+            },
+            '000001.XSHG': {
+                '1d':  '3a24582f',
+                '1m':  'd37d8742',
+                '5m':  '7bb329ad',
+                '15m': '7c4e48a5',
+                '30m': 'e5db84ef',
+                '60m': 'af4be47d'
+            }
+        }
 
         await cache.sys.set('jobs.bars_validation.range.start', '20200511')
         await cache.sys.set('jobs.bars_validation.range.stop', '20200513')
         with mock.patch('omega.jobs.syncquotes.calc_checksums',
                         side_effect=[mock_checksum]):
             tf.day_frames = np.array([20200512])
-            await sq.do_validation(codes, 0)
+            await sq.do_validation(codes, '20200511', '20200512')
             self.assertSetEqual({'20200512,000001.XSHE:1d,7918c38d,7918c38c',
                                  '20200512,000001.XSHG:1m,d37d8742,d37d8741'},
                                 errors)

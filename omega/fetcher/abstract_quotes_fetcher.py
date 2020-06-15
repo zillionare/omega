@@ -53,7 +53,7 @@ class AbstractQuotesFetcher(QuotesFetcher):
         000001.XSHE 	平安银行 	PAYH 	1991-04-03 	2200-01-01 	stock
         :return:
         """
-        securities = cls.get_instance().get_security_list()
+        securities = await cls.get_instance().get_security_list()
         key = 'securities'
         await cache.security.delete(key)
         pipeline = cache.security.pipeline()
