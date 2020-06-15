@@ -112,3 +112,5 @@ ENV/
 /omega/config/test.yaml
 /omega/config/cfg4py_auto_gen.py
 /.idea/workspace.xml
+/.idea/workspace.xml
+/omega/config/dev.yaml

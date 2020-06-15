@@ -9,12 +9,10 @@ Contributors:
 import importlib
 import logging
 import time
-from functools import partial
 from typing import Optional
 
 import arrow
 import cfg4py
-import fire
 import omicron
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from omicron.dal import cache
@@ -32,11 +30,11 @@ cfg: Config = cfg4py.get_instance()
 scheduler: Optional[AsyncIOScheduler] = None
 
 
-async def init(config_dir: str, app, loop):
+async def init(app, loop):
     global scheduler
 
     logger.info("init omega-jobs process")
-    cfg4py.init(config_dir)
+    cfg4py.init(get_config_dir())
 
     await omicron.init()
     await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
@@ -90,14 +88,6 @@ def load_additional_jobs():
             logger.info("failed to create job: %s", job)
 
 
-def start(host: str = '0.0.0.0', port: int = 3180, config_dir: str = None):
-    config_dir = config_dir or get_config_dir()
-
-    app.register_listener(partial(init, config_dir), 'before_server_start')
+def start(host: str = '0.0.0.0', port: int = 3180):
+    app.register_listener(init, 'before_server_start')
     app.run(host=host, port=port, register_sys_signals=True)
-
-
-if __name__ == "__main__":
-    fire.Fire({
-        "start": start
-    })

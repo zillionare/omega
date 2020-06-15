@@ -5,10 +5,9 @@ redis:
   dsn: redis://localhost:6379
 quotes_fetchers:
   - impl: jqadaptor    # there must be a create_instance method in this module
-    workers:
+    groups:
       - account: '18694978299'
         password: 8Bu8tcDpEAHJRn
-        port: 13180
         sessions: 2
 #        - account: '15629126689'
 #          password: '0O2i*tFsENT8'

@@ -8,6 +8,7 @@ Contributors:
 """
 import logging
 import pickle
+from typing import List
 
 import arrow
 import cfg4py
@@ -31,15 +32,14 @@ logger = logging.getLogger(__name__)
 
 
 class Application(object):
-    def __init__(self, fetcher_impl: str, config_dir: str, **kwargs):
+    def __init__(self, fetcher_impl: str, **kwargs):
         self.fetcher_impl = fetcher_impl
-        self.config_dir = config_dir
         self.params = kwargs
 
     async def init(self, *args):
         logger.info("init %s", self.__class__.__name__)
 
-        cfg4py.init(self.config_dir)
+        cfg4py.init(get_config_dir(), False)
         await aq.create_instance(self.fetcher_impl, **self.params)
         await cache.init()
 
@@ -84,11 +84,27 @@ class Application(object):
         await sq.start_sync(secs, frames_to_sync)
 
 
-def start(port: int, impl: str, workers: int = 1, config_dir: str = None, **kwargs):
-    config_dir = config_dir or get_config_dir()
-    fetcher = Application(config_dir=config_dir, fetcher_impl=impl, **kwargs)
+def get_fetcher_groups(fetchers: List, impl: str):
+    for fetcher_info in fetchers:
+        if fetcher_info.get('impl') == impl:
+            return fetcher_info.get('groups')
+    return None
+
+
+def start(impl: str, port: int = 3181, group_id: int = 0):
+    config_dir = get_config_dir()
+    cfg = cfg4py.init(config_dir)
+
+    groups = get_fetcher_groups(cfg.quotes_fetchers, impl)
+    assert groups != None
+    assert len(groups) > group_id
+
+    fetcher = Application(fetcher_impl=impl, **groups[group_id])
     app.register_listener(fetcher.init, 'before_server_start')
-    app.run(host='0.0.0.0', port=port, workers=workers, register_sys_signals=True)
+
+    port = port + group_id
+    sessions = groups[group_id].get('sessions', 1)
+    app.run(host='0.0.0.0', port=port, workers=sessions, register_sys_signals=True)
 
 
 if __name__ == "__main__":
