@@ -19,7 +19,7 @@ opts = {}
 requirements = [
     'apscheduler==3.6.3',
     'arrow==0.15.5',
-    'cfg4py>=0.4.0',
+    'cfg4py>=0.6.0',
     'ruamel.yaml==0.16',
     'aioredis==1.3.1',
     'hiredis==1.0.1',
@@ -30,7 +30,9 @@ requirements = [
     'pytz==2019.3',
     'xxhash==1.4.3',
     'zillionare-omicron>=0.1.2',
-    'aiocache==0.11.1'
+    'aiocache==0.11.1',
+    'sanic==20.3.0',
+    'psutil==5.7.0'
 ]
 
 setup_requirements = []
