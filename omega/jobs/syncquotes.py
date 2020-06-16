@@ -87,7 +87,7 @@ async def start_sync(secs: List[str] = None, frames_to_sync: dict = None):
     """
     初始化bars_sync的任务，并发信号给各后台quotes_fetcher进程以启动同步。
 
-    同步的时间范围指定均为日期。如果是非交易日，自动对齐到上一个已收盘的交易日，使用两端闭合区
+    同步的时间范围指定均为日级别。如果是非交易日，自动对齐到上一个已收盘的交易日，使用两端闭合区
     间（截止frame直到已收盘frame)。
 
     如果未指定同步结束日期，则同步到当前已收盘的交易日。
@@ -100,7 +100,7 @@ async def start_sync(secs: List[str] = None, frames_to_sync: dict = None):
                 {
                     '30m': '2018-01-01,2019-01-01'
                 }
-            表明要同步从2018年1月1日到2019年1月1日的30分钟线数据
+            表明要同步从2018年1月1日到2019年1月1日的30分钟线数据。
 
     Returns:
 
@@ -339,7 +339,7 @@ async def do_sync(sync_frames: dict = None, secs: List[str] = None):
         try:
             await sync_for_sec(code, sync_frames)
         except FetcherQuotaError as e:
-            logger.warning("When syncing %s, quota is reached", code)
+            logger.warning("Quota exceeded when syncing %s. Sync borted.", code)
             logger.exception(e)
             return  # stop the sync
         except Exception as e:

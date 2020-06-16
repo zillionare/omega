@@ -96,15 +96,15 @@ def start(impl: str, port: int = 3181, group_id: int = 0):
     cfg = cfg4py.init(config_dir)
 
     groups = get_fetcher_groups(cfg.quotes_fetchers, impl)
-    assert groups != None
+    assert groups is not None
     assert len(groups) > group_id
 
     fetcher = Application(fetcher_impl=impl, **groups[group_id])
     app.register_listener(fetcher.init, 'before_server_start')
 
-    port = port + group_id
-    sessions = groups[group_id].get('sessions', 1)
-    app.run(host='0.0.0.0', port=port, workers=sessions, register_sys_signals=True)
+    workers = groups[group_id].get('sessions', 1)
+    logger.info("starting omega group %s with %s workers", group_id, workers)
+    app.run(host='0.0.0.0', port=port, workers=workers, register_sys_signals=True)
 
 
 if __name__ == "__main__":
