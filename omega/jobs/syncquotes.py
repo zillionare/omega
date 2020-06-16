@@ -323,7 +323,7 @@ async def do_sync(sync_frames: dict = None, secs: List[str] = None):
     """
     worker's sync job
     """
-    logger.info("signal: %s with params: %s", Events.OMEGA_DO_SYNC, sync_frames)
+    logger.info("do_sync with params: %s", Events.OMEGA_DO_SYNC, sync_frames)
 
     key_scope = "jobs.bars_sync.scope"
 

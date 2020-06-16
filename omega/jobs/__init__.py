@@ -33,8 +33,9 @@ scheduler: Optional[AsyncIOScheduler] = None
 async def init(app, loop):
     global scheduler
 
-    logger.info("init omega-jobs process")
-    cfg4py.init(get_config_dir())
+    config_dir = get_config_dir()
+    cfg4py.init(get_config_dir(), False)
+    logger.info("init omega-jobs process with config at %s", config_dir)
 
     await omicron.init()
     await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
@@ -59,6 +60,8 @@ async def init(app, loop):
     if not last_sync or time.time() - last_sync >= 24 * 3600:
         logger.info("start catch-up quotes sync")
         app.add_task(sq.start_sync())
+
+    logger.info("omega jobs finished initialization")
 
 
 @app.route('/jobs/start_sync')
@@ -89,5 +92,6 @@ def load_additional_jobs():
 
 
 def start(host: str = '0.0.0.0', port: int = 3180):
+    logger.info("staring omega jobs...")
     app.register_listener(init, 'before_server_start')
     app.run(host=host, port=port, register_sys_signals=True)
