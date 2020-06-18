@@ -4,7 +4,6 @@
 """
     管理应用程序生命期、全局对象、任务、全局消息响应
         """
-import asyncio
 import logging
 import os
 import pathlib
@@ -15,15 +14,21 @@ from pathlib import Path
 from subprocess import CalledProcessError, check_output, check_call
 from typing import Any, Union, List, Callable
 
+import cfg4py
 import fire
 import pkg_resources
 import psutil
 import sh
 from ruamel.yaml import YAML
+from termcolor import colored
+
+from omega.core import get_config_dir
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 git_url = 'https://github.com/zillionare/omega'
+
+cfg = cfg4py.get_instance()
 
 
 class EarlyJumpError(BaseException):
@@ -207,18 +212,18 @@ def config_jq_fetcher():
                     'zillionare-omega-adaptors-jq'])
 
 
-def get_input(prompt: str, validation_func: Union[List, Callable], default: Any,
+def get_input(prompt: str, validation: Union[List, Callable], default: Any,
               op_hint: str = None):
     if op_hint is None: op_hint = "直接回车接受默认值，忽略此项(C)，退出(Q):"
     value = input(format_msg(prompt + op_hint))
 
     while True:
-        if isinstance(validation_func, List) and value.upper() in validation_func:
+        if isinstance(validation, List) and value.upper() in validation:
             is_valid_input = True
-        elif validation_func is None:
+        elif validation is None:
             is_valid_input = True
-        elif isinstance(validation_func, Callable):
-            is_valid_input = validation_func(value)
+        elif isinstance(validation, Callable):
+            is_valid_input = validation(value)
         else:
             is_valid_input = True
 
@@ -341,61 +346,54 @@ def setup(reset_factory=False):
     print("配置已完成，建议通过supervisor来管理Omega服务，祝顺利开启财富之旅！")
 
 
-def start():
-    """
-        code = f'from {cls.__module__} import {cls.__name__}; {cls.__name__}.process_entry()'
+def find_procs(app: str):
+    """查找进程名为app的进程"""
+    pids = []
+    for p in psutil.process_iter():
+        cmdline = p.cmdline()
+        if len(cmdline) >= 3 and cmdline[0] == 'python' and cmdline[2] == app:
+            pids.append(p.pid)
 
-        opts = " ".join([f"--{k}={v}" for k, v in kwargs.items()])
-        return subprocess.Popen([sys.executable, '-c', code, opts])
-
-    """
-    logger.info("starting zillionare-omega main process(%s)...", os.getpid())
-
-    if os.environ.get('dev_mode'):
-        pid_file = Path('~/.zillionare/omega.pid').expanduser()
-    else:
-        pid_file = Path('~/zillionare/omega.pid').expanduser()
-    try:
-        with open(pid_file, 'r') as f:
-            pid = int(f.read())
-            if psutil.pid_exists(pid):
-                logger.info("Zillionare-omega is already running: %s", pid)
-                return
-    except Exception as e:
-        pass
-
-    try:
-        with open(pid_file, 'w') as f:
-            f.write(str(os.getpid()))
-    except Exception as e:
-        pass
-
-    try:
-        from omega.app import Application
-        app = Application()
-        # app.set_uv_loop()
-        loop = asyncio.get_event_loop()
-        loop.set_debug(True)
-
-        loop.create_task(app.start())
-        loop.run_forever()
-    except Exception as e:
-        logger.exception(e)
-        logger.warning("Zillionare-omega exit abnormally.")
-    logger.info("Zillionare-omega main process (%s) exited.", os.getpid())
+    return pids
 
 
-def stop():
-    if os.environ.get('dev_mode'):
-        pid_file = Path('~/.zillionare/omega.pid').expanduser()
-    else:
-        pid_file = Path('~/zillionare/omega.pid').expanduser()
-    try:
-        with open(pid_file, 'r') as f:
-            pid = int(f.read())
+def start(service: str):
+    print(f"正在启动zillionare-omega {colored(service, 'green')}...")
+
+    server_roles = ['PRODUCTION', 'TEST', 'DEV']
+    if os.environ.get(cfg4py.envar) not in ['PRODUCTION', 'TEST', 'DEV']:
+        print(f"请设置环境变量{colored(cfg4py.envar, 'red')}为["
+              f"{colored(server_roles, 'red')}]之一。")
+        sys.exit(-1)
+
+    config_dir = get_config_dir()
+    cfg4py.init(config_dir, False)
+
+    pids = find_procs(f'omega.{service}')
+    if len(pids):
+        print(f"服务{service}已经启动,进程为{colored(str(pids), 'green')}")
+        choose = get_input("请选择忽略（1）, 重启（2）：", validation=[1, 2], default=1)
+        if choose == 2:
+            [os.kill(pid, signal.SIGTERM) for pid in pids]
+        else:
+            sys.exit(0)
+
+    # either pid is invalid or service not started
+    # subprocess.Popen(['nohup', sys.executable, '-m', 'omega.jobs', 'start', '&'])
+    os.system(f"nohup {sys.executable} -m omega.jobs start")
+    # todo: wait until it's really started
+    print(f"服务Zillionare-omega/{colored(service, 'green')}已经启动。")
+
+
+def stop(service: str):
+    pids = find_procs(f'omega.{service}')
+    for pid in pids:
+        try:
+            print(f"正在停止进程{colored(pid, 'green')}...")
             os.kill(pid, signal.SIGTERM)
-    except Exception:
-        pass
+            print(f"进程{pid}已退出.")
+        except Exception:
+            pass
 
 
 def main():

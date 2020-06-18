@@ -13,8 +13,8 @@ from typing import List
 import arrow
 import cfg4py
 import fire
+import omicron
 from omicron.core.types import FrameType
-from omicron.dal import cache
 from pyemit import emit
 from sanic import Sanic, response
 
@@ -41,7 +41,7 @@ class Application(object):
 
         cfg4py.init(get_config_dir(), False)
         await aq.create_instance(self.fetcher_impl, **self.params)
-        await cache.init()
+        await omicron.init(aq)
 
         # listen on omega events
         emit.register(Events.OMEGA_DO_SYNC, sq.do_sync)
@@ -51,6 +51,7 @@ class Application(object):
         app.add_route(self.get_security_list, '/quotes/security_list')
         app.add_route(self.get_bars, '/quotes/bars')
         app.add_route(self.get_all_trade_days, '/quotes/all_trade_days')
+        app.add_route(self.sync_bars, '/jobs/sync_bars', methods=['POST'])
 
         logger.info("<<< init %s process done", self.__class__.__name__)
 
@@ -78,10 +79,15 @@ class Application(object):
         return response.raw(body)
 
     async def sync_bars(self, request):
-        secs = request.json.get('secs')
-        frames_to_sync = request.json.get('frames_to_sync')
+        if request.json:
+            secs = request.json.get('secs')
+            frames_to_sync = request.json.get('frames_to_sync')
+        else:
+            secs = None
+            frames_to_sync = None
 
-        await sq.start_sync(secs, frames_to_sync)
+        app.add_task(sq.start_sync(secs, frames_to_sync))
+        return response.text(f"sync_bars with {secs}, {frames_to_sync} is scheduled.")
 
 
 def get_fetcher_groups(fetchers: List, impl: str):
@@ -105,7 +111,6 @@ def start(impl: str, port: int = 3181, group_id: int = 0):
     workers = groups[group_id].get('sessions', 1)
     logger.info("starting omega group %s with %s workers", group_id, workers)
     app.run(host='0.0.0.0', port=port, workers=workers, register_sys_signals=True)
-
 
 if __name__ == "__main__":
     fire.Fire({

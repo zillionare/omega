@@ -323,7 +323,7 @@ async def do_sync(sync_frames: dict = None, secs: List[str] = None):
     """
     worker's sync job
     """
-    logger.info("do_sync with params: %s", Events.OMEGA_DO_SYNC, sync_frames)
+    logger.info("do_sync with params: %s, %s", secs, sync_frames)
 
     key_scope = "jobs.bars_sync.scope"
 
@@ -410,12 +410,13 @@ async def sync_for_sec(code: str, sync_frames: dict = None):
             if n > 0:
                 _end_at = tf.shift(head, -1, frame_type)
                 bars = await aq.get_bars(code, _end_at, n, frame_type)
+                # 如果接口返回的bars['frame'][-1] != _end_at, 说明可能是停牌
                 counters[frame_type.value] += len(bars)
                 logger.debug("sync %s level bars of %s to %s: expected: %s, actual %s",
                              frame_type, code, _end_at, n, len(bars))
                 if len(bars) and bars['frame'][-1] != _end_at:
-                    logger.warning("incontinuous frames found: bars[-1](%s), "
-                                   "head(%s)", bars['frame'][-1], head)
+                    logger.warning("discrete frames found:%s, bars[-1](%s), "
+                                   "head(%s)", code, bars['frame'][-1], head)
 
         if stop > tail:
             n = tf.count_frames(tail, stop, frame_type) - 1
@@ -424,9 +425,10 @@ async def sync_for_sec(code: str, sync_frames: dict = None):
                 logger.debug("sync %s level bars of %s to %s: expected: %s, actual %s",
                              frame_type, code, stop, n, len(bars))
                 counters[frame_type.value] += len(bars)
+                # todo: 如果股票停牌，就会出现这种情况
                 if bars['frame'][0] != tf.shift(tail, 1, frame_type):
-                    logger.warning("incontinuous frames found: tail(%s), bars[0]("
-                                   "%s)", tail, bars['frame'][0])
+                    logger.warning("discrete frames found: %s, tail(%s), bars[0]("
+                                   "%s)", code, tail, bars['frame'][0])
 
     logger.info("finished sync %s, %s", code,
                 ",".join([f"{k}:{v}" for k, v in counters.items()]))

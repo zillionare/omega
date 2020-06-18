@@ -21,7 +21,7 @@ from sanic import Sanic, response
 
 import omega.jobs.syncquotes as sq
 from omega.config.cfg4py_auto_gen import Config
-from omega.core import get_config_dir
+from omega.core import get_config_dir, check_env
 from omega.jobs.synccalendar import sync_calendar
 
 app = Sanic('Omega-jobs')
@@ -92,6 +92,8 @@ def load_additional_jobs():
 
 
 def start(host: str = '0.0.0.0', port: int = 3180):
+    check_env()
     logger.info("staring omega jobs...")
     app.register_listener(init, 'before_server_start')
     app.run(host=host, port=port, register_sys_signals=True)
+    logger.info("omega jobs exited.")

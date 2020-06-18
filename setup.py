@@ -27,12 +27,13 @@ requirements = [
     'numpy>=1.18.1',
     'numba==0.49.1',
     'aiohttp==3.6.2',
-    'pytz==2019.3',
+    'pytz==2020.1',
     'xxhash==1.4.3',
     'zillionare-omicron>=0.1.2',
     'aiocache==0.11.1',
     'sanic==20.3.0',
-    'psutil==5.7.0'
+    'psutil==5.7.0',
+    'termcolor==1.1.0'
 ]
 
 setup_requirements = []
@@ -90,6 +91,6 @@ setup(
         'install': InstallCommand
     },
     entry_points={
-        'console_scripts': ['omega=omega.main:main']
+        'console_scripts': ['omega=omega.cli:main']
     }
 )

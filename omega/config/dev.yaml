@@ -8,7 +8,8 @@ quotes_fetchers:
     groups:
       - account: '18694978299'
         password: 8Bu8tcDpEAHJRn
-        sessions: 2
+        sessions: 1
+
 #        - account: '15629126689'
 #          password: '0O2i*tFsENT8'
 #          sessions: 2

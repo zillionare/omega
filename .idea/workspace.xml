@@ -4,10 +4,16 @@
     <option name="SCOPE_TYPE" value="3" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9d315cbc-a8db-4353-8626-19fd45be9e4a" name="Default Changelist" comment="more dependency">
+    <list default="true" id="9d315cbc-a8db-4353-8626-19fd45be9e4a" name="Default Changelist" comment="1. sync_bars passed testing&#10;2. init omicron with AbstractQuotesFetcher, so omicron can get quotes from local fetcher interface&#10;todo:&#10;1. no convenient way to start and detach a child process">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/omega/app.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/app.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/omega/cli.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/cli.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/omega/config/defaults.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/omega/config/defaults.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/omega/config/dev.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/omega/config/dev.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/omega/core/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/core/__init__.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/omega/jobs/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/jobs/__init__.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/omega/jobs/syncquotes.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/jobs/syncquotes.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/setup.py" beforeDir="false" afterPath="$PROJECT_DIR$/setup.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -40,7 +46,7 @@
     <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
     <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
     <property name="WebServerToolWindowFactoryState" value="false" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/omega/jobs/__init__.py" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/omega/app.py" />
     <property name="run.code.analysis.last.selected.profile" value="aDefault" />
     <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyIntegratedToolsModulesConfigurable" />
   </component>
@@ -60,13 +66,13 @@
         <env name="__cfg4py_server_role__" value="DEV" />
       </envs>
       <option name="SDK_HOME" value="ssh://aaron@localhost:22/home/aaron/miniconda3/envs/omega/bin/python" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/omega/jobs" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/omega" />
       <option name="IS_MODULE_SDK" value="false" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/omega/jobs/__main__.py" />
-      <option name="PARAMETERS" value="start" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/omega/cli.py" />
+      <option name="PARAMETERS" value="start jobs" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
       <option name="MODULE_MODE" value="false" />
@@ -88,6 +94,14 @@
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <PathMappingSettings>
+        <option name="pathMappings">
+          <list>
+            <mapping local-root="$PROJECT_DIR$" remote-root="/mnt/c/workspace/omega" />
+            <mapping local-root="$PROJECT_DIR$/../omicron" remote-root="/mnt/c/workspace/omicron" />
+          </list>
+        </option>
+      </PathMappingSettings>
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/omega/app.py" />
       <option name="PARAMETERS" value="start --impl=jqadaptor --group_id=0" />
       <option name="SHOW_COMMAND_LINE" value="false" />
@@ -268,7 +282,9 @@
       <workItem from="1592014790712" duration="21054000" />
       <workItem from="1592061326317" duration="2976000" />
       <workItem from="1592105872930" duration="23221000" />
-      <workItem from="1592181801140" duration="22780000" />
+      <workItem from="1592181801140" duration="34460000" />
+      <workItem from="1592352401217" duration="16038000" />
+      <workItem from="1592441058874" duration="2056000" />
     </task>
     <task id="LOCAL-00001" summary="1. omicron refactors cache, now move all save_bars to cache&#10;2. timeout for jq remote set to 20, sometimes still not enough&#10;3. omega work lead select mesh">
       <created>1588863976311</created>
@@ -354,7 +370,14 @@
       <option name="project" value="LOCAL" />
       <updated>1592276041050</updated>
     </task>
-    <option name="localTasksCounter" value="13" />
+    <task id="LOCAL-00013" summary="amend log">
+      <created>1592277565729</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1592277565729</updated>
+    </task>
+    <option name="localTasksCounter" value="14" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -390,7 +413,9 @@
         </entry>
         <entry key="MAIN">
           <value>
-            <State />
+            <State>
+              <option name="COLUMN_ORDER" />
+            </State>
           </value>
         </entry>
       </map>
@@ -416,35 +441,36 @@
     <MESSAGE value="minor bug fix." />
     <MESSAGE value="change omega.app start interface, use parameters in config file as much as possible&#10;jobs can be executed by `python -m omega.jobs start` now" />
     <MESSAGE value="more dependency" />
-    <option name="LAST_COMMIT_MESSAGE" value="more dependency" />
+    <MESSAGE value="amend log" />
+    <option name="LAST_COMMIT_MESSAGE" value="amend log" />
     <option name="OPTIMIZE_IMPORTS_BEFORE_PROJECT_COMMIT" value="true" />
     <option name="REFORMAT_BEFORE_PROJECT_COMMIT" value="true" />
     <option name="REARRANGE_BEFORE_PROJECT_COMMIT" value="true" />
   </component>
   <component name="WindowStateProjectService">
-    <state x="3274" y="78" width="1151" height="852" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1592277314206">
+    <state x="3107" y="164" width="1151" height="852" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1592400749471">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="141" y="124" key="#com.intellij.execution.impl.EditConfigurationsDialog/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1588815892868" />
-    <state x="3274" y="78" width="1151" height="852" key="#com.intellij.execution.impl.EditConfigurationsDialog/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592277314206" />
+    <state x="3107" y="164" width="1151" height="852" key="#com.intellij.execution.impl.EditConfigurationsDialog/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592400749471" />
     <state x="3426" y="269" key="#com.intellij.refactoring.safeDelete.UnsafeUsagesDialog" timestamp="1591886754844">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="3426" y="269" key="#com.intellij.refactoring.safeDelete.UnsafeUsagesDialog/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1591886754844" />
-    <state x="3486" y="88" width="1067" height="624" key="#xdebugger.evaluate" timestamp="1592188107725">
+    <state x="3524" y="167" width="1067" height="624" key="#xdebugger.evaluate" timestamp="1592407014324">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="288" y="206" key="#xdebugger.evaluate/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1588764554989" />
-    <state x="3486" y="88" width="1067" height="624" key="#xdebugger.evaluate/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592188107725" />
+    <state x="3524" y="167" width="1067" height="624" key="#xdebugger.evaluate/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592407014324" />
     <state x="3455" y="399" key="ANALYSIS_DLG_com.intellij.analysis.BaseAnalysisAction$1" timestamp="1590568153609">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="3455" y="399" key="ANALYSIS_DLG_com.intellij.analysis.BaseAnalysisAction$1/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1590568153609" />
-    <state x="2931" y="9" width="1259" height="954" key="CommitChangelistDialog2" timestamp="1592277459976">
+    <state x="2931" y="9" width="1259" height="954" key="CommitChangelistDialog2" timestamp="1592441304228">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="3004" y="86" width="1259" height="954" key="CommitChangelistDialog2/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1590667560260" />
-    <state x="2931" y="9" width="1527" height="1016" key="CommitChangelistDialog2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592277459976" />
+    <state x="2931" y="9" width="1527" height="1016" key="CommitChangelistDialog2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592441304227" />
     <state width="641" height="438" key="DebuggerActiveHint" timestamp="1592131192789">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
@@ -458,74 +484,74 @@
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="3430" y="284" key="EnvironmentVariablesDialog/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592187869073" />
-    <state x="3476" y="278" width="844" height="598" key="FileChooserDialogImpl" timestamp="1591791142905">
+    <state x="3476" y="278" width="844" height="598" key="FileChooserDialogImpl" timestamp="1592353089957">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="527" y="233" key="FileChooserDialogImpl/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1588746007077" />
-    <state x="3476" y="278" width="844" height="598" key="FileChooserDialogImpl/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1591791142905" />
-    <state width="1877" height="293" key="GridCell.Tab.0.bottom" timestamp="1592223707509">
+    <state x="3476" y="278" width="844" height="598" key="FileChooserDialogImpl/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592353089957" />
+    <state width="1878" height="263" key="GridCell.Tab.0.bottom" timestamp="1592408852806">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state width="1322" height="294" key="GridCell.Tab.0.bottom/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1591059791337" />
-    <state width="1877" height="293" key="GridCell.Tab.0.bottom/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592223707509" />
+    <state width="1878" height="263" key="GridCell.Tab.0.bottom/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592408852806" />
     <state width="1878" height="299" key="GridCell.Tab.0.bottom/0.0.1368.872@0.0.1368.872" timestamp="1591923050994" />
-    <state width="1877" height="293" key="GridCell.Tab.0.center" timestamp="1592223707509">
+    <state width="1878" height="263" key="GridCell.Tab.0.center" timestamp="1592408852806">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state width="1322" height="294" key="GridCell.Tab.0.center/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1591059791336" />
-    <state width="1877" height="293" key="GridCell.Tab.0.center/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592223707509" />
+    <state width="1878" height="263" key="GridCell.Tab.0.center/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592408852806" />
     <state width="1878" height="299" key="GridCell.Tab.0.center/0.0.1368.872@0.0.1368.872" timestamp="1591923050993" />
-    <state width="1877" height="293" key="GridCell.Tab.0.left" timestamp="1592223707509">
+    <state width="1878" height="263" key="GridCell.Tab.0.left" timestamp="1592408852806">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state width="1322" height="294" key="GridCell.Tab.0.left/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1591059791336" />
-    <state width="1877" height="293" key="GridCell.Tab.0.left/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592223707509" />
+    <state width="1878" height="263" key="GridCell.Tab.0.left/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592408852806" />
     <state width="1878" height="299" key="GridCell.Tab.0.left/0.0.1368.872@0.0.1368.872" timestamp="1591923050993" />
-    <state width="1877" height="293" key="GridCell.Tab.0.right" timestamp="1592223707509">
+    <state width="1878" height="263" key="GridCell.Tab.0.right" timestamp="1592408852806">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state width="1322" height="294" key="GridCell.Tab.0.right/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1591059791336" />
-    <state width="1877" height="293" key="GridCell.Tab.0.right/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592223707509" />
+    <state width="1878" height="263" key="GridCell.Tab.0.right/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592408852806" />
     <state width="1878" height="299" key="GridCell.Tab.0.right/0.0.1368.872@0.0.1368.872" timestamp="1591923050994" />
-    <state width="1877" height="293" key="GridCell.Tab.1.bottom" timestamp="1592223707509">
+    <state width="1878" height="263" key="GridCell.Tab.1.bottom" timestamp="1592408851424">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state width="1322" height="294" key="GridCell.Tab.1.bottom/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1591059791337" />
-    <state width="1877" height="293" key="GridCell.Tab.1.bottom/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592223707509" />
+    <state width="1878" height="263" key="GridCell.Tab.1.bottom/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592408851424" />
     <state width="1878" height="299" key="GridCell.Tab.1.bottom/0.0.1368.872@0.0.1368.872" timestamp="1591923050994" />
-    <state width="1877" height="293" key="GridCell.Tab.1.center" timestamp="1592223707509">
+    <state width="1878" height="263" key="GridCell.Tab.1.center" timestamp="1592408851424">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state width="1322" height="294" key="GridCell.Tab.1.center/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1591059791337" />
-    <state width="1877" height="293" key="GridCell.Tab.1.center/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592223707509" />
+    <state width="1878" height="263" key="GridCell.Tab.1.center/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592408851424" />
     <state width="1878" height="299" key="GridCell.Tab.1.center/0.0.1368.872@0.0.1368.872" timestamp="1591923050994" />
-    <state width="1877" height="293" key="GridCell.Tab.1.left" timestamp="1592223707509">
+    <state width="1878" height="263" key="GridCell.Tab.1.left" timestamp="1592408851423">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state width="1322" height="294" key="GridCell.Tab.1.left/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1591059791337" />
-    <state width="1877" height="293" key="GridCell.Tab.1.left/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592223707509" />
+    <state width="1878" height="263" key="GridCell.Tab.1.left/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592408851423" />
     <state width="1878" height="299" key="GridCell.Tab.1.left/0.0.1368.872@0.0.1368.872" timestamp="1591923050994" />
-    <state width="1877" height="293" key="GridCell.Tab.1.right" timestamp="1592223707509">
+    <state width="1878" height="263" key="GridCell.Tab.1.right" timestamp="1592408851424">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state width="1322" height="294" key="GridCell.Tab.1.right/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1591059791337" />
-    <state width="1877" height="293" key="GridCell.Tab.1.right/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592223707509" />
+    <state width="1878" height="263" key="GridCell.Tab.1.right/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592408851424" />
     <state width="1878" height="299" key="GridCell.Tab.1.right/0.0.1368.872@0.0.1368.872" timestamp="1591923050994" />
-    <state x="3441" y="206" key="PyMappingSimpleResolveDialog" timestamp="1592036891761">
+    <state x="3441" y="206" key="PyMappingSimpleResolveDialog" timestamp="1592400701830">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="502" y="173" key="PyMappingSimpleResolveDialog/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1588815821047" />
-    <state x="3441" y="206" key="PyMappingSimpleResolveDialog/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592036891761" />
+    <state x="3441" y="206" key="PyMappingSimpleResolveDialog/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592400701830" />
     <state x="3088" y="108" key="SettingsEditor" timestamp="1591863693398">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="241" y="95" key="SettingsEditor/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1588746396970" />
     <state x="3088" y="108" key="SettingsEditor/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1591863693398" />
-    <state x="3288" y="256" key="Vcs.Push.Dialog.v2" timestamp="1592276050187">
+    <state x="3288" y="256" key="Vcs.Push.Dialog.v2" timestamp="1592277572133">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="393" y="215" key="Vcs.Push.Dialog.v2/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1590667566517" />
-    <state x="3288" y="256" key="Vcs.Push.Dialog.v2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592276050187" />
+    <state x="3288" y="256" key="Vcs.Push.Dialog.v2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592277572133" />
     <state width="968" height="528" key="XDebugger.FullValuePopup" timestamp="1591348428503">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
@@ -538,21 +564,21 @@
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="2828" y="92" width="1736" height="856" maximized="true" key="com.intellij.history.integration.ui.views.FileHistoryDialog/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592142781691" />
-    <state x="3076" y="209" key="com.intellij.xdebugger.impl.breakpoints.ui.BreakpointsDialogFactory$2" timestamp="1592016433616">
+    <state x="3434" y="161" key="com.intellij.xdebugger.impl.breakpoints.ui.BreakpointsDialogFactory$2" timestamp="1592403163958">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="242" y="175" key="com.intellij.xdebugger.impl.breakpoints.ui.BreakpointsDialogFactory$2/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1588815934161" />
-    <state x="3076" y="209" key="com.intellij.xdebugger.impl.breakpoints.ui.BreakpointsDialogFactory$2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592016433616" />
+    <state x="3434" y="161" key="com.intellij.xdebugger.impl.breakpoints.ui.BreakpointsDialogFactory$2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592403163958" />
     <state x="3580" y="219" key="com.jetbrains.plugins.remotesdk.ui.RemoteMappingsConfiguration" timestamp="1590674910490">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="601" y="184" key="com.jetbrains.plugins.remotesdk.ui.RemoteMappingsConfiguration/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1588745953817" />
     <state x="3580" y="219" key="com.jetbrains.plugins.remotesdk.ui.RemoteMappingsConfiguration/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1590674910490" />
-    <state x="2886" y="50" width="956" height="852" key="find.popup" timestamp="1592220407265">
+    <state x="2886" y="50" width="956" height="852" key="find.popup" timestamp="1592442345139">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="415" y="206" width="752" height="548" key="find.popup/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1592105983157" />
-    <state x="2886" y="50" width="956" height="852" key="find.popup/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592220407265" />
+    <state x="2886" y="50" width="956" height="852" key="find.popup/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592442345139" />
     <state x="3454" y="199" width="504" height="527" key="ftp.server.browser" timestamp="1590674877225">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
@@ -595,6 +621,11 @@
           <line>249</line>
           <option name="timeStamp" value="216" />
         </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>mock:///</url>
+          <line>25</line>
+          <option name="timeStamp" value="244" />
+        </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
     <watches-manager>
@@ -611,15 +642,16 @@
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/omega$Unittests_for_test_jobs_MyTestCase_test_002_sync_week_bars.coverage" NAME="Unittests for test_jobs.MyTestCase.test_002_sync_week_bars Coverage Results" MODIFIED="1592036871874" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$omega_start.coverage" NAME="omega start Coverage Results" MODIFIED="1592223068086" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/omega" />
+    <SUITE FILE_PATH="coverage/omega$omega_start.coverage" NAME="omega start Coverage Results" MODIFIED="1592405799690" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/omega" />
     <SUITE FILE_PATH="coverage/omega$Unittests_for_test_jobs_MyTestCase_test_100_sync_calendar.coverage" NAME="Unittests for test_jobs.MyTestCase.test_100_sync_calendar Coverage Results" MODIFIED="1590024515314" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
+    <SUITE FILE_PATH="coverage/omega$omega_start_jobs.coverage" NAME="omega start jobs Coverage Results" MODIFIED="1592307475739" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="" />
     <SUITE FILE_PATH="coverage/omega$Unittests_for_test_jobs_MyTestCase_test_201_start_job_validation.coverage" NAME="Unittests for test_jobs.MyTestCase.test_201_start_job_validation Coverage Results" MODIFIED="1592149682601" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
     <SUITE FILE_PATH="coverage/omega$Unittests_for_test_jobs_MyTestCase_test_000_sync_day_bars.coverage" NAME="Unittests for test_jobs.MyTestCase.test_000_sync_day_bars Coverage Results" MODIFIED="1592017275308" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
     <SUITE FILE_PATH="coverage/omega$Unittests_for_test_jobs_MyTestCase_test_load_additional_jobs.coverage" NAME="Unittests for test_jobs.MyTestCase.test_load_additional_jobs Coverage Results" MODIFIED="1592118227442" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
     <SUITE FILE_PATH="coverage/omega$Unittests_for_test_omega_MyTestCase_test_config_supervisord.coverage" NAME="Unittests for test_omega.MyTestCase.test_config_supervisord Coverage Results" MODIFIED="1590479548003" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
     <SUITE FILE_PATH="coverage/omega$omega.coverage" NAME="omega Coverage Results" MODIFIED="1590673164057" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/omega" />
     <SUITE FILE_PATH="coverage/omega$Unittests_for_test_abstract_quotes_fetcher_MyTestCase.coverage" NAME="Unittests for test_abstract_quotes_fetcher.MyTestCase Coverage Results" MODIFIED="1590049940787" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$jobs_start.coverage" NAME="jobs-start Coverage Results" MODIFIED="1592223080007" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/omega/jobs" />
+    <SUITE FILE_PATH="coverage/omega$jobs_start.coverage" NAME="jobs-start Coverage Results" MODIFIED="1592308636207" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/omega" />
     <SUITE FILE_PATH="coverage/omega$Unittests_for_test_process_MyTestCase_test_entry.coverage" NAME="Unittests for test_process.MyTestCase.test_entry Coverage Results" MODIFIED="1590894593996" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
     <SUITE FILE_PATH="coverage/omega$Unittests_for_test_omega_MyTestCase_test_get_security_list.coverage" NAME="Unittests for test_omega.MyTestCase.test_get_security_list Coverage Results" MODIFIED="1592200248920" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
     <SUITE FILE_PATH="coverage/omega$Unittests_for_test_jobs_MyTestCase_test_memory.coverage" NAME="Unittests for test_jobs.MyTestCase.test_memory Coverage Results" MODIFIED="1590157998056" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
