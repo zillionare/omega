@@ -19,10 +19,9 @@ from pyemit import emit
 from sanic import Sanic, response
 
 from omega.config.cfg4py_auto_gen import Config
-from omega.core import get_config_dir
+from omega.core import get_config_dir, syncquotes as sq
 from omega.core.events import Events
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
-from omega.jobs import syncquotes as sq
 
 cfg: Config = cfg4py.get_instance()
 

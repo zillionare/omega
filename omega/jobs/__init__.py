@@ -19,10 +19,11 @@ from omicron.dal import cache
 from pyemit import emit
 from sanic import Sanic, response
 
-import omega.jobs.syncquotes as sq
+import omega.core.sanity
+import omega.core.syncquotes as sq
 from omega.config.cfg4py_auto_gen import Config
 from omega.core import get_config_dir, check_env
-from omega.jobs.synccalendar import sync_calendar
+from omega.core.synccalendar import sync_calendar
 
 app = Sanic('Omega-jobs')
 logger = logging.getLogger(__name__)
@@ -45,7 +46,7 @@ async def init(app, loop):
     # do validation daily
     # todo: don't start at non-trade day
     h, m = map(int, cfg.omega.validation.time.split(":"))
-    scheduler.add_job(sq.start_validation, 'cron', hour=h, minute=m)
+    scheduler.add_job(omega.core.sanity.start_validation, 'cron', hour=h, minute=m)
 
     # sync bars
     h, m = map(int, cfg.omega.sync.time.split(":"))

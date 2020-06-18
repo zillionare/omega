@@ -1,9 +1,9 @@
-import functools
 import logging
 import os
 import signal
 import subprocess
 import sys
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -22,8 +22,9 @@ from omicron.dal import security_cache
 from omicron.models.securities import Securities
 from pyemit import emit
 
-import omega.jobs.synccalendar as sc
-import omega.jobs.syncquotes as sq
+import omega.core.sanity
+import omega.core.synccalendar as sc
+import omega.core.syncquotes as sq
 from omega.config.cfg4py_auto_gen import Config
 from omega.core import get_config_dir
 from omega.core.events import ValidationError
@@ -40,7 +41,6 @@ class MyTestCase(unittest.TestCase):
         os.environ[cfg4py.envar] = 'DEV'
         self.config_dir = get_config_dir()
 
-        logger.info("starting solo quotes server...")
         cfg4py.init(self.config_dir, False)
 
         await emit.start(engine=emit.Engine.REDIS, dsn=cfg.redis.dsn, start_server=True)
@@ -54,19 +54,17 @@ class MyTestCase(unittest.TestCase):
         cfg: Config = cfg4py.get_instance()
         fetcher_info = cfg.quotes_fetchers[0]
         impl = fetcher_info['impl']
-        params = fetcher_info['workers'][0]
+        params = fetcher_info['groups'][0]
         if 'port' in params: del params['port']
         if 'sessions' in params: del params['sessions']
         await fetcher.create_instance(impl, **params)
 
     def start_server(self):
-        account = os.environ.get("jqsdk_account")
-        password = os.environ.get("jqsdk_password")
-        code = f"from omega.app import start; start(config_dir='{self.config_dir}', " \
-               f"port=23180, impl='jqadaptor', account='{account}', password=" \
-               f"'{password}')"
-        self.server_process = subprocess.Popen([sys.executable, '-c', code],
+        logger.info("starting omega quotes server")
+        self.server_process = subprocess.Popen([sys.executable, '-m', 'omega.app',
+                                                'start', 'jqadaptor'],
                                                env=os.environ)
+        time.sleep(5)
 
     def stop_server(self) -> None:
         os.kill(self.server_process.pid, signal.SIGTERM)
@@ -205,22 +203,22 @@ class MyTestCase(unittest.TestCase):
 
     @async_run
     async def test_200_validation(self):
+        self.start_server()
         await self.prepare_checksum_data()
 
         errors = set()
 
-        def collect_error(errors: set, report: tuple):
+        async def collect_error(report: tuple):
             if report[0] != ValidationError.UNKNOWN:
                 errors.add(report)
 
-        emit.register(Events.OMEGA_VALIDATION_ERROR,
-                      functools.partial(collect_error, errors))
+        emit.register(Events.OMEGA_VALIDATION_ERROR, collect_error)
 
         codes = ['000001.XSHE']
         await cache.sys.set('jobs.bars_validation.range.start', '20200511')
         await cache.sys.set('jobs.bars_validation.range.stop', '20200513')
-        await sq.do_validation(codes, '20200511', '20200512')
-        self.assertSetEqual(set(), set(errors))
+        await omega.core.sanity.do_validation(codes, '20200511', '20200512')
+        self.assertSetEqual({(0, 20200511, None, None, None, None)}, set(errors))
 
         mock_checksum = {
             '000001.XSHE': {
@@ -243,10 +241,10 @@ class MyTestCase(unittest.TestCase):
 
         await cache.sys.set('jobs.bars_validation.range.start', '20200511')
         await cache.sys.set('jobs.bars_validation.range.stop', '20200513')
-        with mock.patch('omega.jobs.syncquotes.calc_checksums',
+        with mock.patch('omega.core.sanity.calc_checksums',
                         side_effect=[mock_checksum]):
             tf.day_frames = np.array([20200512])
-            await sq.do_validation(codes, '20200511', '20200512')
+            await omega.core.sanity.do_validation(codes, '20200511', '20200512')
             self.assertSetEqual({'20200512,000001.XSHE:1d,7918c38d,7918c38c',
                                  '20200512,000001.XSHG:1m,d37d8742,d37d8741'},
                                 errors)
@@ -255,7 +253,7 @@ class MyTestCase(unittest.TestCase):
     async def test_201_start_job_validation(self):
         secs = Securities()
         with mock.patch.object(secs, 'choose', return_value=['000001.XSHE']):
-            await sq.start_validation()
+            await omega.core.sanity.start_validation()
 
     async def prepare_checksum_data(self):
         end = arrow.get('2020-05-12 15:00')
@@ -305,14 +303,14 @@ class MyTestCase(unittest.TestCase):
             pass
 
         # read from remote, and cache it
-        actual = await sq.get_checksum(20200512)
+        actual = await omega.core.sanity.get_checksum(20200512)
 
         for code in ['000001.XSHE', '000001.XSHG']:
             self.assertDictEqual(expected.get(code), actual.get(code))
 
         # read from local cached file
         self.assertTrue(os.path.exists(chksum_file))
-        actual = await sq.get_checksum(20200512)
+        actual = await omega.core.sanity.get_checksum(20200512)
         for code in ['000001.XSHE', '000001.XSHG']:
             self.assertDictEqual(expected.get(code), actual.get(code))
 
