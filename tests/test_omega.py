@@ -81,6 +81,15 @@ class MyTestCase(unittest.TestCase):
         finally:
             self.stop_server()
 
+    def test_report_logging(self):
+        validation = logging.getLogger('validation')
+        validation.info("this is a test, should go to validation")
+
+        quickscan = logging.getLogger('quickscan')
+        quickscan.info("this is a test should go to quickscan")
+
+        logging.info("this is default, should go to omega.log")
+
 
 if __name__ == '__main__':
     unittest.main()

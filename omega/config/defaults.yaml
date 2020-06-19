@@ -2,40 +2,47 @@
 logging:
   disable_existing_loggers: false
   formatters:
-    simple:
+    default:
       #format: '%(asctime)s %(levelname)-1.1s %(filename)s:%(funcName)s:%(lineno)s | %(message)s'
       format: '%(asctime)s %(levelname)-1.1s %(process)d %(name)s:%(funcName)s:%(lineno)s | %(message)s'
-    report:
-      format: '%(message)s'
+    validation:
+      format: 'VALIDATION: %(message)s'
+    quickscan:
+      format: 'QUICKSCAN: %(message)s'
   handlers:
     console:
       class: logging.StreamHandler
-      formatter: simple
+      formatter: default
       level: DEBUG
-    syslog:
+    default:
       class: logging.handlers.SysLogHandler
       address: /dev/log
       facility: local6
-      formatter: simple
-    validation_report:
-      backupCount: 7
-      class: logging.handlers.RotatingFileHandler
-      encoding: utf-8
-      filename: /var/log/zillionare/validation.log
-      formatter: report
-      level: INFO
-      maxBytes: 10485760
+      formatter: default
+    validation:
+      class: logging.handlers.SysLogHandler
+      address: /dev/log
+      facility: local6
+      formatter: validation
+    quickscan:
+      class: logging.handlers.SysLogHandler
+      address: /dev/log
+      facility: local6
+      formatter: quickscan
   loggers:
     apscheduler:
       level: WARNING
     pyemit:
       level: INFO
-    validation_report:
+    validation:
       handlers:
-        - validation_report
+        - validation
+    quickscan:
+      handlers:
+        - quickscan
   root:
     handlers:
-      - syslog
+      - default
       - console
     level: INFO
   version: 1

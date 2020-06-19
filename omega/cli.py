@@ -148,7 +148,7 @@ def config_syslog():
     """
     # wait user's confirmation
     input(format_msg(msg))
-    src = Path('~/zillionare/omega/config/51-omega.conf').expanduser()
+    src = Path('~/zillionare/omega/config/32-omega-default.conf').expanduser()
     dst = '/etc/rsyslog.d'
 
     try:
@@ -334,7 +334,7 @@ def setup(reset_factory=False):
         dst = pathlib.Path('~/zillionare/omega/config/').expanduser()
         os.makedirs(dst, exist_ok=True)
 
-        for file in ['config/defaults.yaml', 'config/51-omega.conf']:
+        for file in ['config/defaults.yaml', 'config/32-omega-default.conf']:
             src = pkg_resources.resource_filename('omega', file)
             sh.cp("-r", src, dst)
 

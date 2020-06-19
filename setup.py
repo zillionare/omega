@@ -45,11 +45,14 @@ def post_install():
     import sh
 
     for item in ['config', 'data/chksum']:
-        folder = (pathlib.Path('~/zillionare/omega')/item).expanduser()
+        folder = (pathlib.Path('~/zillionare/omega') / item).expanduser()
         os.makedirs(folder, exist_ok=True)
 
     dst = pathlib.Path('~/zillionare/omega/config/').expanduser()
-    for file in ['config/defaults.yaml', 'config/51-omega.conf']:
+    for file in ['config/defaults.yaml',
+                 'config/30-omega-validation.conf',
+                 'config/31-omega-quickscan.conf',
+                 'config/32-omega-default.conf']:
         src = pkg_resources.resource_filename('omega', file)
         sh.cp("-r", src, dst)
 
@@ -61,36 +64,37 @@ class InstallCommand(install):
 
 
 setup(
-    author="Aaron Yang",
-    author_email='code@jieyu.ai',
-    python_requires='>=3.8 ',
-    classifiers=[
-        'Development Status :: 2 - Pre-Alpha',
-        'Intended Audience :: Developers',
-        'License :: OSI Approved :: MIT License',
-        'Natural Language :: English',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8',
-    ],
-    description="Data fetcher framework for zillionare",
-    install_requires=requirements,
-    license="MIT license",
-    long_description=readme + '\n\n' + history,
-    include_package_data=True,
-    keywords='omega',
-    name='zillionare-omega',
-    packages=find_packages(include=['omega', 'omega.*']),
-    pacakge_data={'omega': ['config/defaults.yaml', 'config/51-omega.conf']},
-    setup_requires=setup_requirements,
-    test_suite='tests',
-    tests_require=test_requirements,
-    url='https://github.com/zillionare/omega',
-    version='0.4.0',
-    zip_safe=False,
-    cmdclass={
-        'install': InstallCommand
-    },
-    entry_points={
-        'console_scripts': ['omega=omega.cli:main']
-    }
+        author="Aaron Yang",
+        author_email='code@jieyu.ai',
+        python_requires='>=3.8 ',
+        classifiers=[
+            'Development Status :: 2 - Pre-Alpha',
+            'Intended Audience :: Developers',
+            'License :: OSI Approved :: MIT License',
+            'Natural Language :: English',
+            'Programming Language :: Python :: 3.7',
+            'Programming Language :: Python :: 3.8',
+        ],
+        description="Data fetcher framework for zillionare",
+        install_requires=requirements,
+        license="MIT license",
+        long_description=readme + '\n\n' + history,
+        include_package_data=True,
+        keywords='omega',
+        name='zillionare-omega',
+        packages=find_packages(include=['omega', 'omega.*']),
+        pacakge_data={
+            'omega': ['config/defaults.yaml', 'config/32-omega-default.conf']},
+        setup_requires=setup_requirements,
+        test_suite='tests',
+        tests_require=test_requirements,
+        url='https://github.com/zillionare/omega',
+        version='0.4.0',
+        zip_safe=False,
+        cmdclass={
+            'install': InstallCommand
+        },
+        entry_points={
+            'console_scripts': ['omega=omega.cli:main']
+        }
 )

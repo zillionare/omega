@@ -28,15 +28,13 @@ from aiocache import cached
 from aiohttp import ClientError
 from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
-from omicron.dal import security_cache as sc, cache
+from omicron.dal import security_cache as sc, cache, security_cache
 from omicron.models.securities import Securities
 from pyemit import emit
 
 from omega.core import get_config_dir
 from omega.core.events import ValidationError, Events
 from omega.core.syncquotes import cfg, logger
-
-logger = logging.getLogger(__name__)
 
 
 async def calc_checksums(day: datetime.date, codes: List) -> dict:
@@ -307,3 +305,23 @@ async def start_validation():
     elapsed = time.time() - t0
     logger.info("Validation cost %s seconds, validation will start at %s next time",
                 elapsed, last_no_error_day)
+
+
+async def quick_scan():
+    secs = Securities()
+    codes = secs.choose(cfg.omega.sync.type)
+
+    while code := codes.pop():
+        for frame, start_stop in cfg.omega.sync.frames.items():
+            frame_type = FrameType(frame)
+            start_stop = start_stop.split(",")
+            start = tf.day_shift(arrow.get(start_stop[0]), 0)
+            if len(start_stop) == 2:
+                stop = tf.day_shift(arrow.get(start_stop[1]), 0)
+            else:
+                stop = tf.day_shift(arrow.now(), 0)
+
+            head, tail = await security_cache.get_bars_range(code, frame_type)
+            count = await cache.security.hlen(f"{code}:{frame_type.value}")
+            if count != tf.count_frames(head, tail, frame_type):
+                pass
