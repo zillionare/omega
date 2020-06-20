@@ -6,8 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="9d315cbc-a8db-4353-8626-19fd45be9e4a" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/omega/config/31-omega-quickscan.conf" beforeDir="false" afterPath="$PROJECT_DIR$/omega/config/31-omega-quickscan.conf" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/omega/config/32-omega-default.conf" beforeDir="false" afterPath="$PROJECT_DIR$/omega/config/32-omega-default.conf" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/omega/cli.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/cli.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -333,7 +332,7 @@
       <workItem from="1592577721398" duration="112000" />
       <workItem from="1592617536993" duration="6378000" />
       <workItem from="1592638522048" duration="18408000" />
-      <workItem from="1592664438468" duration="1796000" />
+      <workItem from="1592664438468" duration="2211000" />
     </task>
     <task id="LOCAL-00001" summary="1. omicron refactors cache, now move all save_bars to cache&#10;2. timeout for jq remote set to 20, sometimes still not enough&#10;3. omega work lead select mesh">
       <created>1588863976311</created>
@@ -461,7 +460,14 @@
       <option name="project" value="LOCAL" />
       <updated>1592664290723</updated>
     </task>
-    <option name="localTasksCounter" value="19" />
+    <task id="LOCAL-00019" summary="1. quickscan tag missed &quot;:&quot; cause filter failed. Fixed by sudo rsyslogd -dn&#10;2. use msg instead of rawmsg in omega-default">
+      <created>1592668001672</created>
+      <option name="number" value="00019" />
+      <option name="presentableId" value="LOCAL-00019" />
+      <option name="project" value="LOCAL" />
+      <updated>1592668001672</updated>
+    </task>
+    <option name="localTasksCounter" value="20" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -531,7 +537,8 @@
     <MESSAGE value="add quick_scan" />
     <MESSAGE value="add quick_scan to cli" />
     <MESSAGE value="1. fetcher port should now be specified in configuration file. Now starts fetcher process need impl and group-id only.&#10;2. now week_frames and month_frames are all calculated from trade_days, which should be provided by quotes fetcher.&#10;3. manage omega by cli: provide start, stop, status, restart, sync_sec_list, sync_calendar, sync_bars" />
-    <option name="LAST_COMMIT_MESSAGE" value="1. fetcher port should now be specified in configuration file. Now starts fetcher process need impl and group-id only.&#10;2. now week_frames and month_frames are all calculated from trade_days, which should be provided by quotes fetcher.&#10;3. manage omega by cli: provide start, stop, status, restart, sync_sec_list, sync_calendar, sync_bars" />
+    <MESSAGE value="1. quickscan tag missed &quot;:&quot; cause filter failed. Fixed by sudo rsyslogd -dn&#10;2. use msg instead of rawmsg in omega-default" />
+    <option name="LAST_COMMIT_MESSAGE" value="1. quickscan tag missed &quot;:&quot; cause filter failed. Fixed by sudo rsyslogd -dn&#10;2. use msg instead of rawmsg in omega-default" />
     <option name="OPTIMIZE_IMPORTS_BEFORE_PROJECT_COMMIT" value="true" />
     <option name="REFORMAT_BEFORE_PROJECT_COMMIT" value="true" />
     <option name="REARRANGE_BEFORE_PROJECT_COMMIT" value="true" />
@@ -559,11 +566,11 @@
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="3455" y="399" key="ANALYSIS_DLG_com.intellij.analysis.BaseAnalysisAction$1/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1590568153609" />
-    <state x="2931" y="9" width="1259" height="954" key="CommitChangelistDialog2" timestamp="1592664289190">
+    <state x="2931" y="9" width="1259" height="954" key="CommitChangelistDialog2" timestamp="1592667999226">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="3004" y="86" width="1259" height="954" key="CommitChangelistDialog2/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1590667560260" />
-    <state x="2931" y="9" width="1527" height="1016" key="CommitChangelistDialog2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592664289190" />
+    <state x="2931" y="9" width="1527" height="1016" key="CommitChangelistDialog2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592667999226" />
     <state width="664" height="438" key="DebuggerActiveHint" timestamp="1592655695748">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
@@ -644,11 +651,11 @@
     </state>
     <state x="241" y="95" key="SettingsEditor/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1588746396970" />
     <state x="3088" y="108" key="SettingsEditor/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1591863693398" />
-    <state x="3288" y="256" key="Vcs.Push.Dialog.v2" timestamp="1592664293564">
+    <state x="3288" y="256" key="Vcs.Push.Dialog.v2" timestamp="1592668006235">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="393" y="215" key="Vcs.Push.Dialog.v2/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1590667566517" />
-    <state x="3288" y="256" key="Vcs.Push.Dialog.v2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592664293564" />
+    <state x="3288" y="256" key="Vcs.Push.Dialog.v2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592668006235" />
     <state width="968" height="528" key="XDebugger.FullValuePopup" timestamp="1591348428503">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
@@ -730,7 +737,7 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/omega/cli.py</url>
-          <line>581</line>
+          <line>582</line>
           <option name="timeStamp" value="267" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">

@@ -573,12 +573,13 @@ def sync_calendar():
 
 
 def sync_bars(start: str, end: str = '', frame: str = '1d', codes: str = ''):
+    asyncio.run(_init())
+
     if len(codes) == 0:
         codes = Securities().choose(cfg.omega.sync.type)
     else:
         codes = codes.split(",")
 
-    asyncio.run(_init())
     asyncio.run(sync.sync_bars(codes, {frame: f"{start},{end}"}))
 
 
