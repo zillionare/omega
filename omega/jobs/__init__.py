@@ -11,11 +11,12 @@ import logging
 import time
 from typing import Optional
 
+import aiohttp
 import arrow
 import cfg4py
 import omicron
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from omicron.dal import cache
+from omicron.dal import cache, security_cache
 from pyemit import emit
 from sanic import Sanic, response
 
@@ -23,7 +24,7 @@ import omega.core.sanity
 import omega.core.syncquotes as sq
 from omega.config.cfg4py_auto_gen import Config
 from omega.core import get_config_dir, check_env
-from omega.core.synccalendar import sync_calendar
+from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher
 
 app = Sanic('Omega-jobs')
 logger = logging.getLogger(__name__)
@@ -98,3 +99,25 @@ def start(host: str = '0.0.0.0', port: int = 3180):
     app.register_listener(init, 'before_server_start')
     app.run(host=host, port=port, register_sys_signals=True)
     logger.info("omega jobs exited.")
+
+
+async def sync_calendar():
+    async with aiohttp.ClientSession() as client:
+        async with client.get(cfg.omega.urls.calendar) as resp:
+            if resp.status != 200:
+                logger.warning("failed to fetch calendar from %s",
+                               cfg.omega.urls.calendar)
+                return
+
+            calendar = await resp.json()
+
+    trade_days = await AbstractQuotesFetcher.get_all_trade_days()
+    if trade_days is None or len(trade_days) == 0:
+        if calendar.get('day_frames') is not None:
+            logger.info("save day_frames from %s", cfg.omega.urls.calendar)
+            await security_cache.save_calendar('day_frames', calendar['day_frames'])
+
+    for name in ['week_frames', 'month_frames']:
+        if calendar.get(name):
+            logger.info("save %s from %s", name, cfg.omega.urls.calendar)
+            await security_cache.save_calendar(name, calendar.get(name))

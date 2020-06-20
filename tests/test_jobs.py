@@ -23,8 +23,8 @@ from omicron.models.securities import Securities
 from pyemit import emit
 
 import omega.core.sanity
-import omega.core.synccalendar as sc
 import omega.core.syncquotes as sq
+import omega.jobs
 from omega.config.cfg4py_auto_gen import Config
 from omega.core import get_config_dir
 from omega.core.events import ValidationError
@@ -46,7 +46,7 @@ class MyTestCase(unittest.TestCase):
         await emit.start(engine=emit.Engine.REDIS, dsn=cfg.redis.dsn, start_server=True)
         await self.start_quotes_fetchers()
 
-        await omicron.dal.cache.init()
+        await omicron.init(fetcher)
         home = Path(cfg.omega.home).expanduser()
         os.makedirs(str(home / "data/chksum"), exist_ok=True)
 
@@ -55,8 +55,6 @@ class MyTestCase(unittest.TestCase):
         fetcher_info = cfg.quotes_fetchers[0]
         impl = fetcher_info['impl']
         params = fetcher_info['groups'][0]
-        if 'port' in params: del params['port']
-        if 'sessions' in params: del params['sessions']
         await fetcher.create_instance(impl, **params)
 
     def start_server(self):
@@ -195,11 +193,11 @@ class MyTestCase(unittest.TestCase):
 
     @async_run
     async def test_100_sync_calendar(self):
-        await sc.sync_calendar()
+        await omega.jobs.sync_calendar()
 
         with mock.patch('omega.fetcher.abstract_quotes_fetcher.AbstractQuotesFetcher'
                         '.get_all_trade_days', side_effect=[None]):
-            await sc.sync_calendar()
+            await omega.jobs.sync_calendar()
 
     @async_run
     async def test_200_validation(self):
@@ -335,6 +333,10 @@ class MyTestCase(unittest.TestCase):
             'save_to':    '~/.zillionare/omega/server_data/chksum',
             'start_date': '2020-01-01',
             'end_date':   'None'})
+
+    @async_run
+    async def test_quick_scan(self):
+        await omega.core.sanity.quick_scan()
 
 
 if __name__ == '__main__':

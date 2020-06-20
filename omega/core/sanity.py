@@ -15,6 +15,7 @@ import signal
 import subprocess
 import sys
 import time
+from collections import ChainMap
 from pathlib import Path
 from typing import List, Optional
 
@@ -30,6 +31,7 @@ from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
 from omicron.dal import security_cache as sc, cache, security_cache
 from omicron.models.securities import Securities
+from omicron.models.security import Security
 from pyemit import emit
 
 from omega.core import get_config_dir
@@ -309,19 +311,38 @@ async def start_validation():
 
 async def quick_scan():
     secs = Securities()
-    codes = secs.choose(cfg.omega.sync.type)
+    codes = list(secs.choose(cfg.omega.sync.type))
 
-    while code := codes.pop():
-        for frame, start_stop in cfg.omega.sync.frames.items():
-            frame_type = FrameType(frame)
-            start_stop = start_stop.split(",")
-            start = tf.day_shift(arrow.get(start_stop[0]), 0)
-            if len(start_stop) == 2:
-                stop = tf.day_shift(arrow.get(start_stop[1]), 0)
-            else:
-                stop = tf.day_shift(arrow.now(), 0)
+    report = logging.getLogger('quickscan')
+    frames_to_sync = dict(ChainMap(*cfg.omega.sync.frames))
 
+    for frame, start_stop in frames_to_sync.items():
+        frame_type = FrameType(frame)
+        start_stop = start_stop.split(",")
+        start = tf.day_shift(arrow.get(start_stop[0]), 0)
+        if len(start_stop) == 2:
+            stop = tf.day_shift(arrow.get(start_stop[1]), 0)
+        else:
+            stop = tf.day_shift(arrow.now(), 0)
+
+        while code := codes.pop():
             head, tail = await security_cache.get_bars_range(code, frame_type)
-            count = await cache.security.hlen(f"{code}:{frame_type.value}")
-            if count != tf.count_frames(head, tail, frame_type):
-                pass
+            if head is None or tail is None:
+                report.info("ENOSYNC,%s", code)
+                continue
+
+            expected = tf.count_frames(head, tail, frame_type)
+
+            # 'head', 'tail' should be excluded
+            actual = (await cache.security.hlen(f"{code}:{frame_type.value}")) - 2
+            if actual != expected:
+                report.info("ELEN,%s,%s,%s,%s,%s", code, expected, actual, head, tail)
+                continue
+
+            sec = Security(code)
+            if start < tf.day_shift(head, 0) and sec.ipo_date < start:
+                report.info("ESTART,%s,%s,%s,%s", code, start, tf.day_shift(
+                        head, 0), sec.ipo_date)
+                continue
+            if tf.day_shift(tail, 0) < stop:
+                report.info("EEND,%s,%s,%s", code, stop, tf.day_shift(tail, 0))
