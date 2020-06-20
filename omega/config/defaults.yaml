@@ -43,7 +43,6 @@ logging:
   root:
     handlers:
       - default
-      - console
     level: INFO
   version: 1
 tz: Asia/Chongqing

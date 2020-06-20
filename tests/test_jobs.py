@@ -23,8 +23,9 @@ from omicron.models.securities import Securities
 from pyemit import emit
 
 import omega.core.sanity
-import omega.core.syncquotes as sq
 import omega.jobs
+import omega.jobs.sync
+import omega.jobs.sync as sq
 from omega.config.cfg4py_auto_gen import Config
 from omega.core import get_config_dir
 from omega.core.events import ValidationError
@@ -69,12 +70,12 @@ class MyTestCase(unittest.TestCase):
 
     async def sync_and_check(self, code, frame_type, start, stop,
                              expected_head, expected_end):
-        await sq.do_sync({frame_type.value: f"{start},{stop}"}, [code])
+        await sq.sync_bars_worker({frame_type.value: f"{start},{stop}"}, [code])
 
         head, tail = await security_cache.get_bars_range(code, frame_type)
 
         begin = tf.floor(arrow.get(start, tzinfo=cfg.tz), frame_type)
-        end = sq.get_closed_frame(stop, frame_type)
+        end = sq._get_closed_frame(stop, frame_type)
         n_bars = tf.count_frames(begin, end, frame_type)
         bars = await security_cache.get_bars(code, end, n_bars, frame_type)
         bars = list(filter(lambda x: not np.isnan(x['close']), bars))
@@ -193,11 +194,11 @@ class MyTestCase(unittest.TestCase):
 
     @async_run
     async def test_100_sync_calendar(self):
-        await omega.jobs.sync_calendar()
+        await omega.jobs.sync.sync_calendar()
 
         with mock.patch('omega.fetcher.abstract_quotes_fetcher.AbstractQuotesFetcher'
                         '.get_all_trade_days', side_effect=[None]):
-            await omega.jobs.sync_calendar()
+            await omega.jobs.sync.sync_calendar()
 
     @async_run
     async def test_200_validation(self):

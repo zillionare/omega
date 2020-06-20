@@ -7,7 +7,7 @@ class Events:
     OMEGA_APP_START = "omega/app_start"
     OMEGA_APP_STOP = "omega/app_stop"
 
-    OMEGA_DO_SYNC = "omega/do_sync"
+    OMEGA_DO_SYNC = "omega/sync_bars_worker"
     OMEGA_VALIDATION_PROGRESS = "omega/do_validation"
     OMEGA_DO_CHECKSUM = "omega/do_checksum"
     OMEGA_VALIDATION_ERROR = "omega/validation_error"

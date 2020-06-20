@@ -18,23 +18,24 @@ from arrow import Arrow
 from omicron.core.errors import FetcherQuotaError
 from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
-from omicron.dal import cache
+from omicron.dal import cache, security_cache
 from omicron.dal import security_cache as sc
 from omicron.models.securities import Securities
 from pyemit import emit
 
 from omega.config.cfg4py_auto_gen import Config
 from omega.core.events import Events
-from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
+from omega.fetcher.abstract_quotes_fetcher import (
+    AbstractQuotesFetcher as aq,
+    AbstractQuotesFetcher)
 
 logger = logging.getLogger(__name__)
-
 cfg: Config = cfg4py.get_instance()
 validation_errors = []
 no_validation_error_days = set()
 
 
-async def start_job_timer(job_name: str):
+async def _start_job_timer(job_name: str):
     key_start = f"jobs.bars_{job_name}.start"
 
     pl = cache.sys.pipeline()
@@ -44,7 +45,7 @@ async def start_job_timer(job_name: str):
     await pl.execute()
 
 
-async def stop_job_timer(job_name: str) -> int:
+async def _stop_job_timer(job_name: str) -> int:
     """
     stop timer, and return elapsed time in seconds
     Args:
@@ -69,7 +70,7 @@ async def stop_job_timer(job_name: str) -> int:
     return elapsed
 
 
-async def start_sync(secs: List[str] = None, frames_to_sync: dict = None):
+async def sync_bars(secs: List[str] = None, frames_to_sync: dict = None):
     """
     初始化bars_sync的任务，并发信号给各后台quotes_fetcher进程以启动同步。
 
@@ -108,15 +109,16 @@ async def start_sync(secs: List[str] = None, frames_to_sync: dict = None):
     pl.lpush(key_scope, *secs)
     await pl.execute()
 
-    await start_job_timer('sync')
+    await _start_job_timer('sync')
     await emit.emit(Events.OMEGA_DO_SYNC, frames_to_sync)
+    logger.info("%s send to fetchers.", Events.OMEGA_DO_SYNC)
 
 
-async def do_sync(sync_frames: dict = None, secs: List[str] = None):
+async def sync_bars_worker(sync_frames: dict = None, secs: List[str] = None):
     """
     worker's sync job
     """
-    logger.info("do_sync with params: %s, %s", secs, sync_frames)
+    logger.info("sync_bars_worker with params: %s, %s", secs, sync_frames)
 
     key_scope = "jobs.bars_sync.scope"
 
@@ -130,7 +132,7 @@ async def do_sync(sync_frames: dict = None, secs: List[str] = None):
     # noinspection PyPep8
     while code := await get_sec():
         try:
-            await sync_for_sec(code, sync_frames)
+            await sync_bars_for_security(code, sync_frames)
         except FetcherQuotaError as e:
             logger.warning("Quota exceeded when syncing %s. Sync borted.", code)
             logger.exception(e)
@@ -139,12 +141,12 @@ async def do_sync(sync_frames: dict = None, secs: List[str] = None):
             logger.warning("Failed to sync %s", code)
             logger.exception(e)
 
-    elapsed = await stop_job_timer('sync')
+    elapsed = await _stop_job_timer('sync')
     logger.info('%s finished quotes sync in %s seconds', os.getpid(), elapsed)
 
 
-def get_closed_frame(stop: Union[Arrow, datetime.date, datetime.datetime],
-                     frame_type: FrameType):
+def _get_closed_frame(stop: Union[Arrow, datetime.date, datetime.datetime],
+                      frame_type: FrameType):
     """
     同步时间范围按天来指定，以符合人类习惯。但具体操作时，需要确定到具体的时间帧上。对截止时间，
     如果是周线、月线、日线，取上一个收盘交易日所在的日、周、月线。如果是分钟线，取上一个收盘交
@@ -172,7 +174,7 @@ def get_closed_frame(stop: Union[Arrow, datetime.date, datetime.datetime],
     return stop
 
 
-async def sync_for_sec(code: str, sync_frames: dict = None):
+async def sync_bars_for_security(code: str, sync_frames: dict = None):
     counters = {frame: 0 for frame in sync_frames.keys()}
     logger.info("syncing quotes for %s", code)
 
@@ -185,7 +187,7 @@ async def sync_for_sec(code: str, sync_frames: dict = None):
             start, stop = start_stop, now.date()
 
         start = tf.floor(start, frame_type)
-        stop = get_closed_frame(stop, frame_type)
+        stop = _get_closed_frame(stop, frame_type)
 
         # 取数据库中该frame_type下该code的k线起始点
         head, tail = await sc.get_bars_range(code, frame_type)
@@ -223,3 +225,38 @@ async def sync_for_sec(code: str, sync_frames: dict = None):
 
     logger.info("finished sync %s, %s", code,
                 ",".join([f"{k}:{v}" for k, v in counters.items()]))
+
+
+async def sync_calendar():
+    trade_days = await AbstractQuotesFetcher.get_all_trade_days()
+    if trade_days is None or len(trade_days) == 0:
+        logger.warning("failed to fetch trade days.")
+        return
+
+    weeks = []
+    last = trade_days[0]
+    for cur in trade_days:
+        if cur.weekday() < last.weekday() or (cur - last).days >= 7:
+            weeks.append(last)
+        last = cur
+
+    if weeks[-1] < last:
+        weeks.append(last)
+
+    await security_cache.save_calendar('week_frames', map(tf.date2int, weeks))
+
+    months = []
+    last = trade_days[0]
+    for cur in trade_days:
+        if cur.day < last.day:
+            months.append(last)
+        last = cur
+    months.append(last)
+    await security_cache.save_calendar('month_frames', map(tf.date2int, months))
+    logger.info("trade_days is updated to %s", trade_days[-1])
+
+
+async def sync_securities():
+    """更新证券列表"""
+    secs = await aq.get_security_list()
+    logger.info("%s secs are fetched and saved.", len(secs))

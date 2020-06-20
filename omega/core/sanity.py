@@ -36,7 +36,7 @@ from pyemit import emit
 
 from omega.core import get_config_dir
 from omega.core.events import ValidationError, Events
-from omega.core.syncquotes import cfg, logger
+from omega.jobs.sync import cfg, logger
 
 
 async def calc_checksums(day: datetime.date, codes: List) -> dict:
@@ -327,8 +327,8 @@ async def quick_scan():
         else:
             stop = tf.day_shift(arrow.now(), 0)
 
+        counters[frame][1] = len(codes)
         for code in codes:
-            counters[frame][1] = counters[frame][1] + 1
             head, tail = await security_cache.get_bars_range(code, frame_type)
             if head is None or tail is None:
                 report.info("ENOSYNC,%s", code)

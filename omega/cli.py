@@ -11,7 +11,9 @@ import os
 import pathlib
 import re
 import signal
+import subprocess
 import sys
+import time
 from collections import ChainMap
 from pathlib import Path
 from subprocess import CalledProcessError, check_output, check_call
@@ -23,11 +25,14 @@ import omicron
 import pkg_resources
 import psutil
 import sh
+from omicron.models.securities import Securities
 from ruamel.yaml import YAML
 from termcolor import colored
 
+import omega.jobs.sync as sync
 from omega.core import get_config_dir
 from omega.core.sanity import quick_scan
+from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -351,18 +356,36 @@ def setup(reset_factory=False):
     print("配置已完成，建议通过supervisor来管理Omega服务，祝顺利开启财富之旅！")
 
 
-def find_procs(app: str):
+def find_fetcher_processes():
     """查找进程名为app的进程"""
-    pids = []
+    result = {}
     for p in psutil.process_iter():
-        cmdline = p.cmdline()
-        if len(cmdline) >= 3 and cmdline[0] == 'python' and cmdline[2] == app:
+        cmd = " ".join(p.cmdline())
+        if "omega.app" in cmd and "--impl" in cmd and "--group-id" in cmd:
+            # fetchers
+            m = re.search(r'--impl=([^\s]+)', cmd)
+            impl = m.group(1) if m else ''
+
+            m = re.search(r'--group-id=([^\s]+)', cmd)
+            group_id = m.group(1) if m else ''
+
+            group = f"{impl}:{group_id}"
+            pids = result.get(group, [])
             pids.append(p.pid)
+            result[f"{impl}:{group_id}"] = pids
 
-    return pids
+    return result
 
 
-def start(service: str):
+def start(service: str = ''):
+    """
+
+    Args:
+        service: if service is '', then starts fetcher processes.
+
+    Returns:
+
+    """
     print(f"正在启动zillionare-omega {colored(service, 'green')}...")
 
     server_roles = ['PRODUCTION', 'TEST', 'DEV']
@@ -374,36 +397,154 @@ def start(service: str):
     config_dir = get_config_dir()
     cfg4py.init(config_dir, False)
 
-    pids = find_procs(f'omega.{service}')
-    if len(pids):
-        print(f"服务{service}已经启动,进程为{colored(str(pids), 'green')}")
-        choose = get_input("请选择忽略（1）, 重启（2）：", validation=[1, 2], default=1)
-        if choose == 2:
-            [os.kill(pid, signal.SIGTERM) for pid in pids]
-        else:
-            sys.exit(0)
+    if service == 'jobs':
+        return start_jobs()
 
-    # either pid is invalid or service not started
-    # subprocess.Popen(['nohup', sys.executable, '-m', 'omega.jobs', 'start', '&'])
-    os.system(f"nohup {sys.executable} -m omega.jobs start")
-    # todo: wait until it's really started
-    print(f"服务Zillionare-omega/{colored(service, 'green')}已经启动。")
+    start_fetcher_processes()
 
 
-def stop(service: str):
-    pids = find_procs(f'omega.{service}')
-    for pid in pids:
+def start_fetcher_processes():
+    procs = find_fetcher_processes()
+
+    # fetcher processes are started by groups
+    for fetcher in cfg.quotes_fetchers:
+        impl = fetcher.get('impl')
+        groups = fetcher.get('groups')
+
+        for _id, group in enumerate(groups):
+            sessions = group.get('sessions')
+            started_sessions = procs.get(f"{impl}:{_id}", [])
+            if sessions - len(started_sessions) > 0:
+                print(f"启动的{impl}实例少于配置要求（或尚未启动），正在启动中。。。")
+                # sanic manages sessions, so we have to restart it as a whole
+                for pid in started_sessions:
+                    try:
+                        os.kill(pid, signal.SIGTERM)
+                    except Exception as e:
+                        pass
+                _start_fetcher(impl, _id)
+
+    time.sleep(3)
+    show_fetcher_processes()
+
+
+def show_fetcher_processes():
+    procs = find_fetcher_processes()
+
+    if len(procs):
+        print("   impl   |   group id | pids")
+        for group, pids in procs.items():
+            impl, gid = group.split(":")
+            print(f"{impl:10}|{' ':5}{gid:2}{' ':5}| {pids}")
+    else:
+        print("None")
+
+
+def _start_fetcher(impl: str, group_id: int):
+    subprocess.Popen([sys.executable, '-m', 'omega.app', 'start', f'--impl={impl}',
+                      f'--group-id={group_id}'], stdout=subprocess.DEVNULL)
+
+
+def start_jobs():
+    subprocess.Popen([sys.executable, '-m', 'omega.jobs', 'start'])
+
+    retry = 0
+    while find_jobs_process() is None and retry < 5:
+        print("等待omega.jobs启动中")
+        retry += 1
+        time.sleep(0.5)
+    if retry < 5:
+        print("omega.jobs启动成功。")
+        return
+    else:
+        print("omega.jobs启动失败。")
+        return
+
+
+def restart_jobs():
+    pid = find_jobs_process()
+    if pid is None:
+        print("omega.jobs未运行。正在启动中...")
+        start_jobs()
+    else:
+        # 如果omega.jobs已经运行
+        stop_jobs()
+        start_jobs()
+
+
+def stop_jobs():
+    pid = find_jobs_process()
+    retry = 0
+    while pid is not None and retry < 5:
         try:
-            print(f"正在停止进程{colored(pid, 'green')}...")
             os.kill(pid, signal.SIGTERM)
-            print(f"进程{pid}已退出.")
-        except Exception:
+            retry += 1
+            time.sleep(0.5)
+        except Exception as e:
             pass
+        pid = find_jobs_process()
+
+
+def show_jobs_process():
+    pid = find_jobs_process()
+    if pid:
+        print(pid)
+    else:
+        print("None")
+
+
+def find_jobs_process():
+    for p in psutil.process_iter():
+        cmd = " ".join(p.cmdline())
+        if cmd.find("-m omega.jobs") != -1:
+            return p.pid
+    return None
+
+
+def stop_fetcher_processes():
+    retry = 0
+    while retry < 5:
+        procs = find_fetcher_processes()
+        if len(procs) == 0:
+            return
+
+        for group, pids in procs.items():
+            for pid in pids:
+                try:
+                    os.kill(pid, signal.SIGTERM)
+                except Exception:
+                    pass
+        time.sleep(1)
+
+
+def status():
+    print(f"正在运行中的omega-fetchers进程：\n{'=' * 40}")
+    show_fetcher_processes()
+    print("\n")
+    print(f"正在运行中的jobs进程:\n{'=' * 40}")
+    show_jobs_process()
+
+
+def stop(service: str = ''):
+    if service == 'jobs':
+        return stop_jobs()
+
+    stop_fetcher_processes()
+
+
+def restart(service: str = ''):
+    print("正在重启动服务...")
+    asyncio.run(_init())
+
+    if service == 'jobs':
+        return restart_jobs
+
+    stop_fetcher_processes()
+    start_fetcher_processes()
 
 
 def scan():
-    config_dir = get_config_dir()
-    cfg4py.init(config_dir, False)
+    asyncio.run(_init())
 
     frames_to_sync = dict(ChainMap(*cfg.omega.sync.frames))
     print("系统设置自动同步的数据是：")
@@ -412,7 +553,6 @@ def scan():
     # todo: read file location from 31-quickscan.conf
     print("错误日志将写入到/var/log/zillionare/quickscan.log中。")
 
-    asyncio.run(omicron.init())
     counters = asyncio.run(quick_scan())
     print("扫描完成，发现的错误汇总如下：")
     print("frame errors  total")
@@ -420,12 +560,52 @@ def scan():
     for frame, errors in counters.items():
         print(f"{frame:5}", f"{errors[0]:6}", f"{errors[1]:6}")
 
+
+def sync_sec_list():
+    asyncio.run(_init())
+
+    asyncio.run(sync.sync_securities())
+
+
+def sync_calendar():
+    asyncio.run(_init())
+    asyncio.run(sync.sync_calendar())
+
+
+def sync_bars(start: str, end: str = '', frame: str = '1d', codes: str = ''):
+    if len(codes) == 0:
+        codes = Securities().choose(cfg.omega.sync.type)
+    else:
+        codes = codes.split(",")
+
+    asyncio.run(_init())
+    asyncio.run(sync.sync_bars(codes, {frame: f"{start},{end}"}))
+
+
+async def _init():
+    global cfg
+
+    config_dir = get_config_dir()
+    cfg = cfg4py.init(config_dir, False)
+
+    impl = cfg.quotes_fetchers[0]["impl"]
+    params = cfg.quotes_fetchers[0]["groups"][0]
+
+    await AbstractQuotesFetcher.create_instance(impl, **params)
+    await omicron.init(AbstractQuotesFetcher)
+
+
 def main():
     fire.Fire({
-        'start': start,
-        'setup': setup,
-        'stop':  stop,
-        'scan':  scan
+        'start':         start,
+        'setup':         setup,
+        'stop':          stop,
+        'status':        status,
+        'restart':       restart,
+        'scan':          scan,
+        'sync_sec_list': sync_sec_list,
+        'sync_calendar': sync_calendar,
+        'sync_bars':     sync_bars
     })
 
 

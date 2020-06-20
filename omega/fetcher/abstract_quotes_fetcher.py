@@ -5,6 +5,7 @@
         python script!"""
 import importlib
 import logging
+from typing import Union
 
 import numpy as np
 from arrow import Arrow
@@ -47,16 +48,20 @@ class AbstractQuotesFetcher(QuotesFetcher):
         return cls._instances[i]
 
     @classmethod
-    async def get_security_list(cls) -> np.ndarray:
+    async def get_security_list(cls) -> Union[None, np.ndarray]:
         """
            code         display_name name 	start_date 	end_date 	type
         000001.XSHE 	平安银行 	PAYH 	1991-04-03 	2200-01-01 	stock
         :return:
         """
         securities = await cls.get_instance().get_security_list()
+        if securities is None or len(securities) == 0:
+            logger.warning("failed to update securities. %s is returned.", securities)
+            return securities
+
         key = 'securities'
-        await cache.security.delete(key)
         pipeline = cache.security.pipeline()
+        pipeline.delete(key)
         for code, display_name, name, start, end, _type in securities:
             pipeline.rpush(key,
                            f"{code},{display_name},{name},{start},"

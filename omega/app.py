@@ -19,9 +19,10 @@ from pyemit import emit
 from sanic import Sanic, response
 
 from omega.config.cfg4py_auto_gen import Config
-from omega.core import get_config_dir, syncquotes as sq
+from omega.core import get_config_dir
 from omega.core.events import Events
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
+from omega.jobs import sync as sq
 
 cfg: Config = cfg4py.get_instance()
 
@@ -43,7 +44,7 @@ class Application(object):
         await omicron.init(aq)
 
         # listen on omega events
-        emit.register(Events.OMEGA_DO_SYNC, sq.do_sync)
+        emit.register(Events.OMEGA_DO_SYNC, sq.sync_bars_worker)
         await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
 
         # register route here
@@ -85,22 +86,25 @@ class Application(object):
             secs = None
             frames_to_sync = None
 
-        app.add_task(sq.start_sync(secs, frames_to_sync))
+        app.add_task(sq.sync_bars(secs, frames_to_sync))
         return response.text(f"sync_bars with {secs}, {frames_to_sync} is scheduled.")
 
 
-def get_fetcher_groups(fetchers: List, impl: str):
+def get_fetcher_info(fetchers: List, impl: str):
     for fetcher_info in fetchers:
         if fetcher_info.get('impl') == impl:
-            return fetcher_info.get('groups')
+            return fetcher_info
     return None
 
 
-def start(impl: str, port: int = 3181, group_id: int = 0):
+def start(impl: str, group_id: int = 0):
     config_dir = get_config_dir()
-    cfg = cfg4py.init(config_dir)
+    cfg = cfg4py.init(config_dir, False)
 
-    groups = get_fetcher_groups(cfg.quotes_fetchers, impl)
+    info = get_fetcher_info(cfg.quotes_fetchers, impl)
+    groups = info.get('groups')
+    port = info.get('port') + group_id
+
     assert groups is not None
     assert len(groups) > group_id
 
