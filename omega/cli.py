@@ -4,18 +4,22 @@
 """
     管理应用程序生命期、全局对象、任务、全局消息响应
         """
+import asyncio
+import json
 import logging
 import os
 import pathlib
 import re
 import signal
 import sys
+from collections import ChainMap
 from pathlib import Path
 from subprocess import CalledProcessError, check_output, check_call
 from typing import Any, Union, List, Callable
 
 import cfg4py
 import fire
+import omicron
 import pkg_resources
 import psutil
 import sh
@@ -23,6 +27,7 @@ from ruamel.yaml import YAML
 from termcolor import colored
 
 from omega.core import get_config_dir
+from omega.core.sanity import quick_scan
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -396,11 +401,31 @@ def stop(service: str):
             pass
 
 
+def scan():
+    config_dir = get_config_dir()
+    cfg4py.init(config_dir, False)
+
+    frames_to_sync = dict(ChainMap(*cfg.omega.sync.frames))
+    print("系统设置自动同步的数据是：")
+    print(json.dumps(frames_to_sync, indent=2))
+
+    # todo: read file location from 31-quickscan.conf
+    print("错误日志将写入到/var/log/zillionare/quickscan.log中。")
+
+    asyncio.run(omicron.init())
+    counters = asyncio.run(quick_scan())
+    print("扫描完成，发现的错误汇总如下：")
+    print("frame errors  total")
+    print("===== ======  =====")
+    for frame, errors in counters.items():
+        print(f"{frame:5}", f"{errors[0]:6}", f"{errors[1]:6}")
+
 def main():
     fire.Fire({
         'start': start,
         'setup': setup,
-        'stop':  stop
+        'stop':  stop,
+        'scan':  scan
     })
 
 

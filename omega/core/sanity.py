@@ -311,10 +311,12 @@ async def start_validation():
 
 async def quick_scan():
     secs = Securities()
-    codes = list(secs.choose(cfg.omega.sync.type))
+    codes = secs.choose(cfg.omega.sync.type)
 
     report = logging.getLogger('quickscan')
     frames_to_sync = dict(ChainMap(*cfg.omega.sync.frames))
+
+    counters = {frame: [0, 0] for frame in frames_to_sync.keys()}
 
     for frame, start_stop in frames_to_sync.items():
         frame_type = FrameType(frame)
@@ -325,10 +327,12 @@ async def quick_scan():
         else:
             stop = tf.day_shift(arrow.now(), 0)
 
-        while code := codes.pop():
+        for code in codes:
+            counters[frame][1] = counters[frame][1] + 1
             head, tail = await security_cache.get_bars_range(code, frame_type)
             if head is None or tail is None:
                 report.info("ENOSYNC,%s", code)
+                counters[frame][0] = counters[frame][0] + 1
                 continue
 
             expected = tf.count_frames(head, tail, frame_type)
@@ -337,12 +341,17 @@ async def quick_scan():
             actual = (await cache.security.hlen(f"{code}:{frame_type.value}")) - 2
             if actual != expected:
                 report.info("ELEN,%s,%s,%s,%s,%s", code, expected, actual, head, tail)
+                counters[frame][0] = counters[frame][0] + 1
                 continue
 
             sec = Security(code)
             if start < tf.day_shift(head, 0) and sec.ipo_date < start:
                 report.info("ESTART,%s,%s,%s,%s", code, start, tf.day_shift(
                         head, 0), sec.ipo_date)
+                counters[frame][0] = counters[frame][0] + 1
                 continue
             if tf.day_shift(tail, 0) < stop:
                 report.info("EEND,%s,%s,%s", code, stop, tf.day_shift(tail, 0))
+                counters[frame][0] = counters[frame][0] + 1
+
+    return counters
