@@ -4,18 +4,10 @@
     <option name="SCOPE_TYPE" value="3" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9d315cbc-a8db-4353-8626-19fd45be9e4a" name="Default Changelist" comment="add quick_scan to cli">
+    <list default="true" id="9d315cbc-a8db-4353-8626-19fd45be9e4a" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/omega/app.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/app.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/omega/cli.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/cli.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/omega/config/defaults.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/omega/config/defaults.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/omega/config/dev.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/omega/config/dev.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/omega/core/events.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/core/events.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/omega/core/sanity.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/core/sanity.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/omega/core/syncquotes.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/jobs/sync.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/omega/fetcher/abstract_quotes_fetcher.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/fetcher/abstract_quotes_fetcher.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/omega/jobs/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/jobs/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/test_jobs.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_jobs.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/omega/config/31-omega-quickscan.conf" beforeDir="false" afterPath="$PROJECT_DIR$/omega/config/31-omega-quickscan.conf" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/omega/config/32-omega-default.conf" beforeDir="false" afterPath="$PROJECT_DIR$/omega/config/32-omega-default.conf" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -340,7 +332,8 @@
       <workItem from="1592488053776" duration="3096000" />
       <workItem from="1592577721398" duration="112000" />
       <workItem from="1592617536993" duration="6378000" />
-      <workItem from="1592638522048" duration="17906000" />
+      <workItem from="1592638522048" duration="18408000" />
+      <workItem from="1592664438468" duration="1796000" />
     </task>
     <task id="LOCAL-00001" summary="1. omicron refactors cache, now move all save_bars to cache&#10;2. timeout for jq remote set to 20, sometimes still not enough&#10;3. omega work lead select mesh">
       <created>1588863976311</created>
@@ -461,7 +454,14 @@
       <option name="project" value="LOCAL" />
       <updated>1592624216569</updated>
     </task>
-    <option name="localTasksCounter" value="18" />
+    <task id="LOCAL-00018" summary="1. fetcher port should now be specified in configuration file. Now starts fetcher process need impl and group-id only.&#10;2. now week_frames and month_frames are all calculated from trade_days, which should be provided by quotes fetcher.&#10;3. manage omega by cli: provide start, stop, status, restart, sync_sec_list, sync_calendar, sync_bars">
+      <created>1592664290722</created>
+      <option name="number" value="00018" />
+      <option name="presentableId" value="LOCAL-00018" />
+      <option name="project" value="LOCAL" />
+      <updated>1592664290723</updated>
+    </task>
+    <option name="localTasksCounter" value="19" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -530,7 +530,8 @@
     <MESSAGE value="gitignore" />
     <MESSAGE value="add quick_scan" />
     <MESSAGE value="add quick_scan to cli" />
-    <option name="LAST_COMMIT_MESSAGE" value="add quick_scan to cli" />
+    <MESSAGE value="1. fetcher port should now be specified in configuration file. Now starts fetcher process need impl and group-id only.&#10;2. now week_frames and month_frames are all calculated from trade_days, which should be provided by quotes fetcher.&#10;3. manage omega by cli: provide start, stop, status, restart, sync_sec_list, sync_calendar, sync_bars" />
+    <option name="LAST_COMMIT_MESSAGE" value="1. fetcher port should now be specified in configuration file. Now starts fetcher process need impl and group-id only.&#10;2. now week_frames and month_frames are all calculated from trade_days, which should be provided by quotes fetcher.&#10;3. manage omega by cli: provide start, stop, status, restart, sync_sec_list, sync_calendar, sync_bars" />
     <option name="OPTIMIZE_IMPORTS_BEFORE_PROJECT_COMMIT" value="true" />
     <option name="REFORMAT_BEFORE_PROJECT_COMMIT" value="true" />
     <option name="REARRANGE_BEFORE_PROJECT_COMMIT" value="true" />
@@ -558,11 +559,11 @@
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="3455" y="399" key="ANALYSIS_DLG_com.intellij.analysis.BaseAnalysisAction$1/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1590568153609" />
-    <state x="2931" y="9" width="1259" height="954" key="CommitChangelistDialog2" timestamp="1592649427362">
+    <state x="2931" y="9" width="1259" height="954" key="CommitChangelistDialog2" timestamp="1592664289190">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="3004" y="86" width="1259" height="954" key="CommitChangelistDialog2/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1590667560260" />
-    <state x="2931" y="9" width="1527" height="1016" key="CommitChangelistDialog2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592649427362" />
+    <state x="2931" y="9" width="1527" height="1016" key="CommitChangelistDialog2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592664289190" />
     <state width="664" height="438" key="DebuggerActiveHint" timestamp="1592655695748">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
@@ -581,53 +582,53 @@
     </state>
     <state x="527" y="233" key="FileChooserDialogImpl/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1588746007077" />
     <state x="3476" y="278" width="844" height="598" key="FileChooserDialogImpl/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592661855569" />
-    <state width="1877" height="352" key="GridCell.Tab.0.bottom" timestamp="1592662178146">
+    <state width="1877" height="352" key="GridCell.Tab.0.bottom" timestamp="1592664301766">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state width="1322" height="294" key="GridCell.Tab.0.bottom/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1591059791337" />
-    <state width="1877" height="352" key="GridCell.Tab.0.bottom/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592662178146" />
+    <state width="1877" height="352" key="GridCell.Tab.0.bottom/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592664301766" />
     <state width="1878" height="299" key="GridCell.Tab.0.bottom/0.0.1368.872@0.0.1368.872" timestamp="1591923050994" />
-    <state width="1877" height="352" key="GridCell.Tab.0.center" timestamp="1592662178146">
+    <state width="1877" height="352" key="GridCell.Tab.0.center" timestamp="1592664301766">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state width="1322" height="294" key="GridCell.Tab.0.center/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1591059791336" />
-    <state width="1877" height="352" key="GridCell.Tab.0.center/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592662178146" />
+    <state width="1877" height="352" key="GridCell.Tab.0.center/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592664301766" />
     <state width="1878" height="299" key="GridCell.Tab.0.center/0.0.1368.872@0.0.1368.872" timestamp="1591923050993" />
-    <state width="1877" height="352" key="GridCell.Tab.0.left" timestamp="1592662178146">
+    <state width="1877" height="352" key="GridCell.Tab.0.left" timestamp="1592664301766">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state width="1322" height="294" key="GridCell.Tab.0.left/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1591059791336" />
-    <state width="1877" height="352" key="GridCell.Tab.0.left/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592662178146" />
+    <state width="1877" height="352" key="GridCell.Tab.0.left/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592664301766" />
     <state width="1878" height="299" key="GridCell.Tab.0.left/0.0.1368.872@0.0.1368.872" timestamp="1591923050993" />
-    <state width="1877" height="352" key="GridCell.Tab.0.right" timestamp="1592662178146">
+    <state width="1877" height="352" key="GridCell.Tab.0.right" timestamp="1592664301766">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state width="1322" height="294" key="GridCell.Tab.0.right/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1591059791336" />
-    <state width="1877" height="352" key="GridCell.Tab.0.right/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592662178146" />
+    <state width="1877" height="352" key="GridCell.Tab.0.right/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592664301766" />
     <state width="1878" height="299" key="GridCell.Tab.0.right/0.0.1368.872@0.0.1368.872" timestamp="1591923050994" />
-    <state width="1877" height="352" key="GridCell.Tab.1.bottom" timestamp="1592662178147">
+    <state width="1877" height="352" key="GridCell.Tab.1.bottom" timestamp="1592664301767">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state width="1322" height="294" key="GridCell.Tab.1.bottom/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1591059791337" />
-    <state width="1877" height="352" key="GridCell.Tab.1.bottom/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592662178147" />
+    <state width="1877" height="352" key="GridCell.Tab.1.bottom/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592664301767" />
     <state width="1878" height="299" key="GridCell.Tab.1.bottom/0.0.1368.872@0.0.1368.872" timestamp="1591923050994" />
-    <state width="1877" height="352" key="GridCell.Tab.1.center" timestamp="1592662178147">
+    <state width="1877" height="352" key="GridCell.Tab.1.center" timestamp="1592664301767">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state width="1322" height="294" key="GridCell.Tab.1.center/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1591059791337" />
-    <state width="1877" height="352" key="GridCell.Tab.1.center/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592662178147" />
+    <state width="1877" height="352" key="GridCell.Tab.1.center/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592664301767" />
     <state width="1878" height="299" key="GridCell.Tab.1.center/0.0.1368.872@0.0.1368.872" timestamp="1591923050994" />
-    <state width="1877" height="352" key="GridCell.Tab.1.left" timestamp="1592662178146">
+    <state width="1877" height="352" key="GridCell.Tab.1.left" timestamp="1592664301767">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state width="1322" height="294" key="GridCell.Tab.1.left/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1591059791337" />
-    <state width="1877" height="352" key="GridCell.Tab.1.left/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592662178146" />
+    <state width="1877" height="352" key="GridCell.Tab.1.left/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592664301767" />
     <state width="1878" height="299" key="GridCell.Tab.1.left/0.0.1368.872@0.0.1368.872" timestamp="1591923050994" />
-    <state width="1877" height="352" key="GridCell.Tab.1.right" timestamp="1592662178147">
+    <state width="1877" height="352" key="GridCell.Tab.1.right" timestamp="1592664301767">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state width="1322" height="294" key="GridCell.Tab.1.right/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1591059791337" />
-    <state width="1877" height="352" key="GridCell.Tab.1.right/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592662178147" />
+    <state width="1877" height="352" key="GridCell.Tab.1.right/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592664301767" />
     <state width="1878" height="299" key="GridCell.Tab.1.right/0.0.1368.872@0.0.1368.872" timestamp="1591923050994" />
     <state x="3441" y="206" key="PyMappingSimpleResolveDialog" timestamp="1592400701830">
       <screen x="2736" y="0" width="1920" height="1040" />
@@ -643,11 +644,11 @@
     </state>
     <state x="241" y="95" key="SettingsEditor/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1588746396970" />
     <state x="3088" y="108" key="SettingsEditor/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1591863693398" />
-    <state x="3288" y="256" key="Vcs.Push.Dialog.v2" timestamp="1592624220051">
+    <state x="3288" y="256" key="Vcs.Push.Dialog.v2" timestamp="1592664293564">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="393" y="215" key="Vcs.Push.Dialog.v2/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1590667566517" />
-    <state x="3288" y="256" key="Vcs.Push.Dialog.v2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592624220051" />
+    <state x="3288" y="256" key="Vcs.Push.Dialog.v2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592664293564" />
     <state width="968" height="528" key="XDebugger.FullValuePopup" timestamp="1591348428503">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
@@ -729,12 +730,12 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/omega/cli.py</url>
-          <line>576</line>
+          <line>581</line>
           <option name="timeStamp" value="267" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/omega/cli.py</url>
-          <line>450</line>
+          <line>451</line>
           <option name="timeStamp" value="277" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
