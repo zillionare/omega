@@ -4,7 +4,6 @@
 """
     管理应用程序生命期、全局对象、任务、全局消息响应
         """
-import asyncio
 import json
 import logging
 import os
@@ -25,7 +24,9 @@ import omicron
 import pkg_resources
 import psutil
 import sh
-from omicron.models.securities import Securities
+from cfg4py.resources.cfg4py_auto_gen import Config
+from omicron.core.lang import async_run
+from pyemit import emit
 from ruamel.yaml import YAML
 from termcolor import colored
 
@@ -38,7 +39,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 git_url = 'https://github.com/zillionare/omega'
 
-cfg = cfg4py.get_instance()
+cfg: Config = cfg4py.get_instance()
 
 
 class EarlyJumpError(BaseException):
@@ -532,9 +533,10 @@ def stop(service: str = ''):
     stop_fetcher_processes()
 
 
-def restart(service: str = ''):
+@async_run
+async def restart(service: str = ''):
     print("正在重启动服务...")
-    asyncio.run(_init())
+    await _init()
 
     if service == 'jobs':
         return restart_jobs
@@ -543,8 +545,9 @@ def restart(service: str = ''):
     start_fetcher_processes()
 
 
-def scan():
-    asyncio.run(_init())
+@async_run
+async def scan():
+    await _init()
 
     frames_to_sync = dict(ChainMap(*cfg.omega.sync.frames))
     print("系统设置自动同步的数据是：")
@@ -553,7 +556,7 @@ def scan():
     # todo: read file location from 31-quickscan.conf
     print("错误日志将写入到/var/log/zillionare/quickscan.log中。")
 
-    counters = asyncio.run(quick_scan())
+    counters = await quick_scan()
     print("扫描完成，发现的错误汇总如下：")
     print("frame errors  total")
     print("===== ======  =====")
@@ -561,26 +564,46 @@ def scan():
         print(f"{frame:5}", f"{errors[0]:6}", f"{errors[1]:6}")
 
 
-def sync_sec_list():
-    asyncio.run(_init())
+@async_run
+async def sync_sec_list():
+    await _init()
 
-    asyncio.run(sync.sync_securities())
-
-
-def sync_calendar():
-    asyncio.run(_init())
-    asyncio.run(sync.sync_calendar())
+    await sync.sync_securities()
 
 
-def sync_bars(start: str, end: str = '', frame: str = '1d', codes: str = ''):
-    asyncio.run(_init())
+@async_run
+async def sync_calendar():
+    await _init()
+    await sync.sync_calendar()
 
-    if len(codes) == 0:
-        codes = Securities().choose(cfg.omega.sync.type)
-    else:
-        codes = codes.split(",")
 
-    asyncio.run(sync.sync_bars(codes, {frame: f"{start},{end}"}))
+@async_run
+async def sync_bars(start: str = None, end: str = None, frame: str = None, codes: str = \
+        None):
+    """
+    if no params are provided, then trigger sync based on cfg files
+    Args:
+        start:
+        end:
+        frame:
+        codes:
+
+    Returns:
+
+    """
+    await _init()
+
+    codes = codes.split(",") if codes else None
+
+    frames_to_sync = None
+    if frame and start:
+        if end:
+            frames_to_sync = {frame: f"{start},{end}"}
+        else:
+            frames_to_sync = {frame: start}
+
+    await sync.sync_bars(codes, frames_to_sync)
+    logger.info("request %s,%s send to workers.", codes, frames_to_sync)
 
 
 async def _init():
@@ -592,9 +615,9 @@ async def _init():
     impl = cfg.quotes_fetchers[0]["impl"]
     params = cfg.quotes_fetchers[0]["groups"][0]
 
+    await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
     await AbstractQuotesFetcher.create_instance(impl, **params)
     await omicron.init(AbstractQuotesFetcher)
-
 
 def main():
     fire.Fire({

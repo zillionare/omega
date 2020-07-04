@@ -7,8 +7,7 @@ Interface for quotes fetcher
 from abc import ABC
 
 import numpy
-from arrow import Arrow
-from omicron.core.types import FrameType
+from omicron.core.types import FrameType, Frame
 
 
 class QuotesFetcher(ABC):
@@ -27,11 +26,13 @@ class QuotesFetcher(ABC):
         """
         raise NotImplementedError
 
-    async def get_bars(self, sec: str, end: Arrow, n_bars: int,
+    async def get_bars(self, sec: str, end: Frame, n_bars: int,
                        frame_type: FrameType) -> numpy.ndarray:
         """
         fetch quotes of sec. Return a numpy rec array with n_bars length, and last
-        frame is end
+        frame is end。
+        取n个单位的k线数据，k线周期由frame_type指定。最后结束周期为end。股票停牌期间的数据
+        会使用None填充。
         Args:
             sec:
             end:

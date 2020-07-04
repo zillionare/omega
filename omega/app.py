@@ -62,15 +62,19 @@ class Application(object):
         return response.raw(body)
 
     async def get_bars(self, request):
-        sec = request.json.get('sec')
-        end = arrow.get(request.json.get("end"), tzinfo=cfg.tz)
-        n_bars = request.json.get("n_bars")
-        frame_type = FrameType(request.json.get("frame_type"))
+        try:
+            sec = request.json.get('sec')
+            end = arrow.get(request.json.get("end"), tzinfo=cfg.tz)
+            n_bars = request.json.get("n_bars")
+            frame_type = FrameType(request.json.get("frame_type"))
 
-        bars = await aq.get_bars(sec, end, n_bars, frame_type)
+            bars = await aq.get_bars(sec, end, n_bars, frame_type)
 
-        body = pickle.dumps(bars, protocol=cfg.pickle.ver)
-        return response.raw(body)
+            body = pickle.dumps(bars, protocol=cfg.pickle.ver)
+            return response.raw(body)
+        except Exception as e:
+            logger.exception(e)
+            return response.raw(pickle.dumps(None, protocol=cfg.pickle.ver))
 
     async def get_all_trade_days(self, request):
         days = await aq.get_all_trade_days()

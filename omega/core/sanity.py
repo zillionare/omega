@@ -331,7 +331,7 @@ async def quick_scan():
         for code in codes:
             head, tail = await security_cache.get_bars_range(code, frame_type)
             if head is None or tail is None:
-                report.info("ENOSYNC,%s", code)
+                report.info("ENOSYNC,%s,%s", code, frame)
                 counters[frame][0] = counters[frame][0] + 1
                 continue
 
@@ -340,18 +340,20 @@ async def quick_scan():
             # 'head', 'tail' should be excluded
             actual = (await cache.security.hlen(f"{code}:{frame_type.value}")) - 2
             if actual != expected:
-                report.info("ELEN,%s,%s,%s,%s,%s", code, expected, actual, head, tail)
+                report.info("ELEN,%s,%s,%s,%s,%s,%s", code, frame, expected, actual,
+                            head, tail)
                 counters[frame][0] = counters[frame][0] + 1
                 continue
 
             sec = Security(code)
             if start < tf.day_shift(head, 0) and sec.ipo_date < start:
-                report.info("ESTART,%s,%s,%s,%s", code, start, tf.day_shift(
+                report.info("ESTART,%s,%s,%s,%s,%s", code, frame, start, tf.day_shift(
                         head, 0), sec.ipo_date)
                 counters[frame][0] = counters[frame][0] + 1
                 continue
             if tf.day_shift(tail, 0) < stop:
-                report.info("EEND,%s,%s,%s", code, stop, tf.day_shift(tail, 0))
+                report.info("EEND,%s,%s,%s,%s", code, frame, stop,
+                            tf.day_shift(tail, 0))
                 counters[frame][0] = counters[frame][0] + 1
 
     return counters

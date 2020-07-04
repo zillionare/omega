@@ -11,12 +11,12 @@ quotes_fetchers:
         password: 8Bu8tcDpEAHJRn
         sessions: 1
 
-      - account: '15629126689'
-        password: '0O2i*tFsENT8'
-        sessions: 2
-#        - account: '13986740680'
-#          password: '2Nk&9w6bkW60'
-#          sessions: 2
+#      - account: '15629126689'
+#        password: '0O2i*tFsENT8'
+#        sessions: 2
+#      - account: '13986740680'
+#        password: '2Nk&9w6bkW60'
+#        sessions: 1
 omega:
   home: ~/.zillionare/omega
   server:

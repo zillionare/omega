@@ -101,8 +101,6 @@ async def sync_bars(secs: List[str] = None, frames_to_sync: dict = None):
     if frames_to_sync is None:
         frames_to_sync = dict(ChainMap(*cfg.omega.sync.frames))
 
-    await cache.sys.delete(key_scope)
-
     logger.info("add %s securities into sync queue", len(secs))
     pl = cache.sys.pipeline()
     pl.delete(key_scope)

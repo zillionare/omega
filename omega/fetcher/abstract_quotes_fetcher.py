@@ -3,21 +3,25 @@
 
 """This is a awesome
         python script!"""
+import datetime
 import importlib
 import logging
 from typing import Union
 
+import cfg4py
 import numpy as np
-from arrow import Arrow
 from omicron.core.lang import static_vars
 from omicron.core.timeframe import tf
-from omicron.core.types import FrameType
+from omicron.core.types import FrameType, Frame
 from omicron.dal import cache
 from omicron.dal import security_cache
 
+from omega.core.accelerate import left_join
 from omega.fetcher.quotes_fetcher import QuotesFetcher
 
 logger = logging.getLogger(__file__)
+
+cfg = cfg4py.get_instance()
 
 
 class AbstractQuotesFetcher(QuotesFetcher):
@@ -70,11 +74,44 @@ class AbstractQuotesFetcher(QuotesFetcher):
         return securities
 
     @classmethod
-    async def get_bars(cls, sec: str, end: Arrow, n_bars: int,
+    async def get_bars(cls, sec: str,
+                       end: Union[datetime.date, datetime.date],
+                       n_bars: int,
                        frame_type: FrameType) -> np.ndarray:
         bars = await cls.get_instance().get_bars(sec, end, n_bars, frame_type)
-        await security_cache.save_bars(sec, bars, frame_type)
-        return bars
+
+        closed = tf.floor(end, frame_type)
+        if closed != end:
+            filled = cls._fill_na(bars, n_bars - 1, closed, frame_type)
+            if bars[-1]['frame'] == end:
+                remainder = [bars[-1]]
+            else:
+                remainder = np.empty(1, dtype=bars.dtype)
+                remainder[:] = np.nan
+                remainder['frame'] = end
+        else:
+            filled = cls._fill_na(bars, n_bars, closed, frame_type)
+            remainder = None
+        # 只保存已结束的frame数据到数据库
+        await security_cache.save_bars(sec, filled, frame_type)
+        if remainder is None:
+            return filled
+
+        return np.concatenate([filled, remainder])
+
+    @classmethod
+    def _fill_na(cls, bars: np.array, n: int, end: Frame, frame_type) -> np.ndarray:
+        if frame_type in tf.minute_level_frames:
+            convert = tf.int2time
+        else:
+            convert = tf.int2date
+
+        frames = [convert(x) for x in tf.get_frames_by_count(end, n, frame_type)]
+        filled = np.empty(n, dtype=bars.dtype)
+        filled[:] = np.nan
+        filled['frame'] = frames
+
+        return left_join(filled, bars, 'frame')
 
     @classmethod
     async def get_all_trade_days(cls):
