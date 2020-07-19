@@ -25,7 +25,6 @@ import omicron
 import pkg_resources
 import psutil
 import sh
-from cfg4py.resources.cfg4py_auto_gen import Config
 from omicron.core.lang import async_run
 from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
@@ -34,6 +33,7 @@ from ruamel.yaml import YAML
 from termcolor import colored
 
 import omega.jobs.sync as sync
+from omega.config.cfg4py_auto_gen import Config
 from omega.core import get_config_dir
 from omega.core.sanity import quick_scan
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher
