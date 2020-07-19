@@ -6,15 +6,15 @@ Author: Aaron-Yang [code@jieyu.ai]
 Contributors:
 
 """
+import asyncio
 import datetime
 import logging
 import os
-from collections import ChainMap
 from typing import List, Union
 
 import arrow
 import cfg4py
-from arrow import Arrow
+from dateutil import tz
 from omicron.core.errors import FetcherQuotaError
 from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
@@ -70,7 +70,20 @@ async def _stop_job_timer(job_name: str) -> int:
     return elapsed
 
 
-async def sync_bars(secs: List[str] = None, frames_to_sync: dict = None):
+def read_sync_params(frame_type: FrameType) -> dict:
+    params = {}
+    for item in cfg.omega.sync.bars:
+        if item.get('frame') == frame_type.value:
+            params = item
+            params['start'] = arrow.get(item.get('start') or arrow.now()).date()
+            params['stop'] = arrow.get(item.get('stop') or arrow.now()).date()
+            params['frame_type'] = frame_type
+            return params
+
+    return params
+
+
+async def sync_bars(frame_type: FrameType, sync_params: dict = None, force=False):
     """
     初始化bars_sync的任务，并发信号给各后台quotes_fetcher进程以启动同步。
 
@@ -80,45 +93,134 @@ async def sync_bars(secs: List[str] = None, frames_to_sync: dict = None):
     如果未指定同步结束日期，则同步到当前已收盘的交易日。
 
     Args:
-        secs (List[str]): 将同步的证券代码
-            如果为None，则使用``omega.sync.type``定义的类型来选择要同步的证券代码。
-        frames_to_sync (dict): frames and range(start, end)
-            ::
-                {
-                    '30m': '2018-01-01,2019-01-01'
-                }
-            表明要同步从2018年1月1日到2019年1月1日的30分钟线数据。
+        frame_type (FrameType): 将同步的周期
+        sync_params (dict): 同步需要的参数
+            secs (List[str]): 将同步的证券代码
+                如果为None，则使用``sync_sec_type``定义的类型来选择要同步的证券代码。
+            sync_sec_type: List[str]
+            start: 起始日
+            stop: 截止日。如未指定，同步到已收盘日
+            delay: seconds for sync to wait.
+        force: 即使当前不是交易日，是否也强行进行同步。
+    Returns:
+
+    """
+    if not force and not tf.is_trade_day(arrow.now()):
+        return
+
+    key_scope = f"jobs.bars_sync.scope.{frame_type.value}"
+
+    if sync_params is None:
+        sync_params = read_sync_params(frame_type)
+
+    if not sync_params:
+        logger.warning("sync_params is required for sync.")
+        return
+
+    codes = sync_params.get('secs')
+    if codes is None:
+        secs = Securities()
+        codes = secs.choose(sync_params.get('type'))
+        include = filter(lambda x: x, sync_params.get('include', '').split(','))
+        include = map(lambda x: x.strip(' '), include)
+        codes.extend(include)
+        exclude = sync_params.get('exclude', '')
+        exclude = map(lambda x: x.strip(' '), exclude)
+        codes = set(codes) - set(exclude)
+
+    if len(codes) == 0:
+        logger.warning("no securities are specified for sync %s", frame_type)
+        return
+
+    logger.info("add %s securities into sync queue", len(codes))
+    pl = cache.sys.pipeline()
+    pl.delete(key_scope)
+    pl.lpush(key_scope, *codes)
+    await pl.execute()
+
+    await asyncio.sleep(sync_params.get('delay', 0))
+    await _start_job_timer('sync')
+    await emit.emit(Events.OMEGA_DO_SYNC, {
+        'frame_type': frame_type,
+        'start':      sync_params.get('start'),
+        'stop':       sync_params.get('stop')
+    })
+
+    logger.info("%s send to fetchers.", Events.OMEGA_DO_SYNC)
+
+
+def _parse_sync_params(sync_params: dict):
+    """
+    如果sync_params['start'], sync_params['stop']类型为date：
+        如果frame_type为分钟级，则意味着要取到当天的开始帧和结束帧；
+        如果frame_type为日期级，则要对齐到已结束的帧日期，并且设置时间为15:00否则某些sdk可能会只取
+        到上一周期数据（如jqdatasdk 1.8)
+    如果sync_params['start'], sync_params['stop']类型为datetime：
+        如果frame_type为分钟级别，则通过tf.floor对齐到已结束的帧
+        如果frame_type为日线级别，则对齐到上一个已结束的日帧，时间部分重置为15:00
+
+    Args:
+        sync_params:
 
     Returns:
 
     """
-    key_scope = f"jobs.bars_sync.scope"
+    frame_type = sync_params.get('frame_type')
+    start = sync_params.get('start')
+    stop = sync_params.get('stop')
 
-    if secs is None:
-        secs = Securities()
-        secs = secs.choose(cfg.omega.sync.type)
+    if start is None:
+        raise ValueError("sync_params['start'] must be specified!")
 
-    if frames_to_sync is None:
-        frames_to_sync = dict(ChainMap(*cfg.omega.sync.frames))
+    if type(start) not in [datetime.date, datetime.datetime]:
+        raise TypeError("type of sync_params['start'] must be one of ["
+                        "datetime.datetime, datetime.date]")
 
-    logger.info("add %s securities into sync queue", len(secs))
-    pl = cache.sys.pipeline()
-    pl.delete(key_scope)
-    pl.lpush(key_scope, *secs)
-    await pl.execute()
+    if stop is None:
+        stop = tf.floor(arrow.now(cfg.tz), frame_type)
+    if type(stop) not in [datetime.datetime, datetime.date]:
+        raise TypeError("type of sync_params['stop'] must be one of [None, "
+                        "datetime.datetime, datetime.date]")
 
-    await _start_job_timer('sync')
-    await emit.emit(Events.OMEGA_DO_SYNC, frames_to_sync)
-    logger.info("%s send to fetchers.", Events.OMEGA_DO_SYNC)
+    if start > stop:
+        raise ValueError(
+                f"Invalid sync_params, start {start} must be earlier than stop: {stop}")
+
+    if frame_type in tf.minute_level_frames:
+        if type(start) is datetime.date:
+            start = tf.floor(start, FrameType.DAY)
+            minutes = tf.ticks[frame_type][0]
+            h, m = minutes // 60, minutes % 60
+            start = datetime.datetime(start.year, start.month, start.day, h, m, tzinfo=tz.gettz(cfg.tz))
+        else:
+            start = tf.floor(start, frame_type)
+
+        if type(stop) is datetime.date:
+            stop = tf.floor(stop, FrameType.DAY)
+            stop = datetime.datetime(stop.year, stop.month, stop.day, 15, tzinfo=tz.gettz(cfg.tz))
+        else:
+            stop = tf.floor(stop, frame_type)
+    else:
+        start = tf.floor(start, frame_type)
+        stop = tf.floor(stop, frame_type)
+
+    return frame_type, start, stop
 
 
-async def sync_bars_worker(sync_frames: dict = None, secs: List[str] = None):
+async def sync_bars_worker(sync_params: dict = None, secs: List[str] = None):
     """
     worker's sync job
     """
-    logger.info("sync_bars_worker with params: %s, %s", secs, sync_frames)
+    logger.info("sync_bars_worker with params: %s, %s", sync_params, secs)
 
-    key_scope = "jobs.bars_sync.scope"
+    try:
+        frame_type, start, stop = _parse_sync_params(sync_params)
+    except Exception as e:
+        logger.warning("invalid sync_params: %s", sync_params)
+        logger.exception(e)
+        return
+
+    key_scope = f"jobs.bars_sync.scope.{frame_type.value}"
 
     if secs is not None:
         async def get_sec():
@@ -130,9 +232,9 @@ async def sync_bars_worker(sync_frames: dict = None, secs: List[str] = None):
     # noinspection PyPep8
     while code := await get_sec():
         try:
-            await sync_bars_for_security(code, sync_frames)
+            await sync_bars_for_security(code, frame_type, start, stop)
         except FetcherQuotaError as e:
-            logger.warning("Quota exceeded when syncing %s. Sync borted.", code)
+            logger.warning("Quota exceeded when syncing %s. Sync aborted.", code)
             logger.exception(e)
             return  # stop the sync
         except Exception as e:
@@ -143,86 +245,47 @@ async def sync_bars_worker(sync_frames: dict = None, secs: List[str] = None):
     logger.info('%s finished quotes sync in %s seconds', os.getpid(), elapsed)
 
 
-def _get_closed_frame(stop: Union[Arrow, datetime.date, datetime.datetime],
-                      frame_type: FrameType):
-    """
-    同步时间范围按天来指定，以符合人类习惯。但具体操作时，需要确定到具体的时间帧上。对截止时间，
-    如果是周线、月线、日线，取上一个收盘交易日所在的日、周、月线。如果是分钟线，取上一个收盘交
-    易日的最后一根K线。
-    Args:
-        stop: 用户指定的截止日期
-        frame_type:
-
-    Returns:
-
-    """
-    stop = arrow.get(stop).date()
-    now = arrow.now()
-    if stop == now.date() and tf.is_trade_day(now.date()) \
-            and now.hour * 60 + now.minute <= 900:
-        # 如果截止日期正处在交易时间，则只能同步到上一交易日
-        stop = tf.day_shift(stop, -1)
-
-    if frame_type in [FrameType.WEEK, FrameType.MONTH]:
-        stop = tf.shift(stop, 0, frame_type)
-
-    if frame_type in tf.minute_level_frames:
-        stop = tf.ceil(stop, frame_type)
-
-    return stop
-
-
-async def sync_bars_for_security(code: str, sync_frames: dict = None):
-    counters = {frame: 0 for frame in sync_frames.keys()}
+async def sync_bars_for_security(code: str,
+                                 frame_type: FrameType,
+                                 start: Union[datetime.date, datetime.datetime],
+                                 stop: Union[None, datetime.date, datetime.datetime]):
+    counters = 0
     logger.info("syncing quotes for %s", code)
 
-    for frame, start_stop in sync_frames.items():
-        frame_type = FrameType(frame)
-        now = arrow.now()
-        if ',' in start_stop:
-            start, stop = map(lambda x: x.strip(' '), start_stop.split(','))
-        else:
-            start, stop = start_stop, now.date()
+    # 取数据库中该frame_type下该code的k线起始点
+    head, tail = await sc.get_bars_range(code, frame_type)
+    if not all([head, tail]):
+        await sc.clear_bars_range(code, frame_type)
+        n_bars = tf.count_frames(start, stop, frame_type)
+        bars = await aq.get_bars(code, stop, n_bars, frame_type)
+        counters = len(bars)
+        logger.info("finished sync %s(%s), %s bars synced", code, frame_type, counters)
+        return
 
-        start = tf.floor(start, frame_type)
-        stop = _get_closed_frame(stop, frame_type)
-
-        # 取数据库中该frame_type下该code的k线起始点
-        head, tail = await sc.get_bars_range(code, frame_type)
-        if not all([head, tail]):
-            await sc.clear_bars_range(code, frame_type)
-            n_bars = tf.count_frames(start, stop, frame_type)
-            bars = await aq.get_bars(code, stop, n_bars, frame_type)
-            counters[frame_type.value] = len(bars)
+    if start < head:
+        n = tf.count_frames(start, head, frame_type) - 1
+        if n > 0:
+            _end_at = tf.shift(head, -1, frame_type)
+            bars = await aq.get_bars(code, _end_at, n, frame_type)
+            counters += len(bars)
             logger.debug("sync %s level bars of %s to %s: expected: %s, actual %s",
-                         frame_type, code, stop, n_bars, len(bars))
-            continue
+                         frame_type, code, _end_at, n, len(bars))
+            if len(bars) and bars['frame'][-1] != _end_at:
+                logger.warning("discrete frames found:%s, bars[-1](%s), "
+                               "head(%s)", code, bars['frame'][-1], head)
 
-        if start < head:
-            n = tf.count_frames(start, head, frame_type) - 1
-            if n > 0:
-                _end_at = tf.shift(head, -1, frame_type)
-                bars = await aq.get_bars(code, _end_at, n, frame_type)
-                counters[frame_type.value] += len(bars)
-                logger.debug("sync %s level bars of %s to %s: expected: %s, actual %s",
-                             frame_type, code, _end_at, n, len(bars))
-                if len(bars) and bars['frame'][-1] != _end_at:
-                    logger.warning("discrete frames found:%s, bars[-1](%s), "
-                                   "head(%s)", code, bars['frame'][-1], head)
+    if stop > tail:
+        n = tf.count_frames(tail, stop, frame_type) - 1
+        if n > 0:
+            bars = await aq.get_bars(code, stop, n, frame_type)
+            logger.debug("sync %s level bars of %s to %s: expected: %s, actual %s",
+                         frame_type, code, stop, n, len(bars))
+            counters += len(bars)
+            if bars['frame'][0] != tf.shift(tail, 1, frame_type):
+                logger.warning("discrete frames found: %s, tail(%s), bars[0]("
+                               "%s)", code, tail, bars['frame'][0])
 
-        if stop > tail:
-            n = tf.count_frames(tail, stop, frame_type) - 1
-            if n > 0:
-                bars = await aq.get_bars(code, stop, n, frame_type)
-                logger.debug("sync %s level bars of %s to %s: expected: %s, actual %s",
-                             frame_type, code, stop, n, len(bars))
-                counters[frame_type.value] += len(bars)
-                if bars['frame'][0] != tf.shift(tail, 1, frame_type):
-                    logger.warning("discrete frames found: %s, tail(%s), bars[0]("
-                                   "%s)", code, tail, bars['frame'][0])
-
-    logger.info("finished sync %s, %s", code,
-                ",".join([f"{k}:{v}" for k, v in counters.items()]))
+    logger.info("finished sync %s(%s), %s bars synced", code, frame_type, counters)
 
 
 async def sync_calendar():

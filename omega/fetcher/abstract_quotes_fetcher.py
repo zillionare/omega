@@ -16,7 +16,7 @@ from omicron.core.types import FrameType, Frame
 from omicron.dal import cache
 from omicron.dal import security_cache
 
-from omega.core.accelerate import left_join
+from omega.core.accelerate import merge
 from omega.fetcher.quotes_fetcher import QuotesFetcher
 
 logger = logging.getLogger(__file__)
@@ -77,8 +77,9 @@ class AbstractQuotesFetcher(QuotesFetcher):
     async def get_bars(cls, sec: str,
                        end: Union[datetime.date, datetime.date],
                        n_bars: int,
-                       frame_type: FrameType) -> np.ndarray:
-        bars = await cls.get_instance().get_bars(sec, end, n_bars, frame_type)
+                       frame_type: FrameType,
+                       include_unclosed=True) -> np.ndarray:
+        bars = await cls.get_instance().get_bars(sec, end, n_bars, frame_type, include_unclosed)
 
         closed = tf.floor(end, frame_type)
         if closed != end:
@@ -111,7 +112,7 @@ class AbstractQuotesFetcher(QuotesFetcher):
         filled[:] = np.nan
         filled['frame'] = frames
 
-        return left_join(filled, bars, 'frame')
+        return merge(filled, bars, 'frame')
 
     @classmethod
     async def get_all_trade_days(cls):

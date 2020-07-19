@@ -15,7 +15,6 @@ import signal
 import subprocess
 import sys
 import time
-from collections import ChainMap
 from pathlib import Path
 from typing import List, Optional
 
@@ -27,6 +26,7 @@ import psutil
 import xxhash
 from aiocache import cached
 from aiohttp import ClientError
+from dateutil import tz
 from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
 from omicron.dal import security_cache as sc, cache, security_cache
@@ -38,6 +38,7 @@ from omega.core import get_config_dir
 from omega.core.events import ValidationError, Events
 from omega.jobs.sync import cfg, logger
 
+validation_errors = []
 
 async def calc_checksums(day: datetime.date, codes: List) -> dict:
     """
@@ -116,7 +117,7 @@ async def get_checksum(day: int) -> Optional[List]:
                 continue
 
 
-def do_validation_with_multiprocessing():
+def do_validation_process_entry():
     try:
         t0 = time.time()
         asyncio.run(do_validation())
@@ -260,6 +261,7 @@ async def start_validation():
     no_validation_error_days = set(
             tf.day_frames[(tf.day_frames >= start) & (tf.day_frames <= end)])
 
+    # fixme: do validation per frame_type
     codes = secs.choose(cfg.omega.sync.type)
     await cache.sys.delete("jobs.bars_validation.scope")
     await cache.sys.lpush("jobs.bars_validation.scope", *codes)
@@ -269,8 +271,8 @@ async def start_validation():
 
     t0 = time.time()
 
-    code = f"from omega.core.sanity import do_validation_with_multiprocessing; " \
-           f"do_validation_with_multiprocessing()"
+    code = f"from omega.core.sanity import do_validation_process_entry; " \
+           f"do_validation_process_entry()"
 
     procs = []
     for i in range(cpu_count):
@@ -311,21 +313,37 @@ async def start_validation():
 
 async def quick_scan():
     secs = Securities()
-    codes = secs.choose(cfg.omega.sync.type)
 
     report = logging.getLogger('quickscan')
-    frames_to_sync = dict(ChainMap(*cfg.omega.sync.frames))
 
-    counters = {frame: [0, 0] for frame in frames_to_sync.keys()}
+    counters = {}
+    for sync_config in cfg.omega.sync.bars:
+        frame = sync_config.get('frame')
+        start = sync_config.get('start')
 
-    for frame, start_stop in frames_to_sync.items():
+        if frame is None or start is None:
+            logger.warning("skipped %s: required fields are [frame, start]", sync_config)
+            continue
+
         frame_type = FrameType(frame)
-        start_stop = start_stop.split(",")
-        start = tf.day_shift(arrow.get(start_stop[0]), 0)
-        if len(start_stop) == 2:
-            stop = tf.day_shift(arrow.get(start_stop[1]), 0)
-        else:
-            stop = tf.day_shift(arrow.now(), 0)
+
+        start = arrow.get(start).date()
+        start = tf.floor(start, FrameType.DAY)
+        if frame_type in tf.minute_level_frames:
+            minutes = tf.ticks[frame_type][0]
+            h, m = minutes // 60, minutes % 60
+            start = datetime.datetime(start.year, start.month, start.day, h, m, tzinfo=tz.gettz(cfg.tz))
+
+        counters[frame] = [0, 0]
+        stop = sync_config.get('stop') or arrow.now().date()
+        stop = datetime.datetime(stop.year, stop.month, stop.day, 15, tzinfo=tz.gettz(cfg.tz))
+        codes = secs.choose(sync_config.get('type'))
+        include = filter(lambda x: x, sync_config.get('include', '').split(','))
+        include = map(lambda x: x.strip(' '), include)
+        codes.extend(include)
+        exclude = sync_config.get('exclude', '')
+        exclude = map(lambda x: x.strip(' '), exclude)
+        codes = set(codes) - set(exclude)
 
         counters[frame][1] = len(codes)
         for code in codes:

@@ -200,5 +200,6 @@ class MyTestCase(unittest.TestCase):
         self.assertAlmostEqual(6.51, bars[1]['open'])
         self.assertAlmostEqual(5.7, bars[-1]['open'])
 
+
 if __name__ == '__main__':
     unittest.main()

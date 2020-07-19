@@ -9,15 +9,25 @@ Contributors:
 import logging
 import warnings
 
-from numba import njit, NumbaPendingDeprecationWarning
+from numba import NumbaPendingDeprecationWarning
 
 warnings.filterwarnings("ignore", category=NumbaPendingDeprecationWarning)
 
 logger = logging.getLogger(__name__)
 
 
-@njit
-def left_join(left, right, by):
+def merge(left, right, by):
+    """
+    njit fail if one of left, right contains object, not plain type, but the loop is
+    very fast, cost 0.0001 seconds
+    Args:
+        left:
+        right:
+        by:
+
+    Returns:
+
+    """
     i, j = 0, 0
 
     while j < len(right) and i < len(left):

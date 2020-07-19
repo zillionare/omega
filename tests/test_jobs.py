@@ -1,3 +1,5 @@
+import asyncio
+import datetime
 import logging
 import os
 import signal
@@ -13,7 +15,7 @@ import arrow
 import cfg4py
 import numpy as np
 import omicron
-from omicron.core.events import Events
+from dateutil import tz
 from omicron.core.lang import async_run
 from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
@@ -24,11 +26,10 @@ from pyemit import emit
 
 import omega.core.sanity
 import omega.jobs
-import omega.jobs.sync
-import omega.jobs.sync as sq
+import omega.jobs.sync as sync
 from omega.config.cfg4py_auto_gen import Config
 from omega.core import get_config_dir
-from omega.core.events import ValidationError
+from omega.core.events import ValidationError, Events
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as fetcher
 from omega.jobs import load_additional_jobs
 
@@ -69,22 +70,25 @@ class MyTestCase(unittest.TestCase):
         os.kill(self.server_process.pid, signal.SIGTERM)
 
     async def sync_and_check(self, code, frame_type, start, stop,
-                             expected_head, expected_end):
-        await sq.sync_bars_worker({frame_type.value: f"{start},{stop}"}, [code])
+                             expected_head, expected_tail):
+        await sync.sync_bars_worker({
+            'start':      start,
+            'stop':       stop,
+            'frame_type': frame_type
+        }, [code])
 
         head, tail = await security_cache.get_bars_range(code, frame_type)
 
-        begin = tf.floor(arrow.get(start, tzinfo=cfg.tz), frame_type)
-        end = sq._get_closed_frame(stop, frame_type)
-        n_bars = tf.count_frames(begin, end, frame_type)
-        bars = await security_cache.get_bars(code, end, n_bars, frame_type)
+        n_bars = tf.count_frames(expected_head, expected_tail, frame_type)
+        bars = await security_cache.get_bars(code, expected_tail, n_bars, frame_type)
+
+        # 本单元测试的k线数据应该没有空洞。如果程序在首尾衔接处出现了问题，就会出现空洞，
+        # 导致期望获得的数据与实际数据数量不相等。
         bars = list(filter(lambda x: not np.isnan(x['close']), bars))
 
-        # 进行单元测试的k线数据应该没有空洞。如果程序在首尾衔接处出现了问题，就会出现空洞，
-        # 导致期望获得的数据与实际数据数量不相等。
         self.assertEqual(n_bars, len(bars))
         self.assertEqual(expected_head, head)
-        self.assertEqual(expected_end, tail)
+        self.assertEqual(expected_tail, tail)
 
     @async_run
     async def test_000_sync_day_bars(self):
@@ -95,64 +99,63 @@ class MyTestCase(unittest.TestCase):
         # assume the cache is totally empty, then we'll fetch up to
         # cfg.omega.max_bars bars data, and the cache should
         # have that many records as well
-        start = '2020-05-08'
-        stop = '2020-05-21'
+        start = arrow.get('2020-05-08').date()
+        stop = arrow.get('2020-05-21').date()
 
         await cache.security.delete(f"{code}:{frame_type.value}")
-        await self.sync_and_check(code, frame_type, start, stop, arrow.get(
-                start).date(), arrow.get(stop).date())
+        await self.sync_and_check(code, frame_type, start, stop, start, stop)
 
-        head = arrow.get('2020-05-11').date()
-        tail = arrow.get('2020-05-20').date()
         # There're several records in the cache and all in sync scope. So after the
         # sync, the cache should have bars_to_fetch bars
+        head = arrow.get('2020-05-11').date()
+        tail = arrow.get('2020-05-20').date()
         await security_cache.set_bars_range(code, frame_type, head, tail)
-        await self.sync_and_check(code, frame_type, start, stop,
-                                  arrow.get(start).date(),
-                                  arrow.get(stop).date())
+        await self.sync_and_check(code, frame_type, start, stop, start, stop)
 
         # Day 1 sync
         # The cache already has bars_available records: [expected_head, ..., end]
         # After the sync, the cache should contains [expected_head, ..., end,
         # end + 1] bars in the cache
-        stop = '2020-05-22'
-        await self.sync_and_check(code, frame_type, start, stop, arrow.get(
-                start).date(), arrow.get(stop).date())
+        stop = arrow.get('2020-05-22').date()
+        await self.sync_and_check(code, frame_type, start, stop, start, stop)
 
     @async_run
     async def test_001_sync_min30_bars(self):
         code = '000001.XSHE'
         frame_type = FrameType.MIN30
-        start = '2020-05-08'
-        stop = '2020-05-21'
+        start = arrow.get('2020-05-08').date()
+        stop = arrow.get('2020-05-21').date()
 
         # T0 sync
         # assume the cache is totally empty, then we'll fetch up to
         # cfg.omega.max_bars bars data, and the cache should
         # have that many records as well
 
-        exp_head = arrow.get(start).replace(hour=10, tzinfo=cfg.tz).datetime
-        exp_tail = arrow.get(stop).replace(hour=15, tzinfo=cfg.tz).datetime
+        # if start, stop is specified as date, then it'll shift to the previous day
+        exp_head = arrow.get(start).replace(hour=10, tzinfo=cfg.tz)
+        exp_tail = arrow.get(stop).replace(hour=15, tzinfo=cfg.tz)
+
         await cache.security.delete(f"{code}:{frame_type.value}")
+        logger.info("testing %s, %s, %s, %s", start, stop, exp_head, exp_tail)
         await self.sync_and_check(code, frame_type, start, stop, exp_head, exp_tail)
 
-        head = arrow.get('2020-05-08 10:00', tzinfo=cfg.tz)
-        tail = arrow.get('2020-05-20 15:00', tzinfo=cfg.tz)
-        await security_cache.set_bars_range(code, frame_type, head, tail)
+        start = arrow.get('2020-05-07 15:00', tzinfo=cfg.tz).datetime
+        stop = arrow.get('2020-05-22 10:00', tzinfo=cfg.tz).datetime
+        await cache.security.delete(f"{code}:{frame_type.value}")
 
-        await self.sync_and_check(code, frame_type, start, stop, exp_head, exp_tail)
+        logger.info("testing %s, %s, %s, %s", start, stop, exp_head, exp_tail)
+        await self.sync_and_check(code, frame_type, start, stop, start, stop)
 
-        # T + 1 day sync
-        stop = '2020-05-22'
-        exp_tail = arrow.get(stop).replace(hour=15, tzinfo=cfg.tz).datetime
-        await self.sync_and_check(code, frame_type, start, stop, exp_head, exp_tail)
+        stop = arrow.get('2020-05-25 15:00', tzinfo=cfg.tz).datetime
+        logger.info("testing %s, %s, %s, %s", start, stop, exp_head, exp_tail)
+        await self.sync_and_check(code, frame_type, start, stop, start, stop)
 
     @async_run
     async def test_002_sync_week_bars(self):
         code = '000001.XSHE'
         frame_type = FrameType.WEEK
-        start = '2020-05-07'
-        stop = '2020-05-21'
+        start = arrow.get('2020-05-07').date()
+        stop = arrow.get('2020-05-21').date()
         # T0 sync
 
         exp_head = arrow.get('2020-04-30').date()
@@ -161,8 +164,8 @@ class MyTestCase(unittest.TestCase):
         await self.sync_and_check(code, frame_type, start, stop, exp_head, exp_tail)
 
         # T1 sync
-        # Now assume we're at 2020-05-01, week bars of 20200430 is ready
-        stop = '2020-05-22'
+        start = arrow.get('2020-04-30').date()
+        stop = arrow.get('2020-05-23').date()
         exp_head = arrow.get('2020-04-30').date()
         exp_tail = arrow.get('2020-05-22').date()
 
@@ -173,22 +176,23 @@ class MyTestCase(unittest.TestCase):
         code = '000001.XSHE'
         frame_type = FrameType.MIN60
 
-        start = '2020-05-08'
-        stop = '2020-05-21'
-        exp_head = arrow.get(start, tzinfo=cfg.tz).replace(hour=10, minute=30).datetime
-        exp_tail = arrow.get(stop, tzinfo=cfg.tz).replace(hour=15).datetime
+        start = arrow.get('2020-05-08').date()
+        stop = arrow.get('2020-05-21').date()
+        tzinfo = tz.gettz(cfg.tz)
+        exp_head = datetime.datetime(start.year, start.month, start.day, 10, 30, tzinfo=tzinfo)
+        exp_tail = datetime.datetime(stop.year, stop.month, stop.day, 15, tzinfo=tzinfo)
 
         await cache.security.delete(f"{code}:{frame_type.value}")
         await self.sync_and_check(code, frame_type, start, stop, exp_head, exp_tail)
 
-        head = arrow.get('2020-05-08 10:30', tzinfo=cfg.tz)
-        tail = arrow.get('2020-05-20 15:00', tzinfo=cfg.tz)
+        head = arrow.get('2020-05-08 10:30', tzinfo=cfg.tz).datetime
+        tail = arrow.get('2020-05-20 15:00', tzinfo=cfg.tz).datetime
         await security_cache.set_bars_range(code, frame_type, head, tail)
 
         await self.sync_and_check(code, frame_type, start, stop, exp_head, exp_tail)
 
         # T + 1 day sync
-        stop = '2020-05-22'
+        stop = arrow.get('2020-05-22').date()
         exp_tail = arrow.get(stop).replace(hour=15, tzinfo=cfg.tz).datetime
         await self.sync_and_check(code, frame_type, start, stop, exp_head, exp_tail)
 
@@ -241,12 +245,19 @@ class MyTestCase(unittest.TestCase):
         await cache.sys.set('jobs.bars_validation.range.start', '20200511')
         await cache.sys.set('jobs.bars_validation.range.stop', '20200513')
         with mock.patch('omega.core.sanity.calc_checksums',
-                        side_effect=[mock_checksum]):
-            tf.day_frames = np.array([20200512])
-            await omega.core.sanity.do_validation(codes, '20200511', '20200512')
-            self.assertSetEqual({'20200512,000001.XSHE:1d,7918c38d,7918c38c',
-                                 '20200512,000001.XSHG:1m,d37d8742,d37d8741'},
-                                errors)
+                        side_effect=[mock_checksum, mock_checksum]):
+            try:
+                _tmp = tf.day_frames
+                tf.day_frames = np.array([20200512])
+                codes = ['000001.XSHE', '000001.XSHG']
+                errors = set()
+                await omega.core.sanity.do_validation(codes, '20200511', '20200512')
+                self.assertSetEqual({
+                    (3, 20200512, '000001.XSHE', '1d', '7918c38d', '7918c38c'),
+                    (3, 20200512, '000001.XSHG', '1m', 'd37d8742', 'd37d8741')
+                }, errors)
+            finally:
+                tf.day_frames = _tmp
 
     @async_run
     async def test_201_start_job_validation(self):
@@ -255,7 +266,7 @@ class MyTestCase(unittest.TestCase):
             await omega.core.sanity.start_validation()
 
     async def prepare_checksum_data(self):
-        end = arrow.get('2020-05-12 15:00')
+        end = datetime.datetime(2020, 5, 12, 15)
 
         await cache.sys.set('jobs.checksum.cursor', 20200511)
 
@@ -338,6 +349,41 @@ class MyTestCase(unittest.TestCase):
     @async_run
     async def test_quick_scan(self):
         await omega.core.sanity.quick_scan()
+
+    @async_run
+    async def test_sync_bars(self):
+        config_items = [
+            [
+                {
+                    "frame":   "1d",
+                    "start":   '2020-01-01',
+                    "delay":   3,
+                    "type":    [],
+                    "include": "000001.XSHE,000004.XSHE",
+                    "exclude": "000001.XSHG"
+                }
+            ]
+        ]
+
+        sync_request = []
+
+        async def on_sync_bars(params: dict):
+            sync_request.append(params)
+
+        emit.register(Events.OMEGA_DO_SYNC, on_sync_bars)
+        for config in config_items:
+            cfg.omega.sync.bars = config
+            for frame_config in config:
+                frame_type = FrameType(frame_config.get('frame'))
+                sync_params = frame_config
+                await sync.sync_bars(frame_type, sync_params, force=True)
+
+        await asyncio.sleep(0.2)
+        self.assertDictEqual({
+            'start':      '2020-01-01',
+            'stop':       None,
+            'frame_type': FrameType.DAY
+        }, sync_request[0])
 
 
 if __name__ == '__main__':

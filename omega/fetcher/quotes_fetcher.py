@@ -27,7 +27,7 @@ class QuotesFetcher(ABC):
         raise NotImplementedError
 
     async def get_bars(self, sec: str, end: Frame, n_bars: int,
-                       frame_type: FrameType) -> numpy.ndarray:
+                       frame_type: FrameType, allow_unclosed=True) -> numpy.ndarray:
         """
         fetch quotes of sec. Return a numpy rec array with n_bars length, and last
         frame is end。
@@ -38,6 +38,7 @@ class QuotesFetcher(ABC):
             end:
             n_bars:
             frame_type:
+            allow_unclosed: 为真时，当前未结束的桢数据也获取
 
         Returns:
             a numpy.ndarray, with each element is:
