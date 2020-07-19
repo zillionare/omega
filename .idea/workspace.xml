@@ -10,15 +10,8 @@
       <change afterPath="$PROJECT_DIR$/omega/tools/monitor.py" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/tests/test.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/omega/config/defaults.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/omega/config/defaults.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/omega/core/accelerate.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/core/accelerate.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/omega/core/sanity.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/core/sanity.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/omega/fetcher/abstract_quotes_fetcher.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/fetcher/abstract_quotes_fetcher.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/omega/fetcher/quotes_fetcher.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/fetcher/quotes_fetcher.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/omega/jobs/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/jobs/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/omega/jobs/sync.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/jobs/sync.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/test_abstract_quotes_fetcher.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_abstract_quotes_fetcher.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/test_jobs.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_jobs.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/omega/cli.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/cli.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/omega/core/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/core/__init__.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -380,7 +373,7 @@
       <workItem from="1594731684171" duration="3077000" />
       <workItem from="1594900119399" duration="7025000" />
       <workItem from="1594962797895" duration="21589000" />
-      <workItem from="1595059122631" duration="24781000" />
+      <workItem from="1595059122631" duration="27727000" />
     </task>
     <task id="LOCAL-00001" summary="1. omicron refactors cache, now move all save_bars to cache&#10;2. timeout for jq remote set to 20, sometimes still not enough&#10;3. omega work lead select mesh">
       <created>1588863976311</created>
@@ -529,7 +522,14 @@
       <option name="project" value="LOCAL" />
       <updated>1593869014738</updated>
     </task>
-    <option name="localTasksCounter" value="22" />
+    <task id="LOCAL-00022" summary="1. get_bars will now perform fill_na if stock is not in trade some day. This will make quick sanity/sync check easier&#10;2. change accl.left_join to merge&#10;3. fix quick_scan after sync configuration refactoring&#10;4. refactoring bars sync, now sync can be performed on each frame_type grainity">
+      <created>1595162728306</created>
+      <option name="number" value="00022" />
+      <option name="presentableId" value="LOCAL-00022" />
+      <option name="project" value="LOCAL" />
+      <updated>1595162728306</updated>
+    </task>
+    <option name="localTasksCounter" value="23" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -636,11 +636,11 @@
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="3455" y="399" key="ANALYSIS_DLG_com.intellij.analysis.BaseAnalysisAction$1/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1593868564140" />
-    <state x="2931" y="9" width="1259" height="954" key="CommitChangelistDialog2" timestamp="1595162688935">
+    <state x="2931" y="9" width="1259" height="954" key="CommitChangelistDialog2" timestamp="1595166973449">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="3004" y="86" width="1259" height="954" key="CommitChangelistDialog2/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1590667560260" />
-    <state x="2931" y="9" width="1527" height="1016" key="CommitChangelistDialog2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595162688935" />
+    <state x="2931" y="9" width="1527" height="1016" key="CommitChangelistDialog2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595166973449" />
     <state width="664" height="438" key="DebuggerActiveHint" timestamp="1592655695748">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
@@ -721,11 +721,11 @@
     </state>
     <state x="241" y="95" key="SettingsEditor/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1588746396970" />
     <state x="3088" y="108" key="SettingsEditor/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1591863693398" />
-    <state x="3288" y="256" key="Vcs.Push.Dialog.v2" timestamp="1593869018046">
+    <state x="3288" y="256" key="Vcs.Push.Dialog.v2" timestamp="1595162731932">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="393" y="215" key="Vcs.Push.Dialog.v2/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1590667566517" />
-    <state x="3288" y="256" key="Vcs.Push.Dialog.v2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1593869018046" />
+    <state x="3288" y="256" key="Vcs.Push.Dialog.v2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595162731932" />
     <state width="968" height="528" key="XDebugger.FullValuePopup" timestamp="1594732719179">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
@@ -803,7 +803,7 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/omega/cli.py</url>
-          <line>452</line>
+          <line>455</line>
           <option name="timeStamp" value="277" />
         </line-breakpoint>
         <line-breakpoint suspend="THREAD" type="python-line">

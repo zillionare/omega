@@ -25,6 +25,7 @@ def get_config_dir():
     else:
         _dir = path.normpath(path.join(path.dirname(__file__), '../config'))
 
+    sys.path.insert(0, _dir)
     return _dir
 
 

@@ -4,6 +4,7 @@
 """
     管理应用程序生命期、全局对象、任务、全局消息响应
         """
+import itertools
 import json
 import logging
 import os
@@ -26,6 +27,8 @@ import psutil
 import sh
 from cfg4py.resources.cfg4py_auto_gen import Config
 from omicron.core.lang import async_run
+from omicron.core.timeframe import tf
+from omicron.core.types import FrameType
 from pyemit import emit
 from ruamel.yaml import YAML
 from termcolor import colored
@@ -578,13 +581,10 @@ async def sync_calendar():
 
 
 @async_run
-async def sync_bars(start: str = None, end: str = None, frame: str = None, codes: str = \
-        None):
+async def sync_bars(frame, codes: str = None):
     """
-    if no params are provided, then trigger sync based on cfg files
+    read sync config from config file, if frame/codes is not provided
     Args:
-        start:
-        end:
         frame:
         codes:
 
@@ -593,17 +593,20 @@ async def sync_bars(start: str = None, end: str = None, frame: str = None, codes
     """
     await _init()
 
-    codes = codes.split(",") if codes else None
+    if frame:
+        frame_type = FrameType(frame)
+        params = sync.read_sync_params(FrameType(frame))
+        if codes:
+            params['secs'] = list(map(lambda x: x.strip(' '), codes.split(",")))
+        await sync.sync_bars(frame_type, params, force=True)
+        logger.info("request %s,%s send to workers.", params, codes)
+    else:
+        for frame_type in itertools.chain(tf.day_level_frames, tf.minute_level_frames):
+            params = sync.read_sync_params(frame_type)
+            if params:
+                await sync.sync_bars(frame_type, params, force=True)
 
-    frames_to_sync = None
-    if frame and start:
-        if end:
-            frames_to_sync = {frame: f"{start},{end}"}
-        else:
-            frames_to_sync = {frame: start}
-
-    await sync.sync_bars(codes, frames_to_sync)
-    logger.info("request %s,%s send to workers.", codes, frames_to_sync)
+            logger.info("request %s,%s send to workers.", params, codes)
 
 
 async def _init():
