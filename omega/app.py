@@ -22,7 +22,7 @@ from omega.config.cfg4py_auto_gen import Config
 from omega.core import get_config_dir
 from omega.core.events import Events
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
-from omega.jobs import sync as sq
+from omega.jobs import sync as sq, sync
 
 cfg: Config = cfg4py.get_instance()
 
@@ -48,20 +48,41 @@ class Application(object):
         await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
 
         # register route here
-        app.add_route(self.get_security_list, '/quotes/security_list')
-        app.add_route(self.get_bars, '/quotes/bars')
-        app.add_route(self.get_all_trade_days, '/quotes/all_trade_days')
-        app.add_route(self.sync_bars, '/jobs/sync_bars', methods=['POST'])
+        app.add_route(self.get_security_list_handler, '/quotes/security_list')
+        app.add_route(self.get_bars_handler, '/quotes/bars')
+        app.add_route(self.get_all_trade_days_handler, '/quotes/all_trade_days')
+        app.add_route(self.bars_sync_handler, '/jobs/sync_bars', methods=['POST'])
+        app.add_route(self.sync_calendar_handler, '/jobs/sync_calendar', methods=[
+            'POST'])
+        app.add_route(self.sync_seurity_list_handler, 'jobs/sync_security_list',
+                      methods=[
+                          'POST'])
 
         logger.info("<<< init %s process done", self.__class__.__name__)
 
-    async def get_security_list(self, request):
+    async def sync_calendar_handler(self, request):
+        try:
+            await sync.sync_calendar()
+            return response.json(body=None, status=200)
+        except Exception as e:
+            logger.exception(e)
+            return response.json(e, status=500)
+
+    async def sync_seurity_list_handler(self, request):
+        try:
+            await sync.sync_security_list()
+            return response.json(body=None, status=200)
+        except Exception as e:
+            logger.exception(e)
+            return response.json(body=e, status=500)
+
+    async def get_security_list_handler(self, request):
         secs = await aq.get_security_list()
 
         body = pickle.dumps(secs, protocol=cfg.pickle.ver)
         return response.raw(body)
 
-    async def get_bars(self, request):
+    async def get_bars_handler(self, request):
         try:
             sec = request.json.get('sec')
             end = arrow.get(request.json.get("end"), tzinfo=cfg.tz)
@@ -76,13 +97,13 @@ class Application(object):
             logger.exception(e)
             return response.raw(pickle.dumps(None, protocol=cfg.pickle.ver))
 
-    async def get_all_trade_days(self, request):
+    async def get_all_trade_days_handler(self, request):
         days = await aq.get_all_trade_days()
 
         body = pickle.dumps(days, protocol=cfg.pickle.ver)
         return response.raw(body)
 
-    async def sync_bars(self, request):
+    async def bars_sync_handler(self, request):
         if request.json:
             secs = request.json.get('secs')
             frames_to_sync = request.json.get('frames_to_sync')
@@ -90,7 +111,7 @@ class Application(object):
             secs = None
             frames_to_sync = None
 
-        app.add_task(sq.sync_bars(secs, frames_to_sync))
+        app.add_task(sq.trigger_bars_sync(secs, frames_to_sync))
         return response.text(f"sync_bars with {secs}, {frames_to_sync} is scheduled.")
 
 

@@ -19,8 +19,8 @@ quotes_fetchers:
 #        sessions: 1
 omega:
   home: ~/.zillionare/omega
-  server:
-    url: http://localhost:3181
+  urls:
+    quotes_server: http://localhost:3180
   jobs:
     - name: checksum
       module: zilliontools.checksum

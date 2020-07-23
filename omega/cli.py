@@ -5,7 +5,6 @@
     管理应用程序生命期、全局对象、任务、全局消息响应
         """
 import itertools
-import json
 import logging
 import os
 import pathlib
@@ -14,7 +13,6 @@ import signal
 import subprocess
 import sys
 import time
-from collections import ChainMap
 from pathlib import Path
 from subprocess import CalledProcessError, check_output, check_call
 from typing import Any, Union, List, Callable
@@ -552,14 +550,11 @@ async def restart(service: str = ''):
 async def scan():
     await _init()
 
-    frames_to_sync = dict(ChainMap(*cfg.omega.sync.frames))
-    print("系统设置自动同步的数据是：")
-    print(json.dumps(frames_to_sync, indent=2))
-
     # todo: read file location from 31-quickscan.conf
-    print("错误日志将写入到/var/log/zillionare/quickscan.log中。")
+    print("将根据系统配置的同步设置来检查数据完整性，错误日志将写入到/var/log/zillionare/quickscan.log中。")
 
     counters = await quick_scan()
+
     print("扫描完成，发现的错误汇总如下：")
     print("frame errors  total")
     print("===== ======  =====")
@@ -571,17 +566,17 @@ async def scan():
 async def sync_sec_list():
     await _init()
 
-    await sync.sync_securities()
+    await sync.trigger_single_worker_sync('security_list')
 
 
 @async_run
 async def sync_calendar():
     await _init()
-    await sync.sync_calendar()
+    await sync.trigger_single_worker_sync('calendar')
 
 
 @async_run
-async def sync_bars(frame, codes: str = None):
+async def sync_bars(frame: str = None, codes: str = None):
     """
     read sync config from config file, if frame/codes is not provided
     Args:
@@ -598,13 +593,13 @@ async def sync_bars(frame, codes: str = None):
         params = sync.read_sync_params(FrameType(frame))
         if codes:
             params['secs'] = list(map(lambda x: x.strip(' '), codes.split(",")))
-        await sync.sync_bars(frame_type, params, force=True)
+        await sync.trigger_bars_sync(frame_type, params, force=True)
         logger.info("request %s,%s send to workers.", params, codes)
     else:
         for frame_type in itertools.chain(tf.day_level_frames, tf.minute_level_frames):
             params = sync.read_sync_params(frame_type)
             if params:
-                await sync.sync_bars(frame_type, params, force=True)
+                await sync.trigger_bars_sync(frame_type, params, force=True)
 
             logger.info("request %s,%s send to workers.", params, codes)
 
@@ -621,6 +616,7 @@ async def _init():
     await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
     await AbstractQuotesFetcher.create_instance(impl, **params)
     await omicron.init(AbstractQuotesFetcher)
+
 
 def main():
     fire.Fire({

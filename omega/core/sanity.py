@@ -250,12 +250,19 @@ async def start_validation():
     start, end = await pl.execute()
 
     if start is None:
-        start = cfg.omega.validation.start
-        end = cfg.omega.validation.end
-    elif end is None:
-        end = tf.date2int(arrow.now().date())
+        if cfg.omega.validation.start is None:
+            logger.warning("start of validation is not specified, validation aborted.")
+            return
+        else:
+            start = tf.date2int(arrow.get(cfg.omega.validation.start))
+    else:
+        start = int(start)
 
-    start, end = int(start), int(end)
+    if end is None:
+        end = tf.date2int(tf.floor(arrow.now().date(), FrameType.DAY))
+    else:
+        end = int(end)
+
     assert start <= end
 
     no_validation_error_days = set(
@@ -312,6 +319,7 @@ async def start_validation():
 
 
 async def quick_scan():
+    # fixme
     secs = Securities()
 
     report = logging.getLogger('quickscan')

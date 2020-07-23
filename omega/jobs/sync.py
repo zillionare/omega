@@ -12,6 +12,7 @@ import logging
 import os
 from typing import List, Union
 
+import aiohttp
 import arrow
 import cfg4py
 from dateutil import tz
@@ -76,16 +77,20 @@ def read_sync_params(frame_type: FrameType) -> dict:
         if item.get('frame') == frame_type.value:
             params = item
             params['start'] = arrow.get(item.get('start') or arrow.now()).date()
-            params['stop'] = arrow.get(item.get('stop') or arrow.now()).date()
+            if item.get('stop'):
+                params['stop'] = arrow.get(item.get('stop')).date()
+            else:
+                params['stop'] = None
             params['frame_type'] = frame_type
             return params
 
     return params
 
 
-async def sync_bars(frame_type: FrameType, sync_params: dict = None, force=False):
+async def trigger_bars_sync(frame_type: FrameType, sync_params: dict = None,
+                            force=False):
     """
-    初始化bars_sync的任务，并发信号给各后台quotes_fetcher进程以启动同步。
+    初始化bars_sync的任务，发信号给各quotes_fetcher进程以启动同步。
 
     同步的时间范围指定均为日级别。如果是非交易日，自动对齐到上一个已收盘的交易日，使用两端闭合区
     间（截止frame直到已收盘frame)。
@@ -132,7 +137,7 @@ async def sync_bars(frame_type: FrameType, sync_params: dict = None, force=False
         logger.warning("no securities are specified for sync %s", frame_type)
         return
 
-    logger.info("add %s securities into sync queue", len(codes))
+    logger.info("add %s securities into sync queue(%s)", len(codes), frame_type)
     pl = cache.sys.pipeline()
     pl.delete(key_scope)
     pl.lpush(key_scope, *codes)
@@ -191,13 +196,15 @@ def _parse_sync_params(sync_params: dict):
             start = tf.floor(start, FrameType.DAY)
             minutes = tf.ticks[frame_type][0]
             h, m = minutes // 60, minutes % 60
-            start = datetime.datetime(start.year, start.month, start.day, h, m, tzinfo=tz.gettz(cfg.tz))
+            start = datetime.datetime(start.year, start.month, start.day, h, m,
+                                      tzinfo=tz.gettz(cfg.tz))
         else:
             start = tf.floor(start, frame_type)
 
         if type(stop) is datetime.date:
             stop = tf.floor(stop, FrameType.DAY)
-            stop = datetime.datetime(stop.year, stop.month, stop.day, 15, tzinfo=tz.gettz(cfg.tz))
+            stop = datetime.datetime(stop.year, stop.month, stop.day, 15,
+                                     tzinfo=tz.gettz(cfg.tz))
         else:
             stop = tf.floor(stop, frame_type)
     else:
@@ -288,6 +295,36 @@ async def sync_bars_for_security(code: str,
     logger.info("finished sync %s(%s), %s bars synced", code, frame_type, counters)
 
 
+async def trigger_single_worker_sync(kind: str, params: dict = None):
+    """
+    使用本方法来启动只需要单个quotes fetcher进程来完成的数据同步任务，比如交易日历、证券列表等
+    如果需要同时启动多个quotes fetcher进程来完成数据同步任务，应该通过pyemit来发送广播消息。
+    Args:
+        kind: str, the kind of data to be synced, 'calendar' or 'security list' is
+        acceptable.
+
+    Returns:
+
+    """
+    url = cfg.omega.urls.quotes_server
+    if kind == 'calendar':
+        url += '/jobs/sync_calendar'
+    elif kind == 'security_list':
+        url += '/jobs/sync_security_list'
+    else:
+        raise ValueError(f"{kind} is not supported sync type.")
+
+    async with aiohttp.ClientSession() as client:
+        try:
+            async with client.post(url, data=params) as resp:
+                if resp.status != 200:
+                    logger.warning("failed to trigger %s sync", kind)
+                else:
+                    return resp.json()
+        except Exception as e:
+            logger.exception(e)
+
+
 async def sync_calendar():
     trade_days = await AbstractQuotesFetcher.get_all_trade_days()
     if trade_days is None or len(trade_days) == 0:
@@ -317,7 +354,7 @@ async def sync_calendar():
     logger.info("trade_days is updated to %s", trade_days[-1])
 
 
-async def sync_securities():
+async def sync_security_list():
     """更新证券列表"""
     secs = await aq.get_security_list()
     logger.info("%s secs are fetched and saved.", len(secs))

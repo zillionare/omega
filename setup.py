@@ -33,7 +33,7 @@ requirements = [
     'aiocache==0.11.1',
     'sanic==20.3.0',
     'psutil==5.7.0',
-    'termcolor==1.1.0'
+    'termcolor==1.1.0', 'talib'
 ]
 
 setup_requirements = []

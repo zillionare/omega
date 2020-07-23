@@ -54,7 +54,6 @@ pickle:
 omega:
   home: ~/zillionare/omgea
   urls:
-    calendar: http://stock.jieyu.ai/calendar.json
     checksum: http://stock.jieyu.ai/chksum
   heartbeat: 10
   sync:

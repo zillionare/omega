@@ -327,7 +327,7 @@ class MyTestCase(unittest.TestCase):
     @async_run
     async def test_memory(self):
         await cache.security.flushall()
-        await fetcher.get_bars('000001.XSHE', arrow.now(), 1000,
+        await fetcher.get_bars('000001.XSHE', arrow.now().date(), 1000,
                                FrameType.DAY)
         data = await cache.security.hgetall('000001.XSHE:1d')
         for i in range(5000):
@@ -376,7 +376,7 @@ class MyTestCase(unittest.TestCase):
             for frame_config in config:
                 frame_type = FrameType(frame_config.get('frame'))
                 sync_params = frame_config
-                await sync.sync_bars(frame_type, sync_params, force=True)
+                await sync.trigger_bars_sync(frame_type, sync_params, force=True)
 
         await asyncio.sleep(0.2)
         self.assertDictEqual({

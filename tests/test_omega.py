@@ -29,7 +29,7 @@ class MyTestCase(unittest.TestCase):
     def start_server(self):
         account = os.environ.get("jqsdk_account")
         password = os.environ.get("jqsdk_password")
-        server_url = cfg.omega.server.url
+        server_url = cfg.omega.urls.quotes_server
         try:
             port = int(server_url.split(":")[-1])
         except ValueError:
@@ -73,7 +73,7 @@ class MyTestCase(unittest.TestCase):
             cfg = cfg4py.get_instance()
             async with aiohttp.ClientSession() as client:
                 async with client.get(
-                        f'{cfg.omega.server.url}/quotes/security_list') as resp:
+                        f'{cfg.omega.urls.quotes_server}/quotes/security_list') as resp:
                     content = await resp.content.read(-1)
                     secs = pickle.loads(content)
                     logger.info("get_security_list returns %s records", len(secs))

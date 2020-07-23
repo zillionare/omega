@@ -7,6 +7,7 @@ Contributors:
 
 """
 import asyncio
+import functools
 import importlib
 import itertools
 import logging
@@ -27,7 +28,7 @@ import omega.core.sanity
 import omega.jobs.sync as sq
 from omega.config.cfg4py_auto_gen import Config
 from omega.core import get_config_dir, check_env
-from omega.jobs.sync import sync_calendar
+from omega.jobs.sync import trigger_single_worker_sync
 
 app = Sanic('Omega-jobs')
 logger = logging.getLogger(__name__)
@@ -54,12 +55,10 @@ async def init(app, loop):
 
     # sync securities daily
     h, m = map(int, cfg.omega.sync.security_list.split(":"))
-    scheduler.add_job(sq.sync_securities, 'cron', hour=h, minute=m)
-
-    # sync calendar daily
-    h, m = map(int, cfg.omega.sync.calendar.split(":"))
-    scheduler.add_job(sync_calendar, 'cron', hour=h, minute=m)
-    scheduler.start()
+    scheduler.add_job(functools.partial(sq.trigger_single_worker_sync("calendar")),
+                      'cron', hour=h, minute=m)
+    scheduler.add_job(functools.partial(sq.trigger_single_worker_sync("security_list")),
+                      'cron', hour=h, minute=m)
 
     # sync bars
     _add_bars_sync_job()
@@ -72,7 +71,8 @@ async def init(app, loop):
                                           tf.minute_level_frames):
             params = sq.read_sync_params(frame_type)
             if params:
-                asyncio.create_task(sq.sync_bars(frame_type, params, force=True))
+                asyncio.create_task(
+                    sq.trigger_bars_sync(frame_type, params, force=True))
     else:
         logger.info("%s: less than 24 hours since last sync", last_sync)
 
@@ -84,71 +84,75 @@ def _add_bars_sync_job():
     params = sq.read_sync_params(frame_type)
     if params:
         params['delay'] = params.get('delay') or 5
-        scheduler.add_job(sq.sync_bars, 'cron', hour=9, minute='31-59',
+        scheduler.add_job(sq.trigger_bars_sync, 'cron', hour=9, minute='31-59',
                           args=(frame_type, params))
-        scheduler.add_job(sq.sync_bars, 'cron', hour=10, minute='*',
+        scheduler.add_job(sq.trigger_bars_sync, 'cron', hour=10, minute='*',
                           args=(frame_type, params))
-        scheduler.add_job(sq.sync_bars, 'cron', hour=11, minute='0-30',
+        scheduler.add_job(sq.trigger_bars_sync, 'cron', hour=11, minute='0-30',
                           args=(frame_type, params))
-        scheduler.add_job(sq.sync_bars, 'cron', hour='13-14', minute='*',
+        scheduler.add_job(sq.trigger_bars_sync, 'cron', hour='13-14', minute='*',
                           args=(frame_type, params))
-        scheduler.add_job(sq.sync_bars, 'cron', hour='15', args=(frame_type, params))
+        scheduler.add_job(sq.trigger_bars_sync, 'cron', hour='15',
+                          args=(frame_type, params))
 
     frame_type = FrameType.MIN5
     params = sq.read_sync_params(frame_type)
     if params:
         params['delay'] = params.get('delay') or 60
-        scheduler.add_job(sq.sync_bars, 'cron', hour=9, minute='35-55/5',
+        scheduler.add_job(sq.trigger_bars_sync, 'cron', hour=9, minute='35-55/5',
                           args=(frame_type, params))
-        scheduler.add_job(sq.sync_bars, 'cron', hour=10, minute='*/5',
+        scheduler.add_job(sq.trigger_bars_sync, 'cron', hour=10, minute='*/5',
                           args=(frame_type, params))
-        scheduler.add_job(sq.sync_bars, 'cron', hour=11, minute='0-30/5',
+        scheduler.add_job(sq.trigger_bars_sync, 'cron', hour=11, minute='0-30/5',
                           args=(frame_type, params))
-        scheduler.add_job(sq.sync_bars, 'cron', hour='13-14', minute='*/5',
+        scheduler.add_job(sq.trigger_bars_sync, 'cron', hour='13-14', minute='*/5',
                           args=(frame_type, params))
-        scheduler.add_job(sq.sync_bars, 'cron', hour='15', args=(frame_type, params))
+        scheduler.add_job(sq.trigger_bars_sync, 'cron', hour='15',
+                          args=(frame_type, params))
 
     frame_type = FrameType.MIN15
     params = sq.read_sync_params(frame_type)
     if params:
         params['delay'] = params.get('delay') or 60
-        scheduler.add_job(sq.sync_bars, 'cron', hour=9, minute='45',
+        scheduler.add_job(sq.trigger_bars_sync, 'cron', hour=9, minute='45',
                           args=(frame_type, params))
-        scheduler.add_job(sq.sync_bars, 'cron', hour=10, minute='*/15',
+        scheduler.add_job(sq.trigger_bars_sync, 'cron', hour=10, minute='*/15',
                           args=(frame_type, params))
-        scheduler.add_job(sq.sync_bars, 'cron', hour=11, minute='15,30',
+        scheduler.add_job(sq.trigger_bars_sync, 'cron', hour=11, minute='15,30',
                           args=(frame_type, params))
-        scheduler.add_job(sq.sync_bars, 'cron', hour='13-14', minute='*/15',
+        scheduler.add_job(sq.trigger_bars_sync, 'cron', hour='13-14', minute='*/15',
                           args=(frame_type, params))
-        scheduler.add_job(sq.sync_bars, 'cron', hour='15', args=(frame_type, params))
+        scheduler.add_job(sq.trigger_bars_sync, 'cron', hour='15',
+                          args=(frame_type, params))
 
     frame_type = FrameType.MIN30
     params = sq.read_sync_params(frame_type)
     if params:
         params['delay'] = params.get('delay') or 60
-        scheduler.add_job(sq.sync_bars, 'cron', hour='10-11', minute='*/30',
+        scheduler.add_job(sq.trigger_bars_sync, 'cron', hour='10-11', minute='*/30',
                           args=(frame_type, params))
-        scheduler.add_job(sq.sync_bars, 'cron', hour='13', minute='30',
+        scheduler.add_job(sq.trigger_bars_sync, 'cron', hour='13', minute='30',
                           args=(frame_type, params))
-        scheduler.add_job(sq.sync_bars, 'cron', hour='14-15', minute='*/30',
+        scheduler.add_job(sq.trigger_bars_sync, 'cron', hour='14-15', minute='*/30',
                           args=(frame_type, params))
 
     frame_type = FrameType.MIN60
     params = sq.read_sync_params(frame_type)
     if params:
         params['delay'] = params.get('delay') or 60
-        scheduler.add_job(sq.sync_bars, 'cron', hour='10', minute='30',
+        scheduler.add_job(sq.trigger_bars_sync, 'cron', hour='10', minute='30',
                           args=(frame_type, params))
-        scheduler.add_job(sq.sync_bars, 'cron', hour='11', minute='30',
+        scheduler.add_job(sq.trigger_bars_sync, 'cron', hour='11', minute='30',
                           args=(frame_type, params))
-        scheduler.add_job(sq.sync_bars, 'cron', hour='14-15', minute=0,
+        scheduler.add_job(sq.trigger_bars_sync, 'cron', hour='14-15', minute=0,
                           args=(frame_type, params))
 
     for frame_type in tf.day_level_frames:
         params = sq.read_sync_params(frame_type)
         if params:
             params['delay'] = params.get('delay') or 60
-            scheduler.add_job(sq.sync_bars, 'cron', hour=15, args=(frame_type, params))
+            scheduler.add_job(sq.trigger_bars_sync, 'cron', hour=15,
+                              args=(frame_type, params))
 
 
 @app.route('/jobs/sync_bars')
@@ -159,7 +163,7 @@ async def start_sync(request):
     if sync_to:
         sync_to = arrow.get(sync_to, 'YYYY-MM-DD')
 
-    app.add_task(sq.sync_bars(secs, sync_to))
+    app.add_task(sq.trigger_bars_sync(secs, sync_to))
     return response.text('sync task scheduled')
 
 
