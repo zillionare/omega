@@ -76,6 +76,7 @@ async def init(app, loop):
     else:
         logger.info("%s: less than 24 hours since last sync", last_sync)
 
+    scheduler.start()
     logger.info("omega jobs finished initialization")
 
 
