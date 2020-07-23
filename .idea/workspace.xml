@@ -6,12 +6,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="9d315cbc-a8db-4353-8626-19fd45be9e4a" name="Default Changelist" comment="1. sync_calendar, sync_security_list will now be performed by one fetcher process only(and fixed 'no fetchers available' issue)&#10;2. now sync_bars will NOT remember job creation day as stop day">
-      <change afterPath="$PROJECT_DIR$/omega/jobs/__main__.py" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/omega/tools/__init__.py" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/omega/tools/monitor.py" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/omega/tools/secs.json" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/tests/test.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/omega/jobs/__main__.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/jobs/__main__.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -384,7 +384,7 @@
       <workItem from="1595299132688" duration="16931000" />
       <workItem from="1595340352827" duration="394000" />
       <workItem from="1595340767915" duration="5393000" />
-      <workItem from="1595379383293" duration="13892000" />
+      <workItem from="1595379383293" duration="14168000" />
     </task>
     <task id="LOCAL-00001" summary="1. omicron refactors cache, now move all save_bars to cache&#10;2. timeout for jq remote set to 20, sometimes still not enough&#10;3. omega work lead select mesh">
       <created>1588863976311</created>
@@ -561,7 +561,14 @@
       <option name="project" value="LOCAL" />
       <updated>1595466532304</updated>
     </task>
-    <option name="localTasksCounter" value="26" />
+    <task id="LOCAL-00026" summary="Error: No module named omega.jobs.__main__; 'omega.jobs' is a package and cannot be directly executed">
+      <created>1595466982929</created>
+      <option name="number" value="00026" />
+      <option name="presentableId" value="LOCAL-00026" />
+      <option name="project" value="LOCAL" />
+      <updated>1595466982929</updated>
+    </task>
+    <option name="localTasksCounter" value="27" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -613,7 +620,6 @@
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="true" />
     <option name="CHECK_CODE_CLEANUP_BEFORE_PROJECT_COMMIT" value="true" />
-    <MESSAGE value="1. omicron refactors cache, now move all save_bars to cache&#10;2. timeout for jq remote set to 20, sometimes still not enough&#10;3. omega work lead select mesh" />
     <MESSAGE value="code cleanup, integration test for sync jobs" />
     <MESSAGE value="1. change sync from code-traverse first instead of frame_type traverse first (in the favor of work cooperation)&#10;2. multiprocessing" />
     <MESSAGE value="1. change sync from code-traverse first instead of frame_type traverse first (in the favor of work cooperation)&#10;2. multiprocessing&#10;3. add cli for setup" />
@@ -638,7 +644,8 @@
     <MESSAGE value="1. add config to sys path&#10;2. fix: after sync refactored, sync_bars in cli is broken" />
     <MESSAGE value="fix: wrong module path regard to cfg4y.resources.cfg4py_auto_gen" />
     <MESSAGE value="1. sync_calendar, sync_security_list will now be performed by one fetcher process only(and fixed 'no fetchers available' issue)&#10;2. now sync_bars will NOT remember job creation day as stop day" />
-    <option name="LAST_COMMIT_MESSAGE" value="1. sync_calendar, sync_security_list will now be performed by one fetcher process only(and fixed 'no fetchers available' issue)&#10;2. now sync_bars will NOT remember job creation day as stop day" />
+    <MESSAGE value="Error: No module named omega.jobs.__main__; 'omega.jobs' is a package and cannot be directly executed" />
+    <option name="LAST_COMMIT_MESSAGE" value="Error: No module named omega.jobs.__main__; 'omega.jobs' is a package and cannot be directly executed" />
     <option name="OPTIMIZE_IMPORTS_BEFORE_PROJECT_COMMIT" value="true" />
     <option name="REFORMAT_BEFORE_PROJECT_COMMIT" value="true" />
     <option name="REARRANGE_BEFORE_PROJECT_COMMIT" value="true" />
@@ -671,11 +678,11 @@
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="3455" y="399" key="ANALYSIS_DLG_com.intellij.analysis.BaseAnalysisAction$1/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595465692120" />
-    <state x="2931" y="9" width="1259" height="954" key="CommitChangelistDialog2" timestamp="1595466530852">
+    <state x="2931" y="9" width="1259" height="954" key="CommitChangelistDialog2" timestamp="1595466981274">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="3004" y="86" width="1259" height="954" key="CommitChangelistDialog2/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1590667560260" />
-    <state x="2931" y="9" width="1527" height="1016" key="CommitChangelistDialog2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595466530852" />
+    <state x="2931" y="9" width="1527" height="1016" key="CommitChangelistDialog2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595466981274" />
     <state width="664" height="438" key="DebuggerActiveHint" timestamp="1592655695748">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
@@ -694,53 +701,53 @@
     </state>
     <state x="527" y="233" key="FileChooserDialogImpl/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1588746007077" />
     <state x="3476" y="278" width="844" height="598" key="FileChooserDialogImpl/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1594084373341" />
-    <state width="1877" height="411" key="GridCell.Tab.0.bottom" timestamp="1595466366296">
+    <state width="1877" height="340" key="GridCell.Tab.0.bottom" timestamp="1595467087695">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state width="1326" height="310" key="GridCell.Tab.0.bottom/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1594731538019" />
-    <state width="1877" height="411" key="GridCell.Tab.0.bottom/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595466366296" />
+    <state width="1877" height="340" key="GridCell.Tab.0.bottom/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595467087695" />
     <state width="1326" height="208" key="GridCell.Tab.0.bottom/0.0.1368.872@0.0.1368.872" timestamp="1593685655732" />
-    <state width="1877" height="411" key="GridCell.Tab.0.center" timestamp="1595466366296">
+    <state width="1877" height="340" key="GridCell.Tab.0.center" timestamp="1595467087694">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state width="1326" height="310" key="GridCell.Tab.0.center/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1594731538019" />
-    <state width="1877" height="411" key="GridCell.Tab.0.center/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595466366296" />
+    <state width="1877" height="340" key="GridCell.Tab.0.center/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595467087694" />
     <state width="1326" height="208" key="GridCell.Tab.0.center/0.0.1368.872@0.0.1368.872" timestamp="1593685655732" />
-    <state width="1877" height="411" key="GridCell.Tab.0.left" timestamp="1595466366296">
+    <state width="1877" height="340" key="GridCell.Tab.0.left" timestamp="1595467087694">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state width="1326" height="310" key="GridCell.Tab.0.left/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1594731538019" />
-    <state width="1877" height="411" key="GridCell.Tab.0.left/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595466366296" />
+    <state width="1877" height="340" key="GridCell.Tab.0.left/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595467087694" />
     <state width="1326" height="208" key="GridCell.Tab.0.left/0.0.1368.872@0.0.1368.872" timestamp="1593685655732" />
-    <state width="1877" height="411" key="GridCell.Tab.0.right" timestamp="1595466366296">
+    <state width="1877" height="340" key="GridCell.Tab.0.right" timestamp="1595467087695">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state width="1326" height="310" key="GridCell.Tab.0.right/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1594731538019" />
-    <state width="1877" height="411" key="GridCell.Tab.0.right/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595466366296" />
+    <state width="1877" height="340" key="GridCell.Tab.0.right/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595467087695" />
     <state width="1326" height="208" key="GridCell.Tab.0.right/0.0.1368.872@0.0.1368.872" timestamp="1593685655732" />
-    <state width="1877" height="411" key="GridCell.Tab.1.bottom" timestamp="1595466366047">
+    <state width="1877" height="340" key="GridCell.Tab.1.bottom" timestamp="1595467087695">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state width="1326" height="310" key="GridCell.Tab.1.bottom/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1594731538020" />
-    <state width="1877" height="411" key="GridCell.Tab.1.bottom/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595466366047" />
+    <state width="1877" height="340" key="GridCell.Tab.1.bottom/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595467087695" />
     <state width="1326" height="208" key="GridCell.Tab.1.bottom/0.0.1368.872@0.0.1368.872" timestamp="1593685636874" />
-    <state width="1877" height="411" key="GridCell.Tab.1.center" timestamp="1595466366047">
+    <state width="1877" height="340" key="GridCell.Tab.1.center" timestamp="1595467087695">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state width="1326" height="310" key="GridCell.Tab.1.center/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1594731538019" />
-    <state width="1877" height="411" key="GridCell.Tab.1.center/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595466366047" />
+    <state width="1877" height="340" key="GridCell.Tab.1.center/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595467087695" />
     <state width="1326" height="208" key="GridCell.Tab.1.center/0.0.1368.872@0.0.1368.872" timestamp="1593685636874" />
-    <state width="1877" height="411" key="GridCell.Tab.1.left" timestamp="1595466366047">
+    <state width="1877" height="340" key="GridCell.Tab.1.left" timestamp="1595467087695">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state width="1326" height="310" key="GridCell.Tab.1.left/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1594731538019" />
-    <state width="1877" height="411" key="GridCell.Tab.1.left/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595466366047" />
+    <state width="1877" height="340" key="GridCell.Tab.1.left/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595467087695" />
     <state width="1326" height="208" key="GridCell.Tab.1.left/0.0.1368.872@0.0.1368.872" timestamp="1593685636874" />
-    <state width="1877" height="411" key="GridCell.Tab.1.right" timestamp="1595466366047">
+    <state width="1877" height="340" key="GridCell.Tab.1.right" timestamp="1595467087695">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state width="1326" height="310" key="GridCell.Tab.1.right/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1594731538020" />
-    <state width="1877" height="411" key="GridCell.Tab.1.right/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595466366047" />
+    <state width="1877" height="340" key="GridCell.Tab.1.right/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595467087695" />
     <state width="1326" height="208" key="GridCell.Tab.1.right/0.0.1368.872@0.0.1368.872" timestamp="1593685636874" />
     <state x="3441" y="206" key="PyMappingSimpleResolveDialog" timestamp="1593860925963">
       <screen x="2736" y="0" width="1920" height="1040" />
@@ -756,11 +763,11 @@
     </state>
     <state x="241" y="95" key="SettingsEditor/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1588746396970" />
     <state x="3088" y="108" key="SettingsEditor/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595341383237" />
-    <state x="3288" y="256" key="Vcs.Push.Dialog.v2" timestamp="1595466536211">
+    <state x="3288" y="256" key="Vcs.Push.Dialog.v2" timestamp="1595466986392">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="393" y="215" key="Vcs.Push.Dialog.v2/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1590667566517" />
-    <state x="3288" y="256" key="Vcs.Push.Dialog.v2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595466536211" />
+    <state x="3288" y="256" key="Vcs.Push.Dialog.v2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595466986392" />
     <state width="968" height="528" key="XDebugger.FullValuePopup" timestamp="1594732719179">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
@@ -770,10 +777,10 @@
     </state>
     <state x="335" y="191" key="com.intellij.execution.console.ConsoleHistoryController$MyBrowseAction$1/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1592960592141" />
     <state x="3223" y="228" key="com.intellij.execution.console.ConsoleHistoryController$MyBrowseAction$1/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592903805356" />
-    <state x="2828" y="92" width="1736" height="856" maximized="true" key="com.intellij.history.integration.ui.views.FileHistoryDialog" timestamp="1595466923135">
+    <state x="2828" y="92" width="1736" height="856" maximized="true" key="com.intellij.history.integration.ui.views.FileHistoryDialog" timestamp="1595467201640">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
-    <state x="2828" y="92" width="1736" height="856" maximized="true" key="com.intellij.history.integration.ui.views.FileHistoryDialog/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595466923135" />
+    <state x="2828" y="92" width="1736" height="856" maximized="true" key="com.intellij.history.integration.ui.views.FileHistoryDialog/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595467201640" />
     <state x="3434" y="161" key="com.intellij.xdebugger.impl.breakpoints.ui.BreakpointsDialogFactory$2" timestamp="1595080110681">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
