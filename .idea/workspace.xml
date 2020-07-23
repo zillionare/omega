@@ -11,7 +11,7 @@
       <change afterPath="$PROJECT_DIR$/omega/tools/secs.json" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/tests/test.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/omega/jobs/__main__.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/jobs/__main__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/omega/jobs/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/jobs/__init__.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -384,7 +384,7 @@
       <workItem from="1595299132688" duration="16931000" />
       <workItem from="1595340352827" duration="394000" />
       <workItem from="1595340767915" duration="5393000" />
-      <workItem from="1595379383293" duration="14168000" />
+      <workItem from="1595379383293" duration="14301000" />
     </task>
     <task id="LOCAL-00001" summary="1. omicron refactors cache, now move all save_bars to cache&#10;2. timeout for jq remote set to 20, sometimes still not enough&#10;3. omega work lead select mesh">
       <created>1588863976311</created>
@@ -568,7 +568,14 @@
       <option name="project" value="LOCAL" />
       <updated>1595466982929</updated>
     </task>
-    <option name="localTasksCounter" value="27" />
+    <task id="LOCAL-00027" summary="omega start jobs doesnt' launch jobs process">
+      <created>1595467274709</created>
+      <option name="number" value="00027" />
+      <option name="presentableId" value="LOCAL-00027" />
+      <option name="project" value="LOCAL" />
+      <updated>1595467274709</updated>
+    </task>
+    <option name="localTasksCounter" value="28" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -620,7 +627,6 @@
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="true" />
     <option name="CHECK_CODE_CLEANUP_BEFORE_PROJECT_COMMIT" value="true" />
-    <MESSAGE value="code cleanup, integration test for sync jobs" />
     <MESSAGE value="1. change sync from code-traverse first instead of frame_type traverse first (in the favor of work cooperation)&#10;2. multiprocessing" />
     <MESSAGE value="1. change sync from code-traverse first instead of frame_type traverse first (in the favor of work cooperation)&#10;2. multiprocessing&#10;3. add cli for setup" />
     <MESSAGE value="1. move do_checksum out of main project&#10;2. setup process done" />
@@ -645,7 +651,8 @@
     <MESSAGE value="fix: wrong module path regard to cfg4y.resources.cfg4py_auto_gen" />
     <MESSAGE value="1. sync_calendar, sync_security_list will now be performed by one fetcher process only(and fixed 'no fetchers available' issue)&#10;2. now sync_bars will NOT remember job creation day as stop day" />
     <MESSAGE value="Error: No module named omega.jobs.__main__; 'omega.jobs' is a package and cannot be directly executed" />
-    <option name="LAST_COMMIT_MESSAGE" value="Error: No module named omega.jobs.__main__; 'omega.jobs' is a package and cannot be directly executed" />
+    <MESSAGE value="omega start jobs doesnt' launch jobs process" />
+    <option name="LAST_COMMIT_MESSAGE" value="omega start jobs doesnt' launch jobs process" />
     <option name="OPTIMIZE_IMPORTS_BEFORE_PROJECT_COMMIT" value="true" />
     <option name="REFORMAT_BEFORE_PROJECT_COMMIT" value="true" />
     <option name="REARRANGE_BEFORE_PROJECT_COMMIT" value="true" />
@@ -678,11 +685,11 @@
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="3455" y="399" key="ANALYSIS_DLG_com.intellij.analysis.BaseAnalysisAction$1/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595465692120" />
-    <state x="2931" y="9" width="1259" height="954" key="CommitChangelistDialog2" timestamp="1595466981274">
+    <state x="2931" y="9" width="1259" height="954" key="CommitChangelistDialog2" timestamp="1595467271994">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="3004" y="86" width="1259" height="954" key="CommitChangelistDialog2/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1590667560260" />
-    <state x="2931" y="9" width="1527" height="1016" key="CommitChangelistDialog2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595466981274" />
+    <state x="2931" y="9" width="1527" height="1016" key="CommitChangelistDialog2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595467271994" />
     <state width="664" height="438" key="DebuggerActiveHint" timestamp="1592655695748">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
@@ -763,11 +770,11 @@
     </state>
     <state x="241" y="95" key="SettingsEditor/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1588746396970" />
     <state x="3088" y="108" key="SettingsEditor/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595341383237" />
-    <state x="3288" y="256" key="Vcs.Push.Dialog.v2" timestamp="1595466986392">
+    <state x="3288" y="256" key="Vcs.Push.Dialog.v2" timestamp="1595467276790">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="393" y="215" key="Vcs.Push.Dialog.v2/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1590667566517" />
-    <state x="3288" y="256" key="Vcs.Push.Dialog.v2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595466986392" />
+    <state x="3288" y="256" key="Vcs.Push.Dialog.v2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595467276790" />
     <state width="968" height="528" key="XDebugger.FullValuePopup" timestamp="1594732719179">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>

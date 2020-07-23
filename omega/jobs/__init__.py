@@ -55,9 +55,9 @@ async def init(app, loop):
 
     # sync securities daily
     h, m = map(int, cfg.omega.sync.security_list.split(":"))
-    scheduler.add_job(functools.partial(sq.trigger_single_worker_sync("calendar")),
+    scheduler.add_job(functools.partial(sq.trigger_single_worker_sync, "calendar"),
                       'cron', hour=h, minute=m)
-    scheduler.add_job(functools.partial(sq.trigger_single_worker_sync("security_list")),
+    scheduler.add_job(functools.partial(sq.trigger_single_worker_sync, "security_list"),
                       'cron', hour=h, minute=m)
 
     # sync bars
