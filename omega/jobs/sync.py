@@ -187,10 +187,6 @@ def _parse_sync_params(sync_params: dict):
         raise TypeError("type of sync_params['stop'] must be one of [None, "
                         "datetime.datetime, datetime.date]")
 
-    if start > stop:
-        raise ValueError(
-                f"Invalid sync_params, start {start} must be earlier than stop: {stop}")
-
     if frame_type in tf.minute_level_frames:
         if type(start) is datetime.date:
             start = tf.floor(start, FrameType.DAY)
