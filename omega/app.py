@@ -14,6 +14,7 @@ import arrow
 import cfg4py
 import fire
 import omicron
+from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
 from pyemit import emit
 from sanic import Sanic, response
@@ -85,11 +86,14 @@ class Application(object):
     async def get_bars_handler(self, request):
         try:
             sec = request.json.get('sec')
-            end = arrow.get(request.json.get("end"), tzinfo=cfg.tz)
-            n_bars = request.json.get("n_bars")
             frame_type = FrameType(request.json.get("frame_type"))
 
-            bars = await aq.get_bars(sec, end, n_bars, frame_type)
+            end = arrow.get(request.json.get("end"), tzinfo=cfg.tz)
+            end = end.date() if frame_type in tf.day_level_frames else end.datetime
+            n_bars = request.json.get("n_bars")
+            include_unclosed = request.json.get('include_unclosed', False)
+
+            bars = await aq.get_bars(sec, end, n_bars, frame_type, include_unclosed)
 
             body = pickle.dumps(bars, protocol=cfg.pickle.ver)
             return response.raw(body)

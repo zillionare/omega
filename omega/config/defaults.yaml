@@ -42,7 +42,6 @@ logging:
         - quickscan
   root:
     handlers:
-      - default
       - console
     level: INFO
   version: 1
