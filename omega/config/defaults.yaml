@@ -45,7 +45,7 @@ logging:
       - console
     level: INFO
   version: 1
-tz: Asia/Chongqing
+tz: Asia/Shanghai
 redis:
   dsn: redis://localhost:6379
 pickle:

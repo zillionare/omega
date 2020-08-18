@@ -75,18 +75,24 @@ class AbstractQuotesFetcher(QuotesFetcher):
 
     @classmethod
     async def get_bars(cls, sec: str,
-                       end: Union[datetime.date, datetime.date],
+                       end: Frame,
                        n_bars: int,
                        frame_type: FrameType,
                        include_unclosed=True) -> np.ndarray:
-        bars = await cls.get_instance().get_bars(sec, end, n_bars, frame_type, include_unclosed)
+        if type(end) == datetime.datetime:
+            # 如果传入的时间带秒或者微秒(比如通过arrow.now()获取），则服务器可能无法返回end
+            # 指定的帧
+            end = end.replace(second=0, microsecond=0)
 
+        bars = await cls.get_instance().get_bars(sec, end, n_bars, frame_type,
+                                                 include_unclosed)
         closed = tf.floor(end, frame_type)
         if closed != end:
             filled = cls._fill_na(bars, n_bars - 1, closed, frame_type)
             if bars[-1]['frame'] == end:
                 remainder = [bars[-1]]
             else:
+                # when would we face this?
                 remainder = np.empty(1, dtype=bars.dtype)
                 remainder[:] = np.nan
                 remainder['frame'] = end
