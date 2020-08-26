@@ -8,6 +8,7 @@ import importlib
 import logging
 from typing import Union
 
+import arrow
 import cfg4py
 import numpy as np
 from omicron.core.lang import static_vars
@@ -79,32 +80,42 @@ class AbstractQuotesFetcher(QuotesFetcher):
                        n_bars: int,
                        frame_type: FrameType,
                        include_unclosed=True) -> np.ndarray:
-        if type(end) == datetime.datetime:
-            # 如果传入的时间带秒或者微秒(比如通过arrow.now()获取），则服务器可能无法返回end
-            # 指定的帧
-            end = end.replace(second=0, microsecond=0)
-
         bars = await cls.get_instance().get_bars(sec, end, n_bars, frame_type,
                                                  include_unclosed)
-        closed = tf.floor(end, frame_type)
+
+        now = arrow.now()
+        if type(end) == datetime.date:
+            if end == now.date():
+                closed = tf.floor(datetime.datetime(end.year, end.month, end.day,
+                                                    now.hour), frame_type)
+            else:
+                closed = tf.floor(datetime.datetime(end.year, end.month, end.day,
+                                                    15), frame_type)
+        else:
+            closed = tf.floor(end, frame_type)
+            if frame_type in tf.day_level_frames:
+                end = end.date()
+            else:
+                end = end.replace(second=0, microsecond=0)
+
         if closed != end:
-            filled = cls._fill_na(bars, n_bars - 1, closed, frame_type)
+            finished = cls._fill_na(bars, n_bars - 1, closed, frame_type)
             if bars[-1]['frame'] == end:
                 remainder = [bars[-1]]
-            else:
-                # when would we face this?
+            else:  # 停牌，或者end当天休市。调用者要自己保证传入的end不在休市中
                 remainder = np.empty(1, dtype=bars.dtype)
                 remainder[:] = np.nan
                 remainder['frame'] = end
+                logger.warning("证券%s在frame [%s]处于停牌中", sec, end)
         else:
-            filled = cls._fill_na(bars, n_bars, closed, frame_type)
+            finished = cls._fill_na(bars, n_bars, closed, frame_type)
             remainder = None
         # 只保存已结束的frame数据到数据库
-        await security_cache.save_bars(sec, filled, frame_type)
+        await security_cache.save_bars(sec, finished, frame_type)
         if remainder is None:
-            return filled
+            return finished
 
-        return np.concatenate([filled, remainder])
+        return np.concatenate([finished, remainder])
 
     @classmethod
     def _fill_na(cls, bars: np.array, n: int, end: Frame, frame_type) -> np.ndarray:

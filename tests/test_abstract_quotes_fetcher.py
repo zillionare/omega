@@ -67,7 +67,7 @@ class MyTestCase(unittest.TestCase):
         sec = '000001.XSHE'
         frame_type = FrameType.DAY
         # 2020-4-3 Friday
-        end = tf.floor(arrow.get('2020-04-04'), frame_type)
+        end = arrow.get('2020-04-03').date()
 
         # without cache
         await self.clear_cache(sec, frame_type)
@@ -113,9 +113,9 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(arrow.get('2020-4-30 10:32', tzinfo='Asia/Shanghai'),
                          bars['frame'][-1])
 
-        self.assertAlmostEqual(5.37, bars['open'][0])
-        self.assertAlmostEqual(5.26, bars['open'][-2])
-        self.assertAlmostEqual(5.33, bars['open'][-1])
+        self.assertAlmostEqual(5.37, bars['open'][0], places=2)
+        self.assertAlmostEqual(5.26, bars['open'][-2], places=2)
+        self.assertAlmostEqual(5.33, bars['open'][-1], places=2)
 
         # 检查cache,10：32未存入cache
         cache_len = await cache.security.hlen(f"{sec}:{frame_type.value}")
@@ -195,7 +195,7 @@ class MyTestCase(unittest.TestCase):
          (datetime.date(2020, 4, 30),  nan,  nan,  nan,  nan,       nan,            nan,   nan)]
 
         """
-        end = arrow.get('2020-4-29').date()  # 周三，当周周四结束
+        end = arrow.get('2020-4-29 15:00').datetime  # 周三，当周周四结束
         bars = await AbstractQuotesFetcher.get_bars(sec, end, 3, FrameType.WEEK)
         print(bars)
         self.assertEqual(arrow.get('2020-4-17').date(), bars[0]['frame'])
@@ -206,7 +206,7 @@ class MyTestCase(unittest.TestCase):
         self.assertAlmostEqual(6.51, bars[1]['open'], places=2)
         self.assertTrue(numpy.isnan(bars[-1]['open']))
 
-        end = arrow.get('2020-04-30').date()
+        end = arrow.get('2020-04-30 15:00').datetime
         bars = await AbstractQuotesFetcher.get_bars(sec, end, 3, FrameType.WEEK)
         print(bars)
 
@@ -217,6 +217,18 @@ class MyTestCase(unittest.TestCase):
         self.assertAlmostEqual(6.02, bars[0]['open'], places=2)
         self.assertAlmostEqual(6.51, bars[1]['open'], places=2)
         self.assertAlmostEqual(5.7, bars[-1]['open'], places=2)
+
+    @async_run
+    async def test_get_bars_015(self):
+        sec = '300677.XSHE'
+        frame_type = FrameType.DAY
+        end = arrow.now().datetime
+
+        # without cache
+        # await self.clear_cache(sec, frame_type)
+        bars = await AbstractQuotesFetcher.get_bars(sec, end, 10, frame_type)
+        print(bars)
+
 
 if __name__ == '__main__':
     unittest.main()
