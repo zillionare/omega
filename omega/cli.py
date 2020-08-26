@@ -561,6 +561,8 @@ async def scan():
     for frame, errors in counters.items():
         print(f"{frame:5}", f"{errors[0]:6}", f"{errors[1]:6}")
 
+    await emit.stop()
+
 
 @async_run
 async def sync_sec_list():

@@ -40,6 +40,7 @@ from omega.jobs.sync import cfg, logger
 
 validation_errors = []
 
+
 async def calc_checksums(day: datetime.date, codes: List) -> dict:
     """
 
@@ -330,21 +331,28 @@ async def quick_scan():
         start = sync_config.get('start')
 
         if frame is None or start is None:
-            logger.warning("skipped %s: required fields are [frame, start]", sync_config)
+            logger.warning("skipped %s: required fields are [frame, start]",
+                           sync_config)
             continue
 
         frame_type = FrameType(frame)
 
         start = arrow.get(start).date()
         start = tf.floor(start, FrameType.DAY)
+
+        stop = sync_config.get('stop') or arrow.now().date()
+
         if frame_type in tf.minute_level_frames:
             minutes = tf.ticks[frame_type][0]
             h, m = minutes // 60, minutes % 60
-            start = datetime.datetime(start.year, start.month, start.day, h, m, tzinfo=tz.gettz(cfg.tz))
+            start = datetime.datetime(start.year, start.month, start.day, h, m,
+                                      tzinfo=tz.gettz(cfg.tz))
+
+            stop = datetime.datetime(stop.year, stop.month, stop.day, 15,
+                                     tzinfo=tz.gettz(cfg.tz))
 
         counters[frame] = [0, 0]
-        stop = sync_config.get('stop') or arrow.now().date()
-        stop = datetime.datetime(stop.year, stop.month, stop.day, 15, tzinfo=tz.gettz(cfg.tz))
+
         codes = secs.choose(sync_config.get('type'))
         include = filter(lambda x: x, sync_config.get('include', '').split(','))
         include = map(lambda x: x.strip(' '), include)
@@ -372,14 +380,15 @@ async def quick_scan():
                 continue
 
             sec = Security(code)
-            if start < tf.day_shift(head, 0) and sec.ipo_date < start:
-                report.info("ESTART,%s,%s,%s,%s,%s", code, frame, start, tf.day_shift(
-                        head, 0), sec.ipo_date)
-                counters[frame][0] = counters[frame][0] + 1
-                continue
-            if tf.day_shift(tail, 0) < stop:
-                report.info("EEND,%s,%s,%s,%s", code, frame, stop,
-                            tf.day_shift(tail, 0))
+            if start != head:
+                if type(start) == datetime.date and start > sec.ipo_date or (type(
+                        start) == datetime.datetime and start.date() > sec.ipo_date):
+                    report.info("ESTART,%s,%s,%s,%s,%s", code, frame, start,
+                                head, sec.ipo_date)
+                    counters[frame][0] = counters[frame][0] + 1
+                    continue
+            if tail != stop:
+                report.info("EEND,%s,%s,%s,%s", code, frame, stop, tail)
                 counters[frame][0] = counters[frame][0] + 1
 
     return counters
