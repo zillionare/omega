@@ -75,6 +75,15 @@ class AbstractQuotesFetcher(QuotesFetcher):
         return securities
 
     @classmethod
+    async def get_bars_batch(cls, secs: str,
+                             end: Frame,
+                             n_bars: int,
+                             frame_type: FrameType,
+                             include_unclosed=True) -> np.ndarray:
+        return await cls.get_instance().get_bars_batch(secs, end, n_bars, frame_type,
+                                                       include_unclosed)
+
+    @classmethod
     async def get_bars(cls, sec: str,
                        end: Frame,
                        n_bars: int,

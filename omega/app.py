@@ -51,6 +51,7 @@ class Application(object):
         # register route here
         app.add_route(self.get_security_list_handler, '/quotes/security_list')
         app.add_route(self.get_bars_handler, '/quotes/bars')
+        app.add_route(self.get_bars_batch_handler, '/quotes/bars_batch')
         app.add_route(self.get_all_trade_days_handler, '/quotes/all_trade_days')
         app.add_route(self.bars_sync_handler, '/jobs/sync_bars', methods=['POST'])
         app.add_route(self.sync_calendar_handler, '/jobs/sync_calendar', methods=[
@@ -82,6 +83,24 @@ class Application(object):
 
         body = pickle.dumps(secs, protocol=cfg.pickle.ver)
         return response.raw(body)
+
+    async def get_bars_batch_handler(self, request):
+        try:
+            secs = request.json.get('secs')
+            frame_type = FrameType(request.json.get("frame_type"))
+
+            end = arrow.get(request.json.get("end"), tzinfo=cfg.tz)
+            n_bars = request.json.get("n_bars")
+            include_unclosed = request.json.get('include_unclosed', False)
+
+            bars = await aq.get_bars_batch(secs, end, n_bars, frame_type,
+                                           include_unclosed)
+
+            body = pickle.dumps(bars, protocol=cfg.pickle.ver)
+            return response.raw(body)
+        except Exception as e:
+            logger.exception(e)
+            return response.raw(pickle.dumps(None, protocol=cfg.pickle.ver))
 
     async def get_bars_handler(self, request):
         try:
