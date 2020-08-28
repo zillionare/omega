@@ -90,6 +90,8 @@ class Application(object):
             frame_type = FrameType(request.json.get("frame_type"))
 
             end = arrow.get(request.json.get("end"), tzinfo=cfg.tz)
+            end = end.date() if frame_type in tf.day_level_frames else end.datetime
+
             n_bars = request.json.get("n_bars")
             include_unclosed = request.json.get('include_unclosed', False)
 
