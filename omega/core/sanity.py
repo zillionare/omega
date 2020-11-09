@@ -131,15 +131,15 @@ def do_validation_process_entry():
 
 
 async def do_validation(secs: List[str] = None, start: str = None, end: str = None):
-    """
-    对列表secs中指定的证券行情数据按start到end指定的时间范围进行校验
+    """对列表secs中指定的证券行情数据按start到end指定的时间范围进行校验
+
     Args:
-        secs:
-        start:
-        end:
+        secs (List[str], optional): [description]. Defaults to None.
+        start (str, optional): [description]. Defaults to None.
+        end (str, optional): [description]. Defaults to None.
 
     Returns:
-
+        [type]: [description]
     """
     logger.info("start validation...")
     report = logging.getLogger("validation_report")
@@ -228,8 +228,8 @@ async def do_validation(secs: List[str] = None, start: str = None, end: str = No
 async def on_validation_error(report: tuple):
     """
     Args:
-        report: object like ::
-            (reason, day, code, frame, local, remote)
+        report: object like ::(reason, day, code, frame, local, remote)
+
     Returns:
 
     """

@@ -92,7 +92,7 @@ setup(
     test_suite="tests",
     tests_require=test_requirements,
     url="https://github.com/zillionare/omega",
-    version="version='0.5.1'",
+    version="0.5.1",
     zip_safe=False,
     cmdclass={"install": InstallCommand},
     entry_points={"console_scripts": ["omega=omega.cli:main"]},

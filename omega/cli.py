@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 """
-    管理应用程序生命期、全局对象、任务、全局消息响应
-        """
+管理应用程序生命期、全局对象、任务、全局消息响应
+"""
 import itertools
 import logging
 import os
@@ -597,8 +597,8 @@ async def sync_calendar():
 
 @async_run
 async def sync_bars(frame: str = None, codes: str = None):
-    """
-    read sync config from config file, if frame/codes is not provided
+    """read sync config from config file, if frame/codes is not provided
+
     Args:
         frame:
         codes:

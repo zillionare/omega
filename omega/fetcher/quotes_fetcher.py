@@ -8,7 +8,7 @@ from abc import ABC
 from typing import List, Union
 
 import numpy
-from omicron.core.types import FrameType, Frame
+from omicron.core.types import Frame, FrameType
 
 
 class QuotesFetcher(ABC):
@@ -17,9 +17,9 @@ class QuotesFetcher(ABC):
         fetch security list from server. The returned list is a numpy.ndarray,
         which each elements
         should look like:
-        code           display_name name 	start_date 	end_date 	type
-        000001.XSHE 	平安银行 	PAYH 	1991-04-03 	2200-01-01 	stock
-        000002.XSHE 	万科A 	    WKA 	1991-01-29 	2200-01-01 	stock
+        code         display_name name  start_date  end_date     type
+        000001.XSHE  平安银行      PAYH  1991-04-03  2200-01-01   stock
+        000002.XSHE   万科A        WKA   1991-01-29  2200-01-01   stock
 
         all fields are string type
         Returns:
@@ -27,8 +27,14 @@ class QuotesFetcher(ABC):
         """
         raise NotImplementedError
 
-    async def get_bars(self, sec: str, end: Frame, n_bars: int,
-                       frame_type: FrameType, allow_unclosed=True) -> numpy.ndarray:
+    async def get_bars(
+        self,
+        sec: str,
+        end: Frame,
+        n_bars: int,
+        frame_type: FrameType,
+        allow_unclosed=True,
+    ) -> numpy.ndarray:
         """
         fetch quotes of sec. Return a numpy rec array with n_bars length, and last
         frame is end。
@@ -63,7 +69,7 @@ class QuotesFetcher(ABC):
         """
         raise NotImplementedError
 
-    async def get_valuation(code:Union[str, List[str]], day: Frame)->numpy.ndarray:
+    async def get_valuation(code: Union[str, List[str]], day: Frame) -> numpy.ndarray:
         """读取code指定的股票在date指定日期的市值数据。返回数据包括：
         code: 股票代码
         day: 日期
@@ -72,7 +78,8 @@ class QuotesFetcher(ABC):
         market_cap: 总市值（亿元）
         circulating_market_cap： 流通市值（亿元）
         turnover_ration: 换手率（%）
-        pe_ratio: 市盈率（PE,TTM）每股市价为每股收益的倍数，反映投资人对每元净利润所愿支付的价格，用来估计股票的投资报酬和风险
+        pe_ratio: 市盈率（PE,TTM）每股市价为每股收益的倍数，反映投资人对每元净利润所愿支付的价
+        格，用来估计股票的投资报酬和风险
         pe_ratio_lyr: 市盈率（PE），以上一年度每股盈利计算的静态市盈率. 股价/最近年度报告EPS
         pb_ratio: 市净率（PB）
         ps_ratio: 市销率(PS)

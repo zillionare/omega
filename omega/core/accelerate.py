@@ -17,16 +17,18 @@ logger = logging.getLogger(__name__)
 
 
 def merge(left, right, by):
-    """
+    """merge two numpy structured arrays by `by` key
+
     njit fail if one of left, right contains object, not plain type, but the loop is
     very fast, cost 0.0001 seconds
+
     Args:
-        left:
-        right:
-        by:
+        left ([type]): [description]
+        right ([type]): [description]
+        by ([type]): [description]
 
     Returns:
-
+        [type]: [description]
     """
     i, j = 0, 0
 
