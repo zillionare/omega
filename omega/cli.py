@@ -14,8 +14,8 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from subprocess import CalledProcessError, check_output, check_call
-from typing import Any, Union, List, Callable
+from subprocess import CalledProcessError, check_call, check_output
+from typing import Any, Callable, List, Union
 
 import cfg4py
 import fire
@@ -38,7 +38,7 @@ from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-git_url = 'https://github.com/zillionare/omega'
+git_url = "https://github.com/zillionare/omega"
 
 cfg: Config = cfg4py.get_instance()
 
@@ -57,14 +57,14 @@ def format_msg(msg):
     msg = []
     for line in lines:
         for i in range(int(len(line) / 80 + 1)):
-            msg.append(line[i * 80: min(len(line), (i + 1) * 80)])
+            msg.append(line[i * 80 : min(len(line), (i + 1) * 80)])
     return "\n".join(msg)
 
 
 # noinspection PyUnresolvedReferences
 def update_config(root_key: str, conf: Any):
-    config_file = Path('~/zillionare/omega/config/defaults.yaml').expanduser()
-    with open(config_file, "r", encoding='utf-8') as f:
+    config_file = Path("~/zillionare/omega/config/defaults.yaml").expanduser()
+    with open(config_file, "r", encoding="utf-8") as f:
         parser = YAML()
         cfg = parser.load(f)
         _cfg = cfg
@@ -86,10 +86,10 @@ def update_config(root_key: str, conf: Any):
 
     try:
         sh.cp(config_file, config_file.with_suffix(".bak"))
-        with open(config_file, "w", encoding='utf-8') as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             parser = YAML()
             parser.dump(cfg, f)
-    except Exception as e:
+    except Exception:
         # restore the backup
         sh.mv(config_file.with_suffix(".bak"), config_file)
 
@@ -97,18 +97,18 @@ def update_config(root_key: str, conf: Any):
 def redo(prompt, func, choice=None):
     if choice is None:
         choose = input(prompt)
-        while choose.upper() not in ['C', 'Q', 'R']:
+        while choose.upper() not in ["C", "Q", "R"]:
             choose = input(prompt)
     else:
         print(prompt)
         choose = choice
 
-    if choose.upper() == 'R':
+    if choose.upper() == "R":
         try:
             func()
         except EarlyJumpError:
             return
-    elif choose.upper() == 'C':
+    elif choose.upper() == "C":
         print("您选择了忽略错误继续安装。")
         raise EarlyJumpError
     else:
@@ -135,10 +135,12 @@ def is_valid_time(tm: str) -> bool:
 
 def is_in_venv():
     # 是否为virtual env
-    is_venv = (hasattr(sys, 'real_prefix') or
-               (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix))
+    is_venv = hasattr(sys, "real_prefix") or (
+        hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
+    )
 
-    if is_venv: return True
+    if is_venv:
+        return True
 
     # 是否为conda
     return os.environ.get("CONDA_DEFAULT_ENV") is not None
@@ -160,14 +162,14 @@ def config_syslog():
     """
     # wait user's confirmation
     input(format_msg(msg))
-    src = Path('~/zillionare/omega/config/32-omega-default.conf').expanduser()
-    dst = '/etc/rsyslog.d'
+    src = Path("~/zillionare/omega/config/32-omega-default.conf").expanduser()
+    dst = "/etc/rsyslog.d"
 
     try:
         print("正在应用新的配置文件,请根据提示给予授权：")
         sh.contrib.sudo.cp(src, dst)
         print("即将重启rsyslog服务，请给予授权：")
-        sh.contrib.sudo.service('rsyslog', 'restart')
+        sh.contrib.sudo.service("rsyslog", "restart")
     except Exception as e:
         print(e)
         redo("配置rsyslog失败，请排除错误后重试", config_syslog)
@@ -177,20 +179,21 @@ def config_logging():
     msg = """
     请指定日志文件存放位置，默认位置[/var/log/zillionare/]
     """
-    folder = get_input(msg, None, '/var/log/zillionare')
+    folder = get_input(msg, None, "/var/log/zillionare")
     folder = Path(folder).expanduser()
 
     try:
         if not os.path.exists(folder):
             print("正在创建日志目录，可能需要您授权：")
-            sh.contrib.sudo.mkdir(folder, '-p')
+            sh.contrib.sudo.mkdir(folder, "-p")
             sh.contrib.sudo.chmod(777, folder)
     except Exception as e:
         print(e)
         redo("创建日志目录失败，请排除错误重试，或者重新指定目录", config_logging)
 
-    update_config('logging.handlers.validation_report.filename',
-                  str(folder / 'validation.log'))
+    update_config(
+        "logging.handlers.validation_report.filename", str(folder / "validation.log")
+    )
     config_syslog()
 
 
@@ -201,32 +204,34 @@ def config_jq_fetcher():
         请输入序号开始配置[1]:
     """
     index = input(format_msg(msg))
-    if index == '' or index == '1':
+    if index == "" or index == "1":
         account = input("请输入账号:")
         password = input("请输入密码:")
 
-        config = [{
-            'name':       'jqdatasdk',
-            'module':     'jqadaptor',
-            'parameters': {
-                'account':  account,
-                'password': password
+        config = [
+            {
+                "name": "jqdatasdk",
+                "module": "jqadaptor",
+                "parameters": {"account": account, "password": password},
             }
-        }]
-        update_config('quotes_fetchers', config)
+        ]
+        update_config("quotes_fetchers", config)
     else:
         redo("请输入正确的序号，C跳过，Q退出", config_jq_fetcher)
 
     try:
-        import jqadaptor as jq
+        import jqadaptor as jq  # noqa
     except ModuleNotFoundError:
-        check_call([sys.executable, '-m', 'pip', 'install',
-                    'zillionare-omega-adaptors-jq'])
+        check_call(
+            [sys.executable, "-m", "pip", "install", "zillionare-omega-adaptors-jq"]
+        )
 
 
-def get_input(prompt: str, validation: Union[List, Callable], default: Any,
-              op_hint: str = None):
-    if op_hint is None: op_hint = "直接回车接受默认值，忽略此项(C)，退出(Q):"
+def get_input(
+    prompt: str, validation: Union[List, Callable], default: Any, op_hint: str = None
+):
+    if op_hint is None:
+        op_hint = "直接回车接受默认值，忽略此项(C)，退出(Q):"
     value = input(format_msg(prompt + op_hint))
 
     while True:
@@ -239,11 +244,11 @@ def get_input(prompt: str, validation: Union[List, Callable], default: Any,
         else:
             is_valid_input = True
 
-        if value.upper() == 'C':
+        if value.upper() == "C":
             return None
-        elif value == '':
+        elif value == "":
             return default
-        elif value == 'Q':
+        elif value == "Q":
             print("您选择了退出")
             sys.exit(-1)
         elif is_valid_input:
@@ -264,25 +269,27 @@ def config_sync():
     print(format_msg(msg))
 
     op_hint = ",直接回车接受默认值, 不同步(C)，退出(Q):"
-    frames = {'1d':  get_input("同步日线数据[1000]", is_number, 1000, op_hint),
-              '1w':  get_input("同步周线线数据[1000]", is_number, 1000, op_hint),
-              '1M':  get_input("同步月线数据", is_number, 1000, op_hint),
-              '1y':  get_input("同步年线数据", is_number, 1000, op_hint),
-              '1m':  get_input('同步1分钟数据[1000]', is_number, 1000, op_hint),
-              '5m':  get_input('同步5分钟数据[1000]', is_number, 1000, op_hint),
-              '15m': get_input('同步15分钟数据[1000]', is_number, 1000, op_hint),
-              '30m': get_input('同步30分钟数据[1000]', is_number, 1000, op_hint),
-              '60m': get_input('同步60分钟数据[1000]', is_number, 1000, op_hint)}
+    frames = {
+        "1d": get_input("同步日线数据[1000]", is_number, 1000, op_hint),
+        "1w": get_input("同步周线线数据[1000]", is_number, 1000, op_hint),
+        "1M": get_input("同步月线数据", is_number, 1000, op_hint),
+        "1y": get_input("同步年线数据", is_number, 1000, op_hint),
+        "1m": get_input("同步1分钟数据[1000]", is_number, 1000, op_hint),
+        "5m": get_input("同步5分钟数据[1000]", is_number, 1000, op_hint),
+        "15m": get_input("同步15分钟数据[1000]", is_number, 1000, op_hint),
+        "30m": get_input("同步30分钟数据[1000]", is_number, 1000, op_hint),
+        "60m": get_input("同步60分钟数据[1000]", is_number, 1000, op_hint),
+    }
 
-    sync_time = get_input('设置行情同步时间[15:05]', is_valid_time, '15:05', op_hint)
+    sync_time = get_input("设置行情同步时间[15:05]", is_valid_time, "15:05", op_hint)
 
     frames = {k: v for k, v in frames.items() if v is not None}
 
-    update_config('omega.sync.frames', frames)
+    update_config("omega.sync.frames", frames)
     if sync_time:
-        update_config('omega.sync.time', sync_time)
+        update_config("omega.sync.time", sync_time)
 
-    os.makedirs(Path('~/zillionare/omega/data/chksum'), exist_ok=True)
+    os.makedirs(Path("~/zillionare/omega/data/chksum"), exist_ok=True)
     # for unittest
     return frames, sync_time
 
@@ -293,7 +300,7 @@ def config_redis():
         服务器连接信息。
     """
     print(format_msg(msg))
-    host = get_input("请输入Reids服务器域名或者IP地址[localhost]，", None, 'localhost')
+    host = get_input("请输入Reids服务器域名或者IP地址[localhost]，", None, "localhost")
     port = get_input("请输入Redis服务器端口[6379]，", is_valid_port, 6379)
     password = get_input("请输入Redis服务器密码，", None, None)
 
@@ -304,8 +311,8 @@ def config_redis():
 
     try:
         print(f"正在测试Redis连接: {' '.join(cmd)}")
-        result = check_output(cmd).decode('utf-8')
-        if result.find('PONG') != -1:
+        result = check_output(cmd).decode("utf-8")
+        if result.find("PONG") != -1:
             print("连接成功！")
         else:
             print(f"测试返回结果为:{result}")
@@ -321,9 +328,9 @@ def config_redis():
         redo(msg, config_redis)
 
     if password:
-        update_config('redis.dsn', f"redis://{password}@{host}:{port}")
+        update_config("redis.dsn", f"redis://{password}@{host}:{port}")
     else:
-        update_config('redis.dsn', f"redis://{host}:{port}")
+        update_config("redis.dsn", f"redis://{host}:{port}")
 
 
 def setup(reset_factory=False):
@@ -343,11 +350,11 @@ def setup(reset_factory=False):
     if reset_factory:
         import sh
 
-        dst = pathlib.Path('~/zillionare/omega/config/').expanduser()
+        dst = pathlib.Path("~/zillionare/omega/config/").expanduser()
         os.makedirs(dst, exist_ok=True)
 
-        for file in ['config/defaults.yaml', 'config/32-omega-default.conf']:
-            src = pkg_resources.resource_filename('omega', file)
+        for file in ["config/defaults.yaml", "config/32-omega-default.conf"]:
+            src = pkg_resources.resource_filename("omega", file)
             sh.cp("-r", src, dst)
 
     config_redis()
@@ -365,11 +372,11 @@ def find_fetcher_processes():
         cmd = " ".join(p.cmdline())
         if "omega.app" in cmd and "--impl" in cmd and "--group-id" in cmd:
             # fetchers
-            m = re.search(r'--impl=([^\s]+)', cmd)
-            impl = m.group(1) if m else ''
+            m = re.search(r"--impl=([^\s]+)", cmd)
+            impl = m.group(1) if m else ""
 
-            m = re.search(r'--group-id=([^\s]+)', cmd)
-            group_id = m.group(1) if m else ''
+            m = re.search(r"--group-id=([^\s]+)", cmd)
+            group_id = m.group(1) if m else ""
 
             group = f"{impl}:{group_id}"
             pids = result.get(group, [])
@@ -379,7 +386,7 @@ def find_fetcher_processes():
     return result
 
 
-def start(service: str = ''):
+def start(service: str = ""):
     """
 
     Args:
@@ -390,16 +397,18 @@ def start(service: str = ''):
     """
     print(f"正在启动zillionare-omega {colored(service, 'green')}...")
 
-    server_roles = ['PRODUCTION', 'TEST', 'DEV']
-    if os.environ.get(cfg4py.envar) not in ['PRODUCTION', 'TEST', 'DEV']:
-        print(f"请设置环境变量{colored(cfg4py.envar, 'red')}为["
-              f"{colored(server_roles, 'red')}]之一。")
+    server_roles = ["PRODUCTION", "TEST", "DEV"]
+    if os.environ.get(cfg4py.envar) not in ["PRODUCTION", "TEST", "DEV"]:
+        print(
+            f"请设置环境变量{colored(cfg4py.envar, 'red')}为["
+            f"{colored(server_roles, 'red')}]之一。"
+        )
         sys.exit(-1)
 
     config_dir = get_config_dir()
     cfg4py.init(config_dir, False)
 
-    if service == 'jobs':
+    if service == "jobs":
         return start_jobs()
 
     start_fetcher_processes()
@@ -410,11 +419,11 @@ def start_fetcher_processes():
 
     # fetcher processes are started by groups
     for fetcher in cfg.quotes_fetchers:
-        impl = fetcher.get('impl')
-        groups = fetcher.get('groups')
+        impl = fetcher.get("impl")
+        groups = fetcher.get("groups")
 
         for _id, group in enumerate(groups):
-            sessions = group.get('sessions')
+            sessions = group.get("sessions")
             started_sessions = procs.get(f"{impl}:{_id}", [])
             if sessions - len(started_sessions) > 0:
                 print(f"启动的{impl}实例少于配置要求（或尚未启动），正在启动中。。。")
@@ -422,7 +431,7 @@ def start_fetcher_processes():
                 for pid in started_sessions:
                     try:
                         os.kill(pid, signal.SIGTERM)
-                    except Exception as e:
+                    except Exception:
                         pass
                 _start_fetcher(impl, _id)
 
@@ -443,12 +452,21 @@ def show_fetcher_processes():
 
 
 def _start_fetcher(impl: str, group_id: int):
-    subprocess.Popen([sys.executable, '-m', 'omega.app', 'start', f'--impl={impl}',
-                      f'--group-id={group_id}'], stdout=subprocess.DEVNULL)
+    subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "omega.app",
+            "start",
+            f"--impl={impl}",
+            f"--group-id={group_id}",
+        ],
+        stdout=subprocess.DEVNULL,
+    )
 
 
 def start_jobs():
-    subprocess.Popen([sys.executable, '-m', 'omega.jobs', 'start'])
+    subprocess.Popen([sys.executable, "-m", "omega.jobs", "start"])
 
     retry = 0
     while find_jobs_process() is None and retry < 5:
@@ -482,7 +500,7 @@ def stop_jobs():
             os.kill(pid, signal.SIGTERM)
             retry += 1
             time.sleep(0.5)
-        except Exception as e:
+        except Exception:
             pass
         pid = find_jobs_process()
 
@@ -527,19 +545,19 @@ def status():
     show_jobs_process()
 
 
-def stop(service: str = ''):
-    if service == 'jobs':
+def stop(service: str = ""):
+    if service == "jobs":
         return stop_jobs()
 
     stop_fetcher_processes()
 
 
 @async_run
-async def restart(service: str = ''):
+async def restart(service: str = ""):
     print("正在重启动服务...")
     await _init()
 
-    if service == 'jobs':
+    if service == "jobs":
         return restart_jobs
 
     stop_fetcher_processes()
@@ -568,13 +586,13 @@ async def scan():
 async def sync_sec_list():
     await _init()
 
-    await sync.trigger_single_worker_sync('security_list')
+    await sync.trigger_single_worker_sync("security_list")
 
 
 @async_run
 async def sync_calendar():
     await _init()
-    await sync.trigger_single_worker_sync('calendar')
+    await sync.trigger_single_worker_sync("calendar")
 
 
 @async_run
@@ -594,7 +612,7 @@ async def sync_bars(frame: str = None, codes: str = None):
         frame_type = FrameType(frame)
         params = sync.read_sync_params(FrameType(frame))
         if codes:
-            params['secs'] = list(map(lambda x: x.strip(' '), codes.split(",")))
+            params["secs"] = list(map(lambda x: x.strip(" "), codes.split(",")))
         await sync.trigger_bars_sync(frame_type, params, force=True)
         logger.info("request %s,%s send to workers.", params, codes)
     else:
@@ -621,17 +639,19 @@ async def _init():
 
 
 def main():
-    fire.Fire({
-        'start':         start,
-        'setup':         setup,
-        'stop':          stop,
-        'status':        status,
-        'restart':       restart,
-        'scan':          scan,
-        'sync_sec_list': sync_sec_list,
-        'sync_calendar': sync_calendar,
-        'sync_bars':     sync_bars
-    })
+    fire.Fire(
+        {
+            "start": start,
+            "setup": setup,
+            "stop": stop,
+            "status": status,
+            "restart": restart,
+            "scan": scan,
+            "sync_sec_list": sync_sec_list,
+            "sync_calendar": sync_calendar,
+            "sync_bars": sync_bars,
+        }
+    )
 
 
 if __name__ == "__main__":

@@ -27,15 +27,15 @@ import xxhash
 from aiocache import cached
 from aiohttp import ClientError
 from dateutil import tz
+from omicron import cache
 from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
-from omicron.dal import security_cache as sc, cache, security_cache
 from omicron.models.securities import Securities
 from omicron.models.security import Security
 from pyemit import emit
 
 from omega.core import get_config_dir
-from omega.core.events import ValidationError, Events
+from omega.core.events import Events, ValidationError
 from omega.jobs.sync import cfg, logger
 
 validation_errors = []
@@ -57,26 +57,26 @@ async def calc_checksums(day: datetime.date, codes: List) -> dict:
     for i, code in enumerate(codes):
         try:
             checksum = {}
-            d = await sc.get_bars_raw_data(code, day, 1, FrameType.DAY)
+            d = await cache.get_bars_raw_data(code, day, 1, FrameType.DAY)
             if d:
                 checksum[f"{FrameType.DAY.value}"] = xxhash.xxh32_hexdigest(d)
-            d = await sc.get_bars_raw_data(code, end_time, 240, FrameType.MIN1)
+            d = await cache.get_bars_raw_data(code, end_time, 240, FrameType.MIN1)
             if d:
                 checksum[f"{FrameType.MIN1.value}"] = xxhash.xxh32_hexdigest(d)
 
-            d = await sc.get_bars_raw_data(code, end_time, 48, FrameType.MIN5)
+            d = await cache.get_bars_raw_data(code, end_time, 48, FrameType.MIN5)
             if d:
                 checksum[f"{FrameType.MIN5.value}"] = xxhash.xxh32_hexdigest(d)
 
-            d = await sc.get_bars_raw_data(code, end_time, 16, FrameType.MIN15)
+            d = await cache.get_bars_raw_data(code, end_time, 16, FrameType.MIN15)
             if d:
                 checksum[f"{FrameType.MIN15.value}"] = xxhash.xxh32_hexdigest(d)
 
-            d = await sc.get_bars_raw_data(code, end_time, 8, FrameType.MIN30)
+            d = await cache.get_bars_raw_data(code, end_time, 8, FrameType.MIN30)
             if d:
                 checksum[f"{FrameType.MIN30.value}"] = xxhash.xxh32_hexdigest(d)
 
-            d = await sc.get_bars_raw_data(code, end_time, 4, FrameType.MIN60)
+            d = await cache.get_bars_raw_data(code, end_time, 4, FrameType.MIN60)
             if d:
                 checksum[f"{FrameType.MIN60.value}"] = xxhash.xxh32_hexdigest(d)
 
@@ -95,7 +95,7 @@ async def get_checksum(day: int) -> Optional[List]:
     save_to = (Path(cfg.omega.home) / "data/chksum").expanduser()
     chksum_file = os.path.join(save_to, f"chksum-{day}.json")
     try:
-        with open(chksum_file, 'r') as f:
+        with open(chksum_file, "r") as f:
             return json.load(f)
     except (FileNotFoundError, Exception):
         pass
@@ -109,7 +109,7 @@ async def get_checksum(day: int) -> Optional[List]:
                         logger.warning("failed to fetch checksum from %s", url)
                         return None
 
-                    checksum = await resp.json(encoding='utf-8')
+                    checksum = await resp.json(encoding="utf-8")
                     with open(chksum_file, "w+") as f:
                         json.dump(checksum, f, indent=2)
 
@@ -122,10 +122,10 @@ def do_validation_process_entry():
     try:
         t0 = time.time()
         asyncio.run(do_validation())
-        logger.info('validation finished in %s seconds', time.time() - t0)
+        logger.info("validation finished in %s seconds", time.time() - t0)
         return 0
     except Exception as e:
-        logger.warning('validation exit due to exception:')
+        logger.warning("validation exit due to exception:")
         logger.exception(e)
         return -1
 
@@ -142,22 +142,25 @@ async def do_validation(secs: List[str] = None, start: str = None, end: str = No
 
     """
     logger.info("start validation...")
-    report = logging.getLogger('validation_report')
+    report = logging.getLogger("validation_report")
 
     cfg = cfg4py.init(get_config_dir(), False)
 
     await emit.start(engine=emit.Engine.REDIS, dsn=cfg.redis.dsn, start_server=True)
     await omicron.init()
-    start = int(start or await cache.sys.get('jobs.bars_validation.range.start'))
+    start = int(start or await cache.sys.get("jobs.bars_validation.range.start"))
     if end is None:
         end = tf.date2int(arrow.now().date())
     else:
-        end = int(end or await cache.sys.get('jobs.bars_validation.range.stop'))
+        end = int(end or await cache.sys.get("jobs.bars_validation.range.stop"))
 
     if secs is None:
+
         async def get_sec():
-            return await cache.sys.lpop('jobs.bars_validation.scope')
+            return await cache.sys.lpop("jobs.bars_validation.scope")
+
     else:
+
         async def get_sec():
             return secs.pop() if len(secs) else None
 
@@ -177,30 +180,41 @@ async def do_validation(secs: List[str] = None, start: str = None, end: str = No
 
                     for k in missing1:
                         info = (
-                            ValidationError.LOCAL_MISS, day, code, k, d1.get(k),
-                            d2.get(k))
+                            ValidationError.LOCAL_MISS,
+                            day,
+                            code,
+                            k,
+                            d1.get(k),
+                            d2.get(k),
+                        )
                         report.info("%s,%s,%s,%s,%s,%s", *info)
                         await emit.emit(Events.OMEGA_VALIDATION_ERROR, info)
                     for k in missing2:
                         info = (
-                            ValidationError.REMOTE_MISS, day, code, k, d1.get(k),
-                            d2.get(k)
+                            ValidationError.REMOTE_MISS,
+                            day,
+                            code,
+                            k,
+                            d1.get(k),
+                            d2.get(k),
                         )
                         report.info("%s,%s,%s,%s,%s,%s", *info)
                         await emit.emit(Events.OMEGA_VALIDATION_ERROR, info)
                     for k in mismatch:
                         info = (
-                            ValidationError.MISMATCH, day, code, k, d1.get(k),
-                            d2.get(k)
+                            ValidationError.MISMATCH,
+                            day,
+                            code,
+                            k,
+                            d1.get(k),
+                            d2.get(k),
                         )
                         report.info("%s,%s,%s,%s,%s,%s", *info)
                         await emit.emit(Events.OMEGA_VALIDATION_ERROR, info)
 
                 else:
                     logger.error("checksum for %s not found.", day)
-                    info = (
-                        ValidationError.NO_CHECKSUM, day, None, None, None, None
-                    )
+                    info = (ValidationError.NO_CHECKSUM, day, None, None, None, None)
                     report.info("%s,%s,%s,%s,%s,%s", *info)
                     await emit.emit(Events.OMEGA_VALIDATION_ERROR, info)
         except Exception as e:
@@ -246,8 +260,8 @@ async def start_validation():
 
     # to check if the range is right
     pl = cache.sys.pipeline()
-    pl.get('jobs.bars_validation.range.start')
-    pl.get('jobs.bars_validation.range.end')
+    pl.get("jobs.bars_validation.range.start")
+    pl.get("jobs.bars_validation.range.end")
     start, end = await pl.execute()
 
     if start is None:
@@ -267,9 +281,11 @@ async def start_validation():
     assert start <= end
 
     no_validation_error_days = set(
-            tf.day_frames[(tf.day_frames >= start) & (tf.day_frames <= end)])
+        tf.day_frames[(tf.day_frames >= start) & (tf.day_frames <= end)]
+    )
 
     # fixme: do validation per frame_type
+    # fixme: test fail. Rewrite this before 0.6 releases
     codes = secs.choose(cfg.omega.sync.type)
     await cache.sys.delete("jobs.bars_validation.scope")
     await cache.sys.lpush("jobs.bars_validation.scope", *codes)
@@ -279,12 +295,14 @@ async def start_validation():
 
     t0 = time.time()
 
-    code = f"from omega.core.sanity import do_validation_process_entry; " \
-           f"do_validation_process_entry()"
+    code = (
+        "from omega.core.sanity import do_validation_process_entry; "
+        "do_validation_process_entry()"
+    )
 
     procs = []
     for i in range(cpu_count):
-        proc = subprocess.Popen([sys.executable, '-c', code], env=os.environ)
+        proc = subprocess.Popen([sys.executable, "-c", code], env=os.environ)
         procs.append(proc)
 
     timeout = 3600
@@ -305,34 +323,39 @@ async def start_validation():
                 pass
 
     # set next start point
-    validation_days = set(tf.day_frames[(tf.day_frames >= start) & (tf.day_frames <=
-                                                                    end)])
+    validation_days = set(
+        tf.day_frames[(tf.day_frames >= start) & (tf.day_frames <= end)]
+    )
     diff = validation_days - no_validation_error_days
     if len(diff):
         last_no_error_day = min(diff)
     else:
         last_no_error_day = end
 
-    await cache.sys.set('jobs.bars_validation.range.start', last_no_error_day)
+    await cache.sys.set("jobs.bars_validation.range.start", last_no_error_day)
     elapsed = time.time() - t0
-    logger.info("Validation cost %s seconds, validation will start at %s next time",
-                elapsed, last_no_error_day)
+    logger.info(
+        "Validation cost %s seconds, validation will start at %s next time",
+        elapsed,
+        last_no_error_day,
+    )
 
 
 async def quick_scan():
     # fixme
     secs = Securities()
 
-    report = logging.getLogger('quickscan')
+    report = logging.getLogger("quickscan")
 
     counters = {}
     for sync_config in cfg.omega.sync.bars:
-        frame = sync_config.get('frame')
-        start = sync_config.get('start')
+        frame = sync_config.get("frame")
+        start = sync_config.get("start")
 
         if frame is None or start is None:
-            logger.warning("skipped %s: required fields are [frame, start]",
-                           sync_config)
+            logger.warning(
+                "skipped %s: required fields are [frame, start]", sync_config
+            )
             continue
 
         frame_type = FrameType(frame)
@@ -340,30 +363,32 @@ async def quick_scan():
         start = arrow.get(start).date()
         start = tf.floor(start, FrameType.DAY)
 
-        stop = sync_config.get('stop') or arrow.now().date()
+        stop = sync_config.get("stop") or arrow.now().date()
 
         if frame_type in tf.minute_level_frames:
             minutes = tf.ticks[frame_type][0]
             h, m = minutes // 60, minutes % 60
-            start = datetime.datetime(start.year, start.month, start.day, h, m,
-                                      tzinfo=tz.gettz(cfg.tz))
+            start = datetime.datetime(
+                start.year, start.month, start.day, h, m, tzinfo=tz.gettz(cfg.tz)
+            )
 
-            stop = datetime.datetime(stop.year, stop.month, stop.day, 15,
-                                     tzinfo=tz.gettz(cfg.tz))
+            stop = datetime.datetime(
+                stop.year, stop.month, stop.day, 15, tzinfo=tz.gettz(cfg.tz)
+            )
 
         counters[frame] = [0, 0]
 
-        codes = secs.choose(sync_config.get('type'))
-        include = filter(lambda x: x, sync_config.get('include', '').split(','))
-        include = map(lambda x: x.strip(' '), include)
+        codes = secs.choose(sync_config.get("type"))
+        include = filter(lambda x: x, sync_config.get("include", "").split(","))
+        include = map(lambda x: x.strip(" "), include)
         codes.extend(include)
-        exclude = sync_config.get('exclude', '')
-        exclude = map(lambda x: x.strip(' '), exclude)
+        exclude = sync_config.get("exclude", "")
+        exclude = map(lambda x: x.strip(" "), exclude)
         codes = set(codes) - set(exclude)
 
         counters[frame][1] = len(codes)
         for code in codes:
-            head, tail = await security_cache.get_bars_range(code, frame_type)
+            head, tail = await cache.get_bars_range(code, frame_type)
             if head is None or tail is None:
                 report.info("ENOSYNC,%s,%s", code, frame)
                 counters[frame][0] = counters[frame][0] + 1
@@ -374,17 +399,24 @@ async def quick_scan():
             # 'head', 'tail' should be excluded
             actual = (await cache.security.hlen(f"{code}:{frame_type.value}")) - 2
             if actual != expected:
-                report.info("ELEN,%s,%s,%s,%s,%s,%s", code, frame, expected, actual,
-                            head, tail)
+                report.info(
+                    "ELEN,%s,%s,%s,%s,%s,%s", code, frame, expected, actual, head, tail
+                )
                 counters[frame][0] = counters[frame][0] + 1
                 continue
 
             sec = Security(code)
             if start != head:
-                if type(start) == datetime.date and start > sec.ipo_date or (type(
-                        start) == datetime.datetime and start.date() > sec.ipo_date):
-                    report.info("ESTART,%s,%s,%s,%s,%s", code, frame, start,
-                                head, sec.ipo_date)
+                if (
+                    type(start) == datetime.date
+                    and start > sec.ipo_date
+                    or (
+                        type(start) == datetime.datetime and start.date() > sec.ipo_date
+                    )
+                ):
+                    report.info(
+                        "ESTART,%s,%s,%s,%s,%s", code, frame, start, head, sec.ipo_date
+                    )
                     counters[frame][0] = counters[frame][0] + 1
                     continue
             if tail != stop:

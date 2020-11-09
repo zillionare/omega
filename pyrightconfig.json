@@ -1,0 +1,25 @@
+{
+  "comments": "这个文件是vscode插件Pylance用的",
+  "exclude": [
+    ".git",
+    ".eggs",
+    ".github",
+    ".history",
+    ".idea",
+    ".tox",
+    ".vscode",
+    "docs",
+    "**/__pycache__",
+    "zillionare_omega.egg-info"
+  ],
+
+  "ignore": [
+    "src/oldstuff"
+  ],
+
+  "reportMissingImports": true,
+  "reportMissingTypeStubs": false,
+
+  "pythonVersion": "3.8",
+  "pythonPlatform": "Linux"
+}

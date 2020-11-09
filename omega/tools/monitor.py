@@ -13,7 +13,6 @@ import logging
 import arrow
 import jqdatasdk as jq
 import numpy as np
-import talib
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from pyemit import emit
 from termcolor import colored
@@ -138,14 +137,14 @@ class Security:
             name = f"ma{win}"
             arr[name] = np.convolve(arr, np.ones(win), 'valid') / win
 
-    def macd(self, price: np.array):
-        dif, dea, macd = talib.MACD(price, fastperiod=12, slowperiod=26, signalperiod=9)
-        macd = macd * 2
+    # def macd(self, price: np.array):
+    #     dif, dea, macd = talib.MACD(price, fastperiod=12, slowperiod=26, signalperiod=9)
+    #     macd = macd * 2
 
-        return dif, dea, macd
+    #     return dif, dea, macd
 
-    def ppo(self, price: np.array):
-        return talib.PPO(price)
+    # def ppo(self, price: np.array):
+    #     return talib.PPO(price)
 
     def mom(self, price: np.array, decimals=4):
         """

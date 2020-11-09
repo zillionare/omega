@@ -12,6 +12,7 @@ Welcome to omega's documentation!
    contributing
    authors
    history
+   zillionare
 
 Indices and tables
 ==================

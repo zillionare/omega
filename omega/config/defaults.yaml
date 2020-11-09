@@ -64,9 +64,13 @@ omega:
         delay: 0 # delay * seconds after the frame is done
         include: '300057.XSHE'
         exclude: ''
+        type:
+          - stock
       - frame: '30m'
         start: '2020-06-01'
         delay: 60
+        type:
+          - stock
   validation:
     time: 02:00
     start: '2020-05-11'

@@ -23,7 +23,7 @@ requirements = [
     'ruamel.yaml==0.16',
     'aioredis==1.3.1',
     'hiredis==1.0.1',
-    'pyemit>=version='0.5.0'',
+    'pyemit>=version=0.5.0',
     'numpy>=1.18.1',
     'numba==0.49.1',
     'aiohttp==3.6.2',
