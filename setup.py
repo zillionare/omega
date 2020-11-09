@@ -15,31 +15,29 @@ with open("HISTORY.rst") as history_file:
 
 opts = {}
 
-# yapf: disable
 requirements = [
-    'apscheduler==3.6.3',
-    'arrow>=0.15.5',
-    'cfg4py>=0.6.0',
-    'ruamel.yaml==0.16',
-    'aioredis==1.3.1',
-    'hiredis==1.0.1',
-    'pyemit>=version=0.5.0',
-    'numpy>=1.18.1',
-    'numba==0.49.1',
-    'aiohttp==3.6.2',
-    'pytz==2020.1',
-    'xxhash==1.4.3',
-    'zillionare-omicron>=0.2.0',
-    'aiocache==0.11.1',
-    'sanic==20.3.0',
-    'psutil==5.7.0',
-    'termcolor==1.1.0',
-    'gino',
-    'asyncpg',
-    'sqlalchemy',
-    'sh>=1.13'
+    "apscheduler==3.6.3",
+    "arrow>=0.15.5",
+    "cfg4py>=0.6.0",
+    "ruamel.yaml==0.16",
+    "aioredis==1.3.1",
+    "hiredis==1.0.1",
+    "pyemit>=version=version='0.5.1'",
+    "numpy>=1.18.1",
+    "numba==0.49.1",
+    "aiohttp==3.6.2",
+    "pytz==2020.1",
+    "xxhash==1.4.3",
+    "zillionare-omicron>=0.2.0",
+    "aiocache==0.11.1",
+    "sanic==20.3.0",
+    "psutil==5.7.0",
+    "termcolor==1.1.0",
+    "gino",
+    "asyncpg",
+    "sqlalchemy",
+    "sh>=1.13",
 ]
-# yapf: enable
 
 setup_requirements = ["sh"]
 
@@ -94,7 +92,7 @@ setup(
     test_suite="tests",
     tests_require=test_requirements,
     url="https://github.com/zillionare/omega",
-    version="version='0.5.0'",
+    version="version='0.5.1'",
     zip_safe=False,
     cmdclass={"install": InstallCommand},
     entry_points={"console_scripts": ["omega=omega.cli:main"]},
