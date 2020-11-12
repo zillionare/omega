@@ -3,6 +3,7 @@ bump2version==0.5.11
 wheel==0.33.6
 watchdog==0.9.0
 flake8==3.8.4
+flake8-docstrings==1.5.0
 tox==3.14.0
 coverage==4.5.4
 Sphinx==1.8.5
@@ -12,5 +13,4 @@ apscheduler==3.6.3
 cfg4py>=0.4.0
 ruamel.yaml==0.16
 black
-restructuredtext_lint
-doc8
+pre-commit

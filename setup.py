@@ -22,7 +22,7 @@ requirements = [
     "ruamel.yaml==0.16",
     "aioredis==1.3.1",
     "hiredis==1.0.1",
-    "pyemit>=version=version='0.5.1'",
+    "pyemit>0.5",
     "numpy>=1.18.1",
     "numba==0.49.1",
     "aiohttp==3.6.2",
@@ -45,6 +45,10 @@ test_requirements = ["omega"]
 
 
 def post_install():
+    """将配置资源文件拷贝到用户目录.
+
+    这些资源文件无法被标准安装程序管理。
+    """
     import sh
 
     for item in ["config", "data/chksum"]:
@@ -62,7 +66,7 @@ def post_install():
         sh.cp("-r", src, dst)
 
 
-class InstallCommand(install):
+class _InstallCommand(install):
     def run(self):
         install.run(self)
         post_install()
@@ -94,6 +98,6 @@ setup(
     url="https://github.com/zillionare/omega",
     version="0.5.1",
     zip_safe=False,
-    cmdclass={"install": InstallCommand},
+    cmdclass={"install": _InstallCommand},
     entry_points={"console_scripts": ["omega=omega.cli:main"]},
 )
