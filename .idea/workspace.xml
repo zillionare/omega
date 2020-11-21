@@ -4,16 +4,18 @@
     <option name="SCOPE_TYPE" value="8" />
     <option name="CUSTOM_SCOPE_NAME" value="Module 'omega'" />
   </component>
+  <component name="BranchesTreeState">
+    <expand />
+    <select />
+  </component>
   <component name="ChangeListManager">
-    <list default="true" id="9d315cbc-a8db-4353-8626-19fd45be9e4a" name="Default Changelist" comment="bug fix:&#10;1.">
-      <change afterPath="$PROJECT_DIR$/omega/tools/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/omega/tools/monitor.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/omega/tools/secs.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test.py" afterDir="false" />
+    <list default="true" id="9d315cbc-a8db-4353-8626-19fd45be9e4a" name="Default Changelist" comment="bug fix:&#10;1.isort">
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/omega.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/omega.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/omega/core/sanity.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/core/sanity.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/omega/fetcher/abstract_quotes_fetcher.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/fetcher/abstract_quotes_fetcher.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/omega/jobs/sync.py" beforeDir="false" afterPath="$PROJECT_DIR$/omega/jobs/sync.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/test_abstract_quotes_fetcher.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_abstract_quotes_fetcher.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_jobs.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_jobs.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -41,17 +43,17 @@
   </component>
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
-    <option name="showExcludedFiles" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
   <component name="PropertiesComponent">
     <property name="ASKED_ADD_EXTERNAL_FILES" value="true" />
+    <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
     <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
     <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
     <property name="WebServerToolWindowFactoryState" value="false" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/omega/jobs/__init__.py" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/../../apps/Miniconda3/envs/stock/python.exe" />
     <property name="run.code.analysis.last.selected.profile" value="aDefault" />
-    <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
+    <property name="settings.editor.selected.configurable" value="preferences.externalTools" />
   </component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
@@ -303,6 +305,7 @@
       </list>
     </recent_temporary>
   </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
   <component name="SvnConfiguration">
     <configuration />
   </component>
@@ -650,25 +653,49 @@
             </State>
           </value>
         </entry>
-        <entry key="MAIN">
+        <entry key="2">
           <value>
             <State>
-              <option name="COLUMN_ORDER" />
+              <option name="SHOW_ONLY_AFFECTED_CHANGES" value="true" />
+              <option name="FILTERS">
+                <map>
+                  <entry key="branch">
+                    <value>
+                      <list>
+                        <option value="HEAD" />
+                      </list>
+                    </value>
+                  </entry>
+                  <entry key="roots">
+                    <value>
+                      <list>
+                        <option value="$PROJECT_DIR$" />
+                      </list>
+                    </value>
+                  </entry>
+                </map>
+              </option>
             </State>
+          </value>
+        </entry>
+        <entry key="MAIN">
+          <value>
+            <State />
           </value>
         </entry>
       </map>
     </option>
-    <option name="OPEN_TABS">
-      <set>
-        <option value="1" />
-      </set>
+    <option name="OPEN_GENERIC_TABS">
+      <map>
+        <entry key="1" value="TOOL_WINDOW" />
+        <entry key="2" value="TOOL_WINDOW" />
+      </map>
     </option>
+    <option name="oldMeFiltersMigrated" value="true" />
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="true" />
     <option name="CHECK_CODE_CLEANUP_BEFORE_PROJECT_COMMIT" value="true" />
-    <MESSAGE value="refactoring.&#10;&#10;use Sanic as micro-service to replace RPC calls provided by pyemit. Sanic is mature in multi-processing work, though performance may be a little bit lower compares to pyemit" />
     <MESSAGE value="1. Add validation/checksum/sync time range in config file&#10;2. validation/checksum/sync will now all honour time range" />
     <MESSAGE value="minor bug fix." />
     <MESSAGE value="change omega.app start interface, use parameters in config file as much as possible&#10;jobs can be executed by `python -m omega.jobs start` now" />
@@ -693,7 +720,8 @@
     <MESSAGE value="Fix: can't compare datetime.datetime to datetime.date" />
     <MESSAGE value="fixed:&#10;   get_bars_handler:97 end_at must be type of datetime.date or datetime.date&#10;   get_bars_handler add include_unclosed param" />
     <MESSAGE value="Bug fix: &#10;1. get_bars returns nan for last bars, if end contains seconds and microseconds&#10;2. add 'places' when use assertAlmostEqual" />
-    <option name="LAST_COMMIT_MESSAGE" value="Bug fix: &#10;1. get_bars returns nan for last bars, if end contains seconds and microseconds&#10;2. add 'places' when use assertAlmostEqual" />
+    <MESSAGE value="bug fix:&#10;1.isort" />
+    <option name="LAST_COMMIT_MESSAGE" value="bug fix:&#10;1.isort" />
     <option name="OPTIMIZE_IMPORTS_BEFORE_PROJECT_COMMIT" value="true" />
     <option name="REFORMAT_BEFORE_PROJECT_COMMIT" value="true" />
     <option name="REARRANGE_BEFORE_PROJECT_COMMIT" value="true" />
@@ -703,140 +731,82 @@
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="3276" y="167" key="#Deployment/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1598423253243" />
-    <state x="3411" y="160" key="#Unittests_for_test_jobs.MyTestCase.test_sync_bars_-W_ignore" timestamp="1594557923885">
+    <state x="3418" y="343" key="#Notifications" timestamp="1605972375686">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
-    <state x="3411" y="160" key="#Unittests_for_test_jobs.MyTestCase.test_sync_bars_-W_ignore/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1594557923885" />
+    <state x="3418" y="343" key="#Notifications/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1605972375686" />
     <state x="3250" y="131" width="1151" height="852" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1598438808628">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="3250" y="131" width="1151" height="852" key="#com.intellij.execution.impl.EditConfigurationsDialog/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1598438808628" />
-    <state x="3426" y="269" key="#com.intellij.refactoring.safeDelete.UnsafeUsagesDialog" timestamp="1592617624584">
+    <state x="3375" y="159" key="#com.intellij.ide.macro.MacrosDialog" timestamp="1605972030046">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
-    <state x="3426" y="269" key="#com.intellij.refactoring.safeDelete.UnsafeUsagesDialog/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592617624584" />
-    <state x="3518" y="138" width="733" height="809" key="#com.jetbrains.python.refactoring.move.PyMoveModuleMembersDialog" timestamp="1592639419235">
+    <state x="3375" y="159" key="#com.intellij.ide.macro.MacrosDialog/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1605972030046" />
+    <state x="3358" y="283" width="474" height="503" key="#com.intellij.tools.ToolEditorDialog" timestamp="1605972053264">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
-    <state x="3518" y="138" width="733" height="809" key="#com.jetbrains.python.refactoring.move.PyMoveModuleMembersDialog/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592639419235" />
+    <state x="3358" y="283" width="474" height="503" key="#com.intellij.tools.ToolEditorDialog/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1605972053264" />
     <state x="3622" y="221" width="796" height="675" key="#xdebugger.evaluate" timestamp="1598433948837">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
-    <state x="288" y="206" key="#xdebugger.evaluate/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1594709542560" />
     <state x="3622" y="221" width="796" height="675" key="#xdebugger.evaluate/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1598433948837" />
-    <state x="675" y="63" key="#xdebugger.evaluate/0.0.1368.872@0.0.1368.872" timestamp="1593310045515" />
-    <state x="3455" y="399" key="ANALYSIS_DLG_com.intellij.analysis.BaseAnalysisAction$1" timestamp="1595465692120">
-      <screen x="2736" y="0" width="1920" height="1040" />
-    </state>
-    <state x="3455" y="399" key="ANALYSIS_DLG_com.intellij.analysis.BaseAnalysisAction$1/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595465692120" />
     <state x="2931" y="9" width="1259" height="954" key="CommitChangelistDialog2" timestamp="1598434571354">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
-    <state x="3004" y="86" width="1259" height="954" key="CommitChangelistDialog2/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1597150471485" />
     <state x="2931" y="9" width="1527" height="1016" key="CommitChangelistDialog2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1598434571354" />
-    <state width="664" height="438" key="DebuggerActiveHint" timestamp="1592655695748">
+    <state x="2828" y="92" width="1736" height="856" key="DiffContextDialog" timestamp="1605972461329">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
-    <state width="664" height="438" key="DebuggerActiveHint/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592655695748" />
-    <state x="2828" y="92" width="1736" height="856" maximized="true" key="DiffContextDialog" timestamp="1595466144710">
-      <screen x="2736" y="0" width="1920" height="1040" />
-    </state>
-    <state x="66" y="77" key="DiffContextDialog/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1590667512710" />
-    <state x="2828" y="92" width="1736" height="856" maximized="true" key="DiffContextDialog/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595466144710" />
+    <state x="2828" y="92" width="1736" height="856" key="DiffContextDialog/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1605972461329" />
     <state x="2828" y="92" width="1736" height="856" key="DirDiffDialog" timestamp="1598441440650">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="2828" y="92" width="1736" height="856" key="DirDiffDialog/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1598441440650" />
-    <state x="3430" y="284" key="EnvironmentVariablesDialog" timestamp="1592623573392">
+    <state x="3476" y="275" key="FileChooserDialogImpl" timestamp="1605971998566">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
-    <state x="3430" y="284" key="EnvironmentVariablesDialog/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592623573392" />
-    <state x="3476" y="278" width="844" height="598" key="FileChooserDialogImpl" timestamp="1595906646347">
+    <state x="3476" y="275" key="FileChooserDialogImpl/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1605971998566" />
+    <state width="1899" height="282" key="GridCell.Tab.0.bottom" timestamp="1605972079822">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
-    <state x="3476" y="278" width="844" height="598" key="FileChooserDialogImpl/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595906646347" />
-    <state width="1877" height="319" key="GridCell.Tab.0.bottom" timestamp="1598443334822">
+    <state width="1899" height="282" key="GridCell.Tab.0.bottom/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1605972079822" />
+    <state width="1899" height="282" key="GridCell.Tab.0.center" timestamp="1605972079822">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
-    <state width="1326" height="354" key="GridCell.Tab.0.bottom/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1597147868096" />
-    <state width="1877" height="319" key="GridCell.Tab.0.bottom/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1598443334822" />
-    <state width="1326" height="208" key="GridCell.Tab.0.bottom/0.0.1368.872@0.0.1368.872" timestamp="1593685655732" />
-    <state width="1877" height="319" key="GridCell.Tab.0.center" timestamp="1598443334822">
+    <state width="1899" height="282" key="GridCell.Tab.0.center/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1605972079822" />
+    <state width="1899" height="282" key="GridCell.Tab.0.left" timestamp="1605972079822">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
-    <state width="1326" height="354" key="GridCell.Tab.0.center/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1597147868095" />
-    <state width="1877" height="319" key="GridCell.Tab.0.center/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1598443334822" />
-    <state width="1326" height="208" key="GridCell.Tab.0.center/0.0.1368.872@0.0.1368.872" timestamp="1593685655732" />
-    <state width="1877" height="319" key="GridCell.Tab.0.left" timestamp="1598443334821">
+    <state width="1899" height="282" key="GridCell.Tab.0.left/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1605972079822" />
+    <state width="1899" height="282" key="GridCell.Tab.0.right" timestamp="1605972079822">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
-    <state width="1326" height="354" key="GridCell.Tab.0.left/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1597147868095" />
-    <state width="1877" height="319" key="GridCell.Tab.0.left/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1598443334821" />
-    <state width="1326" height="208" key="GridCell.Tab.0.left/0.0.1368.872@0.0.1368.872" timestamp="1593685655732" />
-    <state width="1877" height="319" key="GridCell.Tab.0.right" timestamp="1598443334822">
-      <screen x="2736" y="0" width="1920" height="1040" />
-    </state>
-    <state width="1326" height="354" key="GridCell.Tab.0.right/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1597147868096" />
-    <state width="1877" height="319" key="GridCell.Tab.0.right/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1598443334822" />
-    <state width="1326" height="208" key="GridCell.Tab.0.right/0.0.1368.872@0.0.1368.872" timestamp="1593685655732" />
+    <state width="1899" height="282" key="GridCell.Tab.0.right/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1605972079822" />
     <state width="1877" height="319" key="GridCell.Tab.1.bottom" timestamp="1598443281416">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
-    <state width="1326" height="354" key="GridCell.Tab.1.bottom/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1597147868097" />
     <state width="1877" height="319" key="GridCell.Tab.1.bottom/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1598443281416" />
-    <state width="1326" height="208" key="GridCell.Tab.1.bottom/0.0.1368.872@0.0.1368.872" timestamp="1593685636874" />
     <state width="1877" height="319" key="GridCell.Tab.1.center" timestamp="1598443281415">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
-    <state width="1326" height="354" key="GridCell.Tab.1.center/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1597147868097" />
     <state width="1877" height="319" key="GridCell.Tab.1.center/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1598443281415" />
-    <state width="1326" height="208" key="GridCell.Tab.1.center/0.0.1368.872@0.0.1368.872" timestamp="1593685636874" />
     <state width="1877" height="319" key="GridCell.Tab.1.left" timestamp="1598443281415">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
-    <state width="1326" height="354" key="GridCell.Tab.1.left/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1597147868096" />
     <state width="1877" height="319" key="GridCell.Tab.1.left/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1598443281415" />
-    <state width="1326" height="208" key="GridCell.Tab.1.left/0.0.1368.872@0.0.1368.872" timestamp="1593685636874" />
     <state width="1877" height="319" key="GridCell.Tab.1.right" timestamp="1598443281416">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
-    <state width="1326" height="354" key="GridCell.Tab.1.right/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1597147868097" />
     <state width="1877" height="319" key="GridCell.Tab.1.right/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1598443281416" />
-    <state width="1326" height="208" key="GridCell.Tab.1.right/0.0.1368.872@0.0.1368.872" timestamp="1593685636874" />
-    <state x="3441" y="206" key="PyMappingSimpleResolveDialog" timestamp="1593860925963">
+    <state x="3020" y="91" width="1150" height="725" key="SettingsEditor" timestamp="1605972055266">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
-    <state x="3441" y="206" key="PyMappingSimpleResolveDialog/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1593860925963" />
-    <state x="3552" y="230" key="RollbackChangesDialog" timestamp="1592488803086">
-      <screen x="2736" y="0" width="1920" height="1040" />
-    </state>
-    <state x="3552" y="230" key="RollbackChangesDialog/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592488803086" />
-    <state x="3088" y="108" width="1150" height="725" key="SettingsEditor" timestamp="1598442551601">
-      <screen x="2736" y="0" width="1920" height="1040" />
-    </state>
-    <state x="3088" y="108" width="1150" height="725" key="SettingsEditor/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1598442551601" />
+    <state x="3020" y="91" width="1150" height="725" key="SettingsEditor/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1605972055266" />
     <state x="3288" y="256" key="Vcs.Push.Dialog.v2" timestamp="1597741603768">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
-    <state x="393" y="215" key="Vcs.Push.Dialog.v2/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1590667566517" />
     <state x="3288" y="256" key="Vcs.Push.Dialog.v2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1597741603768" />
-    <state width="968" height="528" key="XDebugger.FullValuePopup" timestamp="1594732719179">
-      <screen x="2736" y="0" width="1920" height="1040" />
-    </state>
-    <state width="968" height="528" key="XDebugger.FullValuePopup/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1594732719179" />
-    <state x="335" y="191" key="com.intellij.execution.console.ConsoleHistoryController$MyBrowseAction$1" timestamp="1592960592141">
-      <screen x="0" y="0" width="1368" height="872" />
-    </state>
-    <state x="335" y="191" key="com.intellij.execution.console.ConsoleHistoryController$MyBrowseAction$1/0.0.1368.872/2736.0.1920.1040@0.0.1368.872" timestamp="1592960592141" />
-    <state x="3223" y="228" key="com.intellij.execution.console.ConsoleHistoryController$MyBrowseAction$1/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1592903805356" />
-    <state x="2828" y="92" width="1736" height="856" maximized="true" key="com.intellij.history.integration.ui.views.FileHistoryDialog" timestamp="1595467201640">
-      <screen x="2736" y="0" width="1920" height="1040" />
-    </state>
-    <state x="2828" y="92" width="1736" height="856" maximized="true" key="com.intellij.history.integration.ui.views.FileHistoryDialog/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595467201640" />
-    <state x="3434" y="161" key="com.intellij.xdebugger.impl.breakpoints.ui.BreakpointsDialogFactory$2" timestamp="1595080110681">
-      <screen x="2736" y="0" width="1920" height="1040" />
-    </state>
-    <state x="3434" y="161" key="com.intellij.xdebugger.impl.breakpoints.ui.BreakpointsDialogFactory$2/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1595080110681" />
     <state x="3580" y="219" key="com.jetbrains.plugins.remotesdk.ui.RemoteMappingsConfiguration" timestamp="1597736764137">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
@@ -850,6 +820,10 @@
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
     <state x="3454" y="199" width="504" height="527" key="ftp.server.browser/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1597736814795" />
+    <state x="3457" y="232" key="git4idea.branch.GitSmartOperationDialog" timestamp="1605972249113">
+      <screen x="2736" y="0" width="1920" height="1040" />
+    </state>
+    <state x="3457" y="232" key="git4idea.branch.GitSmartOperationDialog/0.0.1368.872/2736.0.1920.1040@2736.0.1920.1040" timestamp="1605972249113" />
     <state x="3359" y="225" width="672" height="678" key="search.everywhere.popup" timestamp="1598437863169">
       <screen x="2736" y="0" width="1920" height="1040" />
     </state>
@@ -916,63 +890,5 @@
         <watch expression="y['frame'].tolist()" language="Python" />
       </configuration>
     </watches-manager>
-  </component>
-  <component name="com.intellij.coverage.CoverageDataManagerImpl">
-    <SUITE FILE_PATH="coverage/omega$omega_stop.coverage" NAME="omega stop Coverage Results" MODIFIED="1592662011552" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/omega" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_abstract_quotes_fetcher_MyTestCase_test_get_bars_014.coverage" NAME="Unittests for test_abstract_quotes_fetcher.MyTestCase.test_get_bars_014 Coverage Results" MODIFIED="1598441224091" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$omega_start.coverage" NAME="omega start Coverage Results" MODIFIED="1592705695443" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/omega" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_abstract_quotes_fetcher_MyTestCase_test_get_bars_011.coverage" NAME="Unittests for test_abstract_quotes_fetcher.MyTestCase.test_get_bars_011 Coverage Results" MODIFIED="1598441181434" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$omega_sync_bars.coverage" NAME="omega sync_bars Coverage Results" MODIFIED="1592706257401" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/omega" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_jobs_MyTestCase_test_201_start_job_validation.coverage" NAME="Unittests for test_jobs.MyTestCase.test_201_start_job_validation Coverage Results" MODIFIED="1592149682601" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_abstract_quotes_fetcher_MyTestCase_test_get_bars_002.coverage" NAME="Unittests for test_abstract_quotes_fetcher.MyTestCase.test_get_bars_002 Coverage Results" MODIFIED="1597738802074" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_abstract_quotes_fetcher_MyTestCase_test_get_bars_005.coverage" NAME="Unittests for test_abstract_quotes_fetcher.MyTestCase.test_get_bars_005 Coverage Results" MODIFIED="1593868535921" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_jobs_MyTestCase_test_000_sync_day_bars.coverage" NAME="Unittests for test_jobs.MyTestCase.test_000_sync_day_bars Coverage Results" MODIFIED="1595080090056" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_omega_MyTestCase_test_config_supervisord.coverage" NAME="Unittests for test_omega.MyTestCase.test_config_supervisord Coverage Results" MODIFIED="1590479548003" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$jobs_start.coverage" NAME="jobs-start Coverage Results" MODIFIED="1592308636207" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/omega" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_abstract_quotes_fetcher_MyTestCase.coverage" NAME="Unittests for test_abstract_quotes_fetcher.MyTestCase Coverage Results" MODIFIED="1598441257306" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_jobs_MyTestCase_test_get_checksum.coverage" NAME="Unittests for test_jobs.MyTestCase.test_get_checksum Coverage Results" MODIFIED="1595122888013" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_omega_MyTestCase_test_config_sync.coverage" NAME="Unittests for test_omega.MyTestCase.test_config_sync Coverage Results" MODIFIED="1590245552559" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_abstract_quotes_fetcher_MyTestCase_test_get_security_list.coverage" NAME="Unittests for test_abstract_quotes_fetcher.MyTestCase.test_get_security_list Coverage Results" MODIFIED="1597741408807" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_jobs_MyTestCase.coverage" NAME="Unittests for test_jobs.MyTestCase Coverage Results" MODIFIED="1595481888378" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_abstract_quotes_fetcher_MyTestCase_test_get_bars_010.coverage" NAME="Unittests for test_abstract_quotes_fetcher.MyTestCase.test_get_bars_010 Coverage Results" MODIFIED="1598441163965" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_process_MyTestCase_test_start.coverage" NAME="Unittests for test_process.MyTestCase.test_start Coverage Results" MODIFIED="1591692487325" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_jobs_MyTestCase_test_200_validation_segment.coverage" NAME="Unittests for test_jobs.MyTestCase.test_200_validation_segment Coverage Results" MODIFIED="1589617417619" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_abstract_quotes_fetcher_MyTestCase_test_get_bars_004.coverage" NAME="Unittests for test_abstract_quotes_fetcher.MyTestCase.test_get_bars_004 Coverage Results" MODIFIED="1593868331402" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_jobs_MyTestCase_test_003_sync_min60_bars.coverage" NAME="Unittests for test_jobs.MyTestCase.test_003_sync_min60_bars Coverage Results" MODIFIED="1595080658064" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_jobs_MyTestCase_test_quick_scan.coverage" NAME="Unittests for test_jobs.MyTestCase.test_quick_scan Coverage Results" MODIFIED="1595127192198" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_jobs_MyTestCase_test_do_checksum.coverage" NAME="Unittests for test_jobs.MyTestCase.test_do_checksum Coverage Results" MODIFIED="1590049147239" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_abstract_quotes_fetcher_MyTestCase_test_get_bars.coverage" NAME="Unittests for test_abstract_quotes_fetcher.MyTestCase.test_get_bars Coverage Results" MODIFIED="1593221925821" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_omega_MyTestCase_test_update_config.coverage" NAME="Unittests for test_omega.MyTestCase.test_update_config Coverage Results" MODIFIED="1590222790533" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_abstract_quotes_fetcher_MyTestCase_test_get_bars_015.coverage" NAME="Unittests for test_abstract_quotes_fetcher.MyTestCase.test_get_bars_015 Coverage Results" MODIFIED="1598441233497" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_jobs_MyTestCase_test_get_raw.coverage" NAME="Unittests for test_jobs.MyTestCase.test_get_raw Coverage Results" MODIFIED="1589707022090" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_abstract_quotes_fetcher_MyTestCase_test_get_bars_003.coverage" NAME="Unittests for test_abstract_quotes_fetcher.MyTestCase.test_get_bars_003 Coverage Results" MODIFIED="1594731739716" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_abstract_quotes_fetcher_MyTestCase_test_30_bars.coverage" NAME="Unittests for test_abstract_quotes_fetcher.MyTestCase.test_30_bars Coverage Results" MODIFIED="1594733774712" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_jobs_MyTestCase_test_002_sync_week_bars.coverage" NAME="Unittests for test_jobs.MyTestCase.test_002_sync_week_bars Coverage Results" MODIFIED="1595080369867" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$omega_scan.coverage" NAME="omega sync_bars Coverage Results" MODIFIED="1592650082265" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/omega" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_jobs_MyTestCase_test_100_sync_calendar.coverage" NAME="Unittests for test_jobs.MyTestCase.test_100_sync_calendar Coverage Results" MODIFIED="1595080692245" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$momemtum_plot.coverage" NAME="momemtum_plot Coverage Results" MODIFIED="1595861672297" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/omega/tools" />
-    <SUITE FILE_PATH="coverage/omega$omega_start_jobs.coverage" NAME="omega start jobs Coverage Results" MODIFIED="1592307475739" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_jobs_MyTestCase_test_load_additional_jobs.coverage" NAME="Unittests for test_jobs.MyTestCase.test_load_additional_jobs Coverage Results" MODIFIED="1592118227442" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$job.coverage" NAME="job Coverage Results" MODIFIED="1595162067525" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/omega/jobs" />
-    <SUITE FILE_PATH="coverage/omega$omega.coverage" NAME="omega Coverage Results" MODIFIED="1590673164057" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/omega" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_process_MyTestCase_test_entry.coverage" NAME="Unittests for test_process.MyTestCase.test_entry Coverage Results" MODIFIED="1590894593996" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$monitor.coverage" NAME="monitor Coverage Results" MODIFIED="1595485626375" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/omega/tools" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_omega_MyTestCase_test_get_security_list.coverage" NAME="Unittests for test_omega.MyTestCase.test_get_security_list Coverage Results" MODIFIED="1592200248920" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_jobs_MyTestCase_test_memory.coverage" NAME="Unittests for test_jobs.MyTestCase.test_memory Coverage Results" MODIFIED="1592490258189" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$app.coverage" NAME="app Coverage Results" MODIFIED="1589123954770" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/omega" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_omega_MyTestCase.coverage" NAME="Unittests for test_omega.MyTestCase Coverage Results" MODIFIED="1592189384094" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_in_test_jobs_py.coverage" NAME="Unittests in test_jobs.py Coverage Results" MODIFIED="1595466215621" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_abstract_quotes_fetcher_MyTestCase_test_get_bars_013.coverage" NAME="Unittests for test_abstract_quotes_fetcher.MyTestCase.test_get_bars_013 Coverage Results" MODIFIED="1598441209508" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_jobs_MyTestCase_test_sync_bars.coverage" NAME="Unittests for test_jobs.MyTestCase.test_sync_bars Coverage Results" MODIFIED="1595123255247" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$cli.coverage" NAME="cli Coverage Results" MODIFIED="1590675010432" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/omega" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_abstract_quotes_fetcher_MyTestCase_test_get_bars_001.coverage" NAME="Unittests for test_abstract_quotes_fetcher.MyTestCase.test_get_bars_001 Coverage Results" MODIFIED="1597738749472" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_jobs_MyTestCase_test_report.coverage" NAME="Unittests for test_jobs.MyTestCase.test_report Coverage Results" MODIFIED="1589938891437" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_jobs_MyTestCase_test.coverage" NAME="Unittests for test_jobs.MyTestCase.test Coverage Results" MODIFIED="1588993383440" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$omega_setup.coverage" NAME="omega-setup Coverage Results" MODIFIED="1590313290983" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/omega" />
-    <SUITE FILE_PATH="coverage/omega$app_start.coverage" NAME="app start Coverage Results" MODIFIED="1598443150694" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/omega" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_jobs_MyTestCase_test_001_sync_min30_bars.coverage" NAME="Unittests for test_jobs.MyTestCase.test_001_sync_min30_bars Coverage Results" MODIFIED="1595080344443" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_jobs_MyTestCase_test_200_validation.coverage" NAME="Unittests for test_jobs.MyTestCase.test_200_validation Coverage Results" MODIFIED="1595122834094" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$test.coverage" NAME="test Coverage Results" MODIFIED="1594709497311" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/omega$Unittests_for_test_abstract_quotes_fetcher_MyTestCase_test_get_bars_012.coverage" NAME="Unittests for test_abstract_quotes_fetcher.MyTestCase.test_get_bars_012 Coverage Results" MODIFIED="1598441195549" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
   </component>
 </project>
