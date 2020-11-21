@@ -13,15 +13,15 @@ import arrow
 import cfg4py
 import numpy as np
 
+from numpy.lib import recfunctions as rfn
+from omega.core.accelerate import merge
+from omega.fetcher.quotes_fetcher import QuotesFetcher
 from omicron import cache
 from omicron.core.lang import static_vars
 from omicron.core.timeframe import tf
 from omicron.core.types import Frame
 from omicron.core.types import FrameType
 from omicron.models.valuation import Valuation
-
-from omega.core.accelerate import merge
-from omega.fetcher.quotes_fetcher import QuotesFetcher
 
 
 logger = logging.getLogger(__file__)
@@ -176,9 +176,13 @@ class AbstractQuotesFetcher(QuotesFetcher):
         valuation = await cls.get_instance().get_valuation(code, day, n)
 
         await Valuation.save(valuation)
+
+        if fields is None:
+            return valuation
+
         if isinstance(fields, str):
             fields = [fields]
-        if fields:
-            return valuation[fields]
-        else:
-            return valuation
+
+        mapping = dict(valuation.dtype.descr)
+        fields = [(name, mapping[name]) for name in fields]
+        return rfn.require_fields(valuation, fields)

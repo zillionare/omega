@@ -1247,7 +1247,7 @@ url = "../../../../c/workspace/omicron"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "4436e432167cab2ac1355b10ad3364fabd032d5eac130f82772f4295e27cd5f3"
+content-hash = "be894377a819b3471a831a63bdebf5d0792b9551d791c6d63593d8cc6f5c604a"
 
 [metadata.files]
 aiocache = [

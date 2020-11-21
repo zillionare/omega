@@ -1,3 +1,5 @@
+import json
+import logging
 import os
 import subprocess
 import sys
@@ -7,6 +9,10 @@ import aiohttp
 import cfg4py
 
 from omega.core import get_config_dir
+
+
+cfg = cfg4py.get_instance()
+logger = logging.getLogger(__name__)
 
 
 def init_test_env():
@@ -32,11 +38,20 @@ async def is_local_omega_alive(port: int = 3181):
 
 
 async def start_omega(port: int = 3181):
+    msg = (
+        "omega is running on localhost. However, it may fails the test due to it's"
+        "not started with configurations required by unittest"
+    )
     if await is_local_omega_alive(port):
+        logger.warning(msg)
         return None
 
+    cfg.omega.urls.quotes_server = f"http://localhost:{port}"
     account = os.environ["jq_account"]
     password = os.environ["jq_password"]
+
+    # hack: by default postgres is disabled, but we need it enabled for ut
+    cfg_ = json.dumps({"postgres": {"dsn": cfg.postgres.dsn, "enabled": "true"}})
 
     process = subprocess.Popen(
         [
@@ -44,7 +59,8 @@ async def start_omega(port: int = 3181):
             "-m",
             "omega.app",
             "start",
-            "jqadaptor",
+            "--impl=jqadaptor",
+            f"-cfg={cfg_}",
             f"--account={account}",
             f"--password={password}",
             f"--port={port}",

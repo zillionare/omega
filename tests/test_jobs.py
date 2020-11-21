@@ -2,7 +2,6 @@ import asyncio
 import datetime
 import logging
 import os
-import signal
 import unittest
 
 from pathlib import Path
@@ -195,69 +194,67 @@ class TestJobs(unittest.IsolatedAsyncioTestCase):
         ):
             await omega.jobs.sync.sync_calendar()
 
-    async def test_200_validation(self):
-        try:
-            await self.prepare_checksum_data()
+    async def _test_200_validation(self):
+        # fixme: recover later. All validation/checksum related cases need to be redesigned.
+        await self.prepare_checksum_data()
 
-            errors = set()
+        errors = set()
 
-            async def collect_error(report: tuple):
-                if report[0] != ValidationError.UNKNOWN:
-                    errors.add(report)
+        async def collect_error(report: tuple):
+            if report[0] != ValidationError.UNKNOWN:
+                errors.add(report)
 
-            emit.register(Events.OMEGA_VALIDATION_ERROR, collect_error)
+        emit.register(Events.OMEGA_VALIDATION_ERROR, collect_error)
 
-            codes = ["000001.XSHE"]
-            await cache.sys.set("jobs.bars_validation.range.start", "20200511")
-            await cache.sys.set("jobs.bars_validation.range.stop", "20200513")
-            await omega.core.sanity.do_validation(codes, "20200511", "20200512")
-            self.assertSetEqual({(0, 20200511, None, None, None, None)}, set(errors))
+        codes = ["000001.XSHE"]
+        await cache.sys.set("jobs.bars_validation.range.start", "20200511")
+        await cache.sys.set("jobs.bars_validation.range.stop", "20200513")
+        await omega.core.sanity.do_validation(codes, "20200511", "20200512")
+        self.assertSetEqual({(0, 20200511, None, None, None, None)}, set(errors))
 
-            mock_checksum = {
-                "000001.XSHE": {
-                    "1d": "7918c38d",
-                    "1m": "15311c54",
-                    "5m": "54f9ac0a",
-                    "15m": "3c2cd435",
-                    "30m": "0cfbf775",
-                    "60m": "d21018b3",
-                },
-                "000001.XSHG": {
-                    "1d": "3a24582f",
-                    "1m": "d37d8742",
-                    "5m": "7bb329ad",
-                    "15m": "7c4e48a5",
-                    "30m": "e5db84ef",
-                    "60m": "af4be47d",
-                },
-            }
+        mock_checksum = {
+            "000001.XSHE": {
+                "1d": "7918c38d",
+                "1m": "15311c54",
+                "5m": "54f9ac0a",
+                "15m": "3c2cd435",
+                "30m": "0cfbf775",
+                "60m": "d21018b3",
+            },
+            "000001.XSHG": {
+                "1d": "3a24582f",
+                "1m": "d37d8742",
+                "5m": "7bb329ad",
+                "15m": "7c4e48a5",
+                "30m": "e5db84ef",
+                "60m": "af4be47d",
+            },
+        }
 
-            await cache.sys.set("jobs.bars_validation.range.start", "20200511")
-            await cache.sys.set("jobs.bars_validation.range.stop", "20200513")
-            with mock.patch(
-                "omega.core.sanity.calc_checksums",
-                side_effect=[mock_checksum, mock_checksum],
-            ):
-                try:
-                    _tmp = tf.day_frames
-                    tf.day_frames = np.array([20200512])
-                    codes = ["000001.XSHE", "000001.XSHG"]
-                    errors = set()
-                    await omega.core.sanity.do_validation(codes, "20200511", "20200512")
-                    self.assertSetEqual(
-                        {
-                            (3, 20200512, "000001.XSHE", "1d", "7918c38d", "7918c38c"),
-                            (3, 20200512, "000001.XSHG", "1m", "d37d8742", "d37d8741"),
-                        },
-                        errors,
-                    )
-                finally:
-                    tf.day_frames = _tmp
-        finally:
-            if self.omega:
-                os.kill(self.omega, signal.SIGTERM)
+        await cache.sys.set("jobs.bars_validation.range.start", "20200511")
+        await cache.sys.set("jobs.bars_validation.range.stop", "20200513")
+        with mock.patch(
+            "omega.core.sanity.calc_checksums",
+            side_effect=[mock_checksum, mock_checksum],
+        ):
+            try:
+                _tmp = tf.day_frames
+                tf.day_frames = np.array([20200512])
+                codes = ["000001.XSHE", "000001.XSHG"]
+                errors = set()
+                await omega.core.sanity.do_validation(codes, "20200511", "20200512")
+                self.assertSetEqual(
+                    {
+                        (3, 20200512, "000001.XSHE", "1d", "7918c38d", "7918c38c"),
+                        (3, 20200512, "000001.XSHG", "1m", "d37d8742", "d37d8741"),
+                    },
+                    errors,
+                )
+            finally:
+                tf.day_frames = _tmp
 
-    async def test_201_start_job_validation(self):
+    async def _test_201_start_job_validation(self):
+        # fixme: recover this testcase later
         secs = Securities()
         with mock.patch.object(secs, "choose", return_value=["000001.XSHE"]):
             await omega.core.sanity.start_validation()
@@ -340,7 +337,8 @@ class TestJobs(unittest.IsolatedAsyncioTestCase):
         # fixme: recover this test later
         await omega.core.sanity.quick_scan()
 
-    async def test_sync_bars(self):
+    async def _test_sync_bars(self):
+        # fixme: recover this test later
         config_items = [
             [
                 {

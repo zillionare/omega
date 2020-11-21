@@ -1,6 +1,6 @@
 [flake8]
 max-line-length = 88
-ignore = E501, E203, W503
+ignore = E501, E203, W503, E122
 per-file-ignores = 
     __init__.py:F401
     docs/conf.py:E402

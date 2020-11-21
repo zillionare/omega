@@ -30,18 +30,17 @@ import xxhash
 from aiocache import cached
 from aiohttp import ClientError
 from dateutil import tz
+from omega.core import get_config_dir
+from omega.core.events import Events
+from omega.core.events import ValidationError
+from omega.jobs.sync import cfg
+from omega.jobs.sync import logger
 from omicron import cache
 from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
 from omicron.models.securities import Securities
 from omicron.models.security import Security
 from pyemit import emit
-
-from omega.core import get_config_dir
-from omega.core.events import Events
-from omega.core.events import ValidationError
-from omega.jobs.sync import cfg
-from omega.jobs.sync import logger
 
 
 validation_errors = []
@@ -292,7 +291,7 @@ async def start_validation():
 
     # fixme: do validation per frame_type
     # fixme: test fail. Rewrite this before 0.6 releases
-    codes = secs.choose(cfg.omega.sync.type)
+    codes = secs.choose(cfg.omega.sync)
     await cache.sys.delete("jobs.bars_validation.scope")
     await cache.sys.lpush("jobs.bars_validation.scope", *codes)
 
