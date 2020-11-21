@@ -13,7 +13,10 @@ def init_test_env():
     os.environ[cfg4py.envar] = "DEV"
 
     cfg4py.init(get_config_dir(), False)
-    return cfg4py.get_instance()
+    # enable postgres for unittest
+    cfg = cfg4py.get_instance()
+    cfg.postgres.enabled = True
+    return cfg
 
 
 async def is_local_omega_alive(port: int = 3181):
@@ -42,9 +45,9 @@ async def start_omega(port: int = 3181):
             "omega.app",
             "start",
             "jqadaptor",
-            f"--account='{account}'",
+            f"--account={account}",
             f"--password={password}",
-            "--port=3181",
+            f"--port={port}",
         ],
         env=os.environ,
     )

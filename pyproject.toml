@@ -39,10 +39,9 @@ pytest = "^6.1.2"
 pytest-cov = "^2.10.1"
 doc8 = "^0.8.1"
 recommonmark = "^0.6.0"
+jqdatasdk = "^1.8.3"
 "zillionare-omicron" = {path = "/c/workspace/omicron"}
 "zillionare-omega-adaptors-jq" = {path = "/c/workspace/omega_jqadaptor"}
-jqdatasdk = "^1.8.3"
-
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
