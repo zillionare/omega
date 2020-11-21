@@ -14,6 +14,13 @@ help:
 
 .PHONY: help Makefile
 
+docs:
+	rm -f omega.rst
+	rm -f modules.rst
+	sphinx-apidoc -o ./ ../omega
+	$(MAKE) -C . clean
+	$(MAKE) -C . html
+	
 # Catch-all target: route all unknown targets to Sphinx using the new
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
 %: Makefile

@@ -8,22 +8,27 @@ Contributors:
 """
 import logging
 import pickle
+
 from typing import List
 
 import arrow
 import cfg4py
 import fire
 import omicron
+
 from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
 from pyemit import emit
-from sanic import Sanic, response
+from sanic import Sanic
+from sanic import response
 
+from omega import __version__
 from omega.config.cfg4py_auto_gen import Config
 from omega.core import get_config_dir
 from omega.core.events import Events
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omega.jobs import sync as sq
+
 
 cfg: Config = cfg4py.get_instance()
 
@@ -33,15 +38,19 @@ logger = logging.getLogger(__name__)
 
 
 class Application(object):
-    def __init__(self, fetcher_impl: str, **kwargs):
+    def __init__(self, fetcher_impl: str, cfg: dict = None, **kwargs):
         self.fetcher_impl = fetcher_impl
         self.params = kwargs
+        self.inherit_cfg = cfg or {}
 
     async def init(self, *args):
         logger.info("init %s", self.__class__.__name__)
 
         cfg4py.init(get_config_dir(), False)
+        cfg4py.update_config(self.inherit_cfg)
+
         await aq.create_instance(self.fetcher_impl, **self.params)
+
         await omicron.init(aq)
 
         # listen on omega events
@@ -49,6 +58,7 @@ class Application(object):
         await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
 
         # register route here
+        app.add_route(self.get_version, "/sys/version")
         app.add_route(self.get_security_list_handler, "/quotes/security_list")
         app.add_route(self.get_bars_handler, "/quotes/bars")
         app.add_route(self.get_bars_batch_handler, "/quotes/bars_batch")
@@ -63,6 +73,9 @@ class Application(object):
         app.add_route(self.get_valuation, "quotes/valuation")
 
         logger.info("<<< init %s process done", self.__class__.__name__)
+
+    async def get_version(self, request):
+        return response.text(__version__)
 
     async def get_valuation(self, request):
         try:
@@ -168,41 +181,34 @@ def get_fetcher_info(fetchers: List, impl: str):
     return None
 
 
-def start(impl: str, group_id: int = 0, **kwargs):
-    """launch omega process.
+def start(impl: str, cfg: dict = None, **fetcher_params):
+    """启动一组Omega进程
 
-    if kwargs present, then group_id is ignored. Otherwise, `start` will read group
-    settings indexed by that group_id from config file.
+    使用本函数来启动一组Omega进程。这一组进程使用同样的quotes fetcher,但可能有1到多个session
+    (限制由quotes fetcher给出)。它们共享同一个port。Sanic在内部实现了load-balance机制。
+
+    通过多次调用本方法，传入不同的quotes fetcher impl参数，即可启动多组Omega服务。
+
+    如果指定了`fetcher_params`，则`start`将使用impl, fetcher_params来启动单组Omega服务，使
+    用impl指定的fetcher。否则，将使用`cfg.quotes_fetcher`中提供的信息来创建Omega.
+
+    如果`cfg`不为None，则应该指定为合法的json string，其内容将覆盖本地cfg。这个设置目前的主要
+    要作用是方便单元测试。
+
 
     Args:
-        impl (str): [description]
-        group_id (int, optional): [description]. Defaults to 0.
+        impl (str): quotes fetcher implementor
+        cfg: the cfg in json string
+        fetcher_params: contains info required by creating quotes fetcher
     """
-    if kwargs:
-        workers = kwargs.get("sessions", 1)
-        port = kwargs.get("port", 3181)
-        if "port" in kwargs:
-            del kwargs["port"]
-        fetcher = Application(fetcher_impl=impl, **kwargs)
-    else:
-        config_dir = get_config_dir()
-        cfg = cfg4py.init(config_dir, False)
+    sessions = fetcher_params.get("sessions", 1)
+    port = fetcher_params.get("port", 3181)
+    omega = Application(impl, cfg, **fetcher_params)
 
-        info = get_fetcher_info(cfg.quotes_fetchers, impl)
-        groups = info.get("groups")
-        port = info.get("port") + group_id
+    app.register_listener(omega.init, "before_server_start")
 
-        assert groups is not None
-        assert len(groups) > group_id
-
-        workers = groups[group_id].get("sessions", 1)
-
-        fetcher = Application(fetcher_impl=impl, **groups[group_id])
-
-    app.register_listener(fetcher.init, "before_server_start")
-
-    logger.info("starting omega group %s with %s workers", group_id, workers)
-    app.run(host="0.0.0.0", port=port, workers=workers, register_sys_signals=True)
+    logger.info("starting omega group listen on %s with %s workers", port, sessions)
+    app.run(host="0.0.0.0", port=port, workers=sessions, register_sys_signals=True)
 
 
 if __name__ == "__main__":

@@ -13,8 +13,11 @@ logging:
     console:
       class: logging.StreamHandler
       formatter: default
-      level: DEBUG
-    default:
+    develop:
+      class: logging.handlers.RotatingFileHandler
+      formatter: default
+      filename: /var/log/zillionare/omega.log
+    production:
       class: logging.handlers.SysLogHandler
       address: /dev/log
       facility: local6
@@ -42,32 +45,36 @@ logging:
         - quickscan
   root:
     handlers:
-      - console
+      - develop
     level: INFO
   version: 1
 tz: Asia/Shanghai
 redis:
   dsn: redis://localhost:6379
+postgres:
+  dsn: postgres://${pg_account}:${pg_password}@localhost/zillionare
+  enabled: false
 pickle:
   ver: 4
 omega:
   home: ~/zillionare/omgea
   urls:
     checksum: http://stock.jieyu.ai/chksum
+    quotes_server: http://localhost:3181
   heartbeat: 10
   sync:
     security_list: 02:00
     calendar: 02:00
     bars:
       - frame: '1d'
-        start: '2019-01-01'
+        start: '2020-10-11'
         delay: 0 # delay * seconds after the frame is done
         include: '300057.XSHE'
         exclude: ''
         type:
           - stock
       - frame: '30m'
-        start: '2020-06-01'
+        start: '2020-11-11'
         delay: 60
         type:
           - stock
@@ -75,3 +82,12 @@ omega:
     time: 02:00
     start: '2020-05-11'
     end: '2020-05-13'
+
+quotes_fetchers:
+  - impl: jqadaptor    # there must be a create_instance method in this module
+    workers:
+      - account: ${jq_account}
+        password: ${jq_password}
+        port: 3181
+        # note! for the first group, if you set n, then you'll get n + 1 workers
+        sessions: 2

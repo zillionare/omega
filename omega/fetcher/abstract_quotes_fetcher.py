@@ -5,19 +5,24 @@
 import datetime
 import importlib
 import logging
-from typing import List, Union
+
+from typing import List
+from typing import Union
 
 import arrow
 import cfg4py
 import numpy as np
+
 from omicron import cache
 from omicron.core.lang import static_vars
 from omicron.core.timeframe import tf
-from omicron.core.types import Frame, FrameType
+from omicron.core.types import Frame
+from omicron.core.types import FrameType
 from omicron.models.valuation import Valuation
 
 from omega.core.accelerate import merge
 from omega.fetcher.quotes_fetcher import QuotesFetcher
+
 
 logger = logging.getLogger(__file__)
 
@@ -171,6 +176,8 @@ class AbstractQuotesFetcher(QuotesFetcher):
         valuation = await cls.get_instance().get_valuation(code, day, n)
 
         await Valuation.save(valuation)
+        if isinstance(fields, str):
+            fields = [fields]
         if fields:
             return valuation[fields]
         else:

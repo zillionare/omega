@@ -4,15 +4,16 @@ import unittest
 
 import arrow
 import cfg4py
-import numpy
 import numpy as np
 import omicron
+
 from omicron import cache
 from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
 
-from omega.config.cfg4py_auto_gen import Config
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
+from tests import init_test_env
+
 
 logger = logging.getLogger(__name__)
 
@@ -21,14 +22,9 @@ cfg = cfg4py.get_instance()
 
 class TestAbstractQuotesFetcher(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
-        os.environ[cfg4py.envar] = "DEV"
+        init_test_env()
 
-        cfg4py.init(self.get_config_path(), False)
-        cfg: Config = cfg4py.get_instance()
-        if len(cfg.quotes_fetchers) == 0:
-            raise ValueError("please config quotes fetcher before test.")
-
-        await self.start_quotes_fetchers()
+        await self.create_quotes_fetcher()
         await omicron.init(aq)
 
     async def asyncTearDown(self) -> None:
@@ -38,23 +34,16 @@ class TestAbstractQuotesFetcher(unittest.IsolatedAsyncioTestCase):
         src_dir = os.path.dirname(__file__)
         return os.path.join(src_dir, "../omega/config")
 
-    async def start_quotes_fetchers(self):
+    async def create_quotes_fetcher(self):
         fetcher_info = cfg.quotes_fetchers[0]
         impl = fetcher_info["impl"]
-        params = fetcher_info["groups"][0]
-        if "port" in params:
-            del params["port"]
-        if "sessions" in params:
-            del params["sessions"]
+        params = fetcher_info["workers"][0]
         await aq.create_instance(impl, **params)
 
     async def clear_cache(self, sec: str, frame_type: FrameType):
         await cache.security.delete(f"{sec}:{frame_type.value}")
 
     async def test_get_security_list(self):
-        async def on_security_list_updated(msg):
-            logger.info("security list updated")
-
         secs = await aq.get_security_list()
         self.assertEqual("000001.XSHE", secs[0][0])
 
@@ -68,7 +57,6 @@ class TestAbstractQuotesFetcher(unittest.IsolatedAsyncioTestCase):
         # without cache
         await self.clear_cache(sec, frame_type)
         bars = await aq.get_bars(sec, end, 10, frame_type)
-        print(bars)
 
         self.assertEqual(bars[0]["frame"], arrow.get("2020-03-23").date())
         self.assertEqual(bars[-1]["frame"], arrow.get("2020-04-03").date())
@@ -119,7 +107,7 @@ class TestAbstractQuotesFetcher(unittest.IsolatedAsyncioTestCase):
         cache_len = await cache.security.hlen(f"{sec}:{frame_type.value}")
         self.assertEqual(8, cache_len)
         bars_2 = await cache.get_bars(sec, tf.floor(end, frame_type), 6, frame_type)
-        numpy.array_equal(bars[:-1], bars_2)
+        np.array_equal(bars[:-1], bars_2)
 
     async def test_get_bars_012(self):
         """分钟级别，中间有一天停牌，end指定时间正在交易"""
@@ -139,7 +127,7 @@ class TestAbstractQuotesFetcher(unittest.IsolatedAsyncioTestCase):
         )
         self.assertAlmostEqual(5.37, bars["open"][0], places=2)
         self.assertAlmostEqual(5.26, bars["open"][-1], places=2)
-        self.assertTrue(numpy.isnan(bars["open"][1]))
+        self.assertTrue(np.isnan(bars["open"][1]))
 
         # 结束时间帧未结束
         end = arrow.get("2020-04-30 10:32:00.13", tzinfo=cfg.tz).datetime
@@ -169,13 +157,13 @@ class TestAbstractQuotesFetcher(unittest.IsolatedAsyncioTestCase):
         )
         self.assertAlmostEqual(5.47, bars["open"][0], places=2)
         self.assertAlmostEqual(5.37, bars["open"][-2], places=2)
-        self.assertTrue(numpy.isnan(bars["open"][-1]))
+        self.assertTrue(np.isnan(bars["open"][-1]))
 
         # 检查cache,10：30 已存入cache
         cache_len = await cache.security.hlen(f"{sec}:{frame_type.value}")
         self.assertEqual(8, cache_len)
         bars_2 = await cache.get_bars(sec, tf.floor(end, frame_type), 6, frame_type)
-        numpy.array_equal(bars, bars_2)
+        np.array_equal(bars, bars_2)
 
     async def test_get_bars_014(self):
         """测试周线级别未结束的frame能否对齐"""
@@ -200,7 +188,7 @@ class TestAbstractQuotesFetcher(unittest.IsolatedAsyncioTestCase):
 
         self.assertAlmostEqual(6.02, bars[0]["open"], places=2)
         self.assertAlmostEqual(6.51, bars[1]["open"], places=2)
-        self.assertTrue(numpy.isnan(bars[-1]["open"]))
+        self.assertTrue(np.isnan(bars[-1]["open"]))
 
         end = arrow.get("2020-04-30 15:00").datetime
         bars = await aq.get_bars(sec, end, 3, frame_type)
@@ -234,6 +222,6 @@ class TestAbstractQuotesFetcher(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(secs), len(vals))
 
         # return two records, only two fields
-        vals = await aq.get_valuation(secs, date, fields=["date", "code"])
+        vals = await aq.get_valuation(secs, date, fields=["frame", "code"])
         self.assertEqual(set(secs), set(vals["code"].tolist()))
-        self.assertSequenceEqual(vals.dtype.names, ["date", "code"])
+        self.assertSequenceEqual(vals.dtype.names, ["frame", "code"])

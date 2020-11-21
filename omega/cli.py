@@ -13,9 +13,15 @@ import signal
 import subprocess
 import sys
 import time
+
 from pathlib import Path
-from subprocess import CalledProcessError, check_call, check_output
-from typing import Any, Callable, List, Union
+from subprocess import CalledProcessError
+from subprocess import check_call
+from subprocess import check_output
+from typing import Any
+from typing import Callable
+from typing import List
+from typing import Union
 
 import cfg4py
 import fire
@@ -23,6 +29,7 @@ import omicron
 import pkg_resources
 import psutil
 import sh
+
 from omicron.core.lang import async_run
 from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
@@ -31,10 +38,12 @@ from ruamel.yaml import YAML
 from termcolor import colored
 
 import omega.jobs.sync as sync
+
 from omega.config.cfg4py_auto_gen import Config
 from omega.core import get_config_dir
 from omega.core.sanity import quick_scan
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -370,18 +379,18 @@ def find_fetcher_processes():
     result = {}
     for p in psutil.process_iter():
         cmd = " ".join(p.cmdline())
-        if "omega.app" in cmd and "--impl" in cmd and "--group-id" in cmd:
+        if "omega.app start" in cmd and "--impl" in cmd and "--port" in cmd:
             # fetchers
             m = re.search(r"--impl=([^\s]+)", cmd)
             impl = m.group(1) if m else ""
 
-            m = re.search(r"--group-id=([^\s]+)", cmd)
-            group_id = m.group(1) if m else ""
+            m = re.search(r"--port=(\d+)", cmd)
+            port = m.group(1) if m else ""
 
-            group = f"{impl}:{group_id}"
+            group = f"{impl}:{port}"
             pids = result.get(group, [])
             pids.append(p.pid)
-            result[f"{impl}:{group_id}"] = pids
+            result[group] = pids
 
     return result
 
@@ -420,11 +429,14 @@ def start_fetcher_processes():
     # fetcher processes are started by groups
     for fetcher in cfg.quotes_fetchers:
         impl = fetcher.get("impl")
-        groups = fetcher.get("groups")
+        workers = fetcher.get("workers")
 
-        for _id, group in enumerate(groups):
+        for group in workers:
             sessions = group.get("sessions")
-            started_sessions = procs.get(f"{impl}:{_id}", [])
+            port = group.get("port")
+            account = group.get("account")
+            password = group.get("password")
+            started_sessions = procs.get(f"{impl}:{port}", [])
             if sessions - len(started_sessions) > 0:
                 print(f"启动的{impl}实例少于配置要求（或尚未启动），正在启动中。。。")
                 # sanic manages sessions, so we have to restart it as a whole
@@ -433,7 +445,9 @@ def start_fetcher_processes():
                         os.kill(pid, signal.SIGTERM)
                     except Exception:
                         pass
-                _start_fetcher(impl, _id)
+
+                _start_fetcher(impl, account, password, port, sessions)
+                time.sleep(1)
 
     time.sleep(3)
     show_fetcher_processes()
@@ -443,15 +457,17 @@ def show_fetcher_processes():
     procs = find_fetcher_processes()
 
     if len(procs):
-        print("   impl   |   group id | pids")
+        print("   impl   |     port   |  pids")
         for group, pids in procs.items():
-            impl, gid = group.split(":")
-            print(f"{impl:10}|{' ':5}{gid:2}{' ':5}| {pids}")
+            impl, port = group.split(":")
+            print(f"{impl:10}|{' ':5}{port:2}{' ':3}|  {pids}")
     else:
         print("None")
 
 
-def _start_fetcher(impl: str, group_id: int):
+def _start_fetcher(
+    impl: str, account: str, password: str, port: int, sessions: int = 1
+):
     subprocess.Popen(
         [
             sys.executable,
@@ -459,7 +475,10 @@ def _start_fetcher(impl: str, group_id: int):
             "omega.app",
             "start",
             f"--impl={impl}",
-            f"--group-id={group_id}",
+            f"--account={account}",
+            f"--password={password}",
+            f"--port={port}",
+            f"--sessions={sessions}",
         ],
         stdout=subprocess.DEVNULL,
     )

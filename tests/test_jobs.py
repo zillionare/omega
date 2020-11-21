@@ -3,10 +3,8 @@ import datetime
 import logging
 import os
 import signal
-import subprocess
-import sys
-import time
 import unittest
+
 from pathlib import Path
 from unittest import mock
 from unittest.mock import MagicMock
@@ -15,6 +13,7 @@ import arrow
 import cfg4py
 import numpy as np
 import omicron
+
 from dateutil import tz
 from omicron import cache
 from omicron.core.timeframe import tf
@@ -25,11 +24,15 @@ from pyemit import emit
 import omega.core.sanity
 import omega.jobs
 import omega.jobs.sync as sync
+
 from omega.config.cfg4py_auto_gen import Config
-from omega.core import get_config_dir
-from omega.core.events import Events, ValidationError
-from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as fetcher
+from omega.core.events import Events
+from omega.core.events import ValidationError
+from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omega.jobs import load_additional_jobs
+from tests import init_test_env
+from tests import start_omega
+
 
 logger = logging.getLogger(__name__)
 cfg: Config = cfg4py.get_instance()
@@ -37,45 +40,28 @@ cfg: Config = cfg4py.get_instance()
 
 class TestJobs(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
-        os.environ[cfg4py.envar] = "DEV"
-        self.config_dir = get_config_dir()
-
-        cfg4py.init(self.config_dir, False)
+        init_test_env()
 
         await emit.start(engine=emit.Engine.REDIS, dsn=cfg.redis.dsn, start_server=True)
-        await self.start_quotes_fetchers()
 
-        await omicron.init(fetcher)
+        await self.create_quotes_fetcher()
+        await omicron.init(aq)
         home = Path(cfg.omega.home).expanduser()
         os.makedirs(str(home / "data/chksum"), exist_ok=True)
 
-        self.server_process = None
-
-    def tearDown(self) -> None:
-        if self.server_process:
-            os.kill(self.server_process.pid, signal.SIGKILL)
+        self.omega = await start_omega()
 
     async def asyncTearDown(self) -> None:
         await omicron.shutdown()
+        if self.omega:
+            self.omega.kill()
 
-    def start_server(self):
-        logger.info("starting omega quotes server")
-        self.server_process = subprocess.Popen(
-            [sys.executable, "-m", "omega.app", "start", "jqadaptor"], env=os.environ
-        )
-
-        # to ensure omega finish start.
-        time.sleep(5)
-
-    async def start_quotes_fetchers(self):
+    async def create_quotes_fetcher(self):
         cfg: Config = cfg4py.get_instance()
         fetcher_info = cfg.quotes_fetchers[0]
         impl = fetcher_info["impl"]
-        params = fetcher_info["groups"][0]
-        await fetcher.create_instance(impl, **params)
-
-    def stop_server(self) -> None:
-        os.kill(self.server_process.pid, signal.SIGTERM)
+        params = fetcher_info["workers"][0]
+        await aq.create_instance(impl, **params)
 
     async def sync_and_check(
         self, code, frame_type, start, stop, expected_head, expected_tail
@@ -212,63 +198,66 @@ class TestJobs(unittest.IsolatedAsyncioTestCase):
             await omega.jobs.sync.sync_calendar()
 
     async def test_200_validation(self):
-        self.start_server()
-        await self.prepare_checksum_data()
+        try:
+            await self.prepare_checksum_data()
 
-        errors = set()
+            errors = set()
 
-        async def collect_error(report: tuple):
-            if report[0] != ValidationError.UNKNOWN:
-                errors.add(report)
+            async def collect_error(report: tuple):
+                if report[0] != ValidationError.UNKNOWN:
+                    errors.add(report)
 
-        emit.register(Events.OMEGA_VALIDATION_ERROR, collect_error)
+            emit.register(Events.OMEGA_VALIDATION_ERROR, collect_error)
 
-        codes = ["000001.XSHE"]
-        await cache.sys.set("jobs.bars_validation.range.start", "20200511")
-        await cache.sys.set("jobs.bars_validation.range.stop", "20200513")
-        await omega.core.sanity.do_validation(codes, "20200511", "20200512")
-        self.assertSetEqual({(0, 20200511, None, None, None, None)}, set(errors))
+            codes = ["000001.XSHE"]
+            await cache.sys.set("jobs.bars_validation.range.start", "20200511")
+            await cache.sys.set("jobs.bars_validation.range.stop", "20200513")
+            await omega.core.sanity.do_validation(codes, "20200511", "20200512")
+            self.assertSetEqual({(0, 20200511, None, None, None, None)}, set(errors))
 
-        mock_checksum = {
-            "000001.XSHE": {
-                "1d": "7918c38d",
-                "1m": "15311c54",
-                "5m": "54f9ac0a",
-                "15m": "3c2cd435",
-                "30m": "0cfbf775",
-                "60m": "d21018b3",
-            },
-            "000001.XSHG": {
-                "1d": "3a24582f",
-                "1m": "d37d8742",
-                "5m": "7bb329ad",
-                "15m": "7c4e48a5",
-                "30m": "e5db84ef",
-                "60m": "af4be47d",
-            },
-        }
+            mock_checksum = {
+                "000001.XSHE": {
+                    "1d": "7918c38d",
+                    "1m": "15311c54",
+                    "5m": "54f9ac0a",
+                    "15m": "3c2cd435",
+                    "30m": "0cfbf775",
+                    "60m": "d21018b3",
+                },
+                "000001.XSHG": {
+                    "1d": "3a24582f",
+                    "1m": "d37d8742",
+                    "5m": "7bb329ad",
+                    "15m": "7c4e48a5",
+                    "30m": "e5db84ef",
+                    "60m": "af4be47d",
+                },
+            }
 
-        await cache.sys.set("jobs.bars_validation.range.start", "20200511")
-        await cache.sys.set("jobs.bars_validation.range.stop", "20200513")
-        with mock.patch(
-            "omega.core.sanity.calc_checksums",
-            side_effect=[mock_checksum, mock_checksum],
-        ):
-            try:
-                _tmp = tf.day_frames
-                tf.day_frames = np.array([20200512])
-                codes = ["000001.XSHE", "000001.XSHG"]
-                errors = set()
-                await omega.core.sanity.do_validation(codes, "20200511", "20200512")
-                self.assertSetEqual(
-                    {
-                        (3, 20200512, "000001.XSHE", "1d", "7918c38d", "7918c38c"),
-                        (3, 20200512, "000001.XSHG", "1m", "d37d8742", "d37d8741"),
-                    },
-                    errors,
-                )
-            finally:
-                tf.day_frames = _tmp
+            await cache.sys.set("jobs.bars_validation.range.start", "20200511")
+            await cache.sys.set("jobs.bars_validation.range.stop", "20200513")
+            with mock.patch(
+                "omega.core.sanity.calc_checksums",
+                side_effect=[mock_checksum, mock_checksum],
+            ):
+                try:
+                    _tmp = tf.day_frames
+                    tf.day_frames = np.array([20200512])
+                    codes = ["000001.XSHE", "000001.XSHG"]
+                    errors = set()
+                    await omega.core.sanity.do_validation(codes, "20200511", "20200512")
+                    self.assertSetEqual(
+                        {
+                            (3, 20200512, "000001.XSHE", "1d", "7918c38d", "7918c38c"),
+                            (3, 20200512, "000001.XSHG", "1m", "d37d8742", "d37d8741"),
+                        },
+                        errors,
+                    )
+                finally:
+                    tf.day_frames = _tmp
+        finally:
+            if self.omega:
+                os.kill(self.omega, signal.SIGTERM)
 
     async def test_201_start_job_validation(self):
         secs = Securities()
@@ -285,11 +274,11 @@ class TestJobs(unittest.IsolatedAsyncioTestCase):
             await cache.clear_bars_range("000001.XSHE", frame_type)
             await cache.clear_bars_range("000001.XSHG", frame_type)
 
-            await fetcher.get_bars("000001.XSHE", end, n, frame_type)
-            await fetcher.get_bars("000001.XSHG", end, n, frame_type)
+            await aq.get_bars("000001.XSHE", end, n, frame_type)
+            await aq.get_bars("000001.XSHG", end, n, frame_type)
 
-        await fetcher.get_bars("000001.XSHE", end.date(), 1, FrameType.DAY)
-        await fetcher.get_bars("000001.XSHG", end.date(), 1, FrameType.DAY)
+        await aq.get_bars("000001.XSHE", end.date(), 1, FrameType.DAY)
+        await aq.get_bars("000001.XSHG", end.date(), 1, FrameType.DAY)
 
         expected = {
             "000001.XSHE": {
@@ -347,7 +336,10 @@ class TestJobs(unittest.IsolatedAsyncioTestCase):
             },
         )
 
-    async def test_quick_scan(self):
+    async def _test_quick_scan(self):
+        """
+        todo: disable test_quick_scan for now
+        """
         await omega.core.sanity.quick_scan()
 
     async def test_sync_bars(self):

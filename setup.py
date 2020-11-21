@@ -22,7 +22,6 @@ requirements = [
     "ruamel.yaml==0.16",
     "aioredis==1.3.1",
     "hiredis==1.0.1",
-    "pyemit>0.5",
     "numpy>=1.18.1",
     "numba==0.49.1",
     "aiohttp==3.6.2",
@@ -33,9 +32,8 @@ requirements = [
     "sanic==20.3.0",
     "psutil==5.7.0",
     "termcolor==1.1.0",
-    "gino",
-    "asyncpg",
-    "sqlalchemy",
+    "gino==1.0.1",
+    "asyncpg==0.20.1",
     "sh>=1.13",
 ]
 

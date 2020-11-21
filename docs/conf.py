@@ -20,10 +20,9 @@
 import os
 import sys
 
-import omega
+import omega  # noqa
 
 sys.path.insert(0, os.path.abspath(".."))
-
 
 # -- General configuration ---------------------------------------------
 
@@ -33,7 +32,15 @@ sys.path.insert(0, os.path.abspath(".."))
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ["sphinx.ext.autodoc", "sphinx.ext.viewcode", "recommonmark"]
+extensions = [
+    "sphinx.ext.autodoc",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.intersphinx",
+    "sphinx.ext.napoleon",
+    "recommonmark",
+]
+
+needs_extensions = {"recommonmark": "0.6"}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
@@ -47,7 +54,7 @@ source_suffix = [".rst", ".md"]
 master_doc = "index"
 
 # General information about the project.
-project = "omega"
+project = "Zillionare-Omega"
 copyright = "2020, Aaron Yang"
 author = "Aaron Yang"
 
