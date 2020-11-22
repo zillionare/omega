@@ -110,3 +110,6 @@ ENV/
 /omega/config/dev.yaml
 /omega/config/production.yaml
 /omega/config/test.yaml
+.empty/
+.history/
+.idea/workspace.xml
