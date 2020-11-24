@@ -1,0 +1,13 @@
+include AUTHORS.rst
+include CONTRIBUTING.rst
+include HISTORY.rst
+include LICENSE
+include README.rst
+include omega/config/defaults.yaml
+include omega/config/30-omega-validation.conf
+include omega/config/31-omega-quickscan.conf
+include omega/config/32-omega-default.conf
+
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
+

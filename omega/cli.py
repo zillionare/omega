@@ -13,37 +13,28 @@ import signal
 import subprocess
 import sys
 import time
-
 from pathlib import Path
-from subprocess import CalledProcessError
-from subprocess import check_call
-from subprocess import check_output
-from typing import Any
-from typing import Callable
-from typing import List
-from typing import Union
+from subprocess import CalledProcessError, check_call, check_output
+from typing import Any, Callable, List, Union
+
+import pkg_resources
 
 import cfg4py
 import fire
+import omega.jobs.sync as sync
 import omicron
-import pkg_resources
 import psutil
 import sh
-
+from omega.config.schema import Config
+from omega.core import get_config_dir
+from omega.core.sanity import quick_scan
+from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher
 from omicron.core.lang import async_run
 from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
 from pyemit import emit
 from ruamel.yaml import YAML
 from termcolor import colored
-
-import omega.jobs.sync as sync
-
-from omega.config.cfg4py_auto_gen import Config
-from omega.core import get_config_dir
-from omega.core.sanity import quick_scan
-from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher
-
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

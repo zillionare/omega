@@ -16,18 +16,17 @@ from typing import Optional
 
 import arrow
 import cfg4py
+import omega.core.sanity
+import omega.jobs.sync as sq
 import omicron
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from omega.config.schema import Config
+from omega.core import check_env, get_config_dir
 from omicron import cache
 from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
 from pyemit import emit
 from sanic import Sanic, response
-
-import omega.core.sanity
-import omega.jobs.sync as sq
-from omega.config.cfg4py_auto_gen import Config
-from omega.core import check_env, get_config_dir
 
 app = Sanic("Omega-jobs")
 logger = logging.getLogger(__name__)

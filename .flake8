@@ -4,6 +4,7 @@ ignore = E501, E203, W503, E122
 per-file-ignores = 
     __init__.py:F401
     docs/conf.py:E402
+    tests/*:D
 exclude =
     .git
     __pycache__
@@ -17,11 +18,6 @@ exclude =
     .pytest_cache
     .vscode
     .github
-    poetry/utils/_compat.py
-    poetry/utils/env_scripts/tags.py
-    tests/fixtures/
-    tests/repositories/fixtures/
-    tests/utils/fixtures/
     .eggs
 # available styles are pep257, google, numpy
 docstring-convention = google

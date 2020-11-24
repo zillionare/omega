@@ -20,9 +20,9 @@
 import os
 import sys
 
+sys.path.insert(0, os.path.abspath(".."))
 import omega  # noqa
 
-sys.path.insert(0, os.path.abspath(".."))
 
 # -- General configuration ---------------------------------------------
 
@@ -38,9 +38,11 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.napoleon",
     "recommonmark",
+    "sphinx.ext.autosectionlabel",
 ]
 
 needs_extensions = {"recommonmark": "0.6"}
+autosectionlabel_prefix_document = True
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]

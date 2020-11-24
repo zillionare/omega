@@ -16,16 +16,15 @@ import aiohttp
 import arrow
 import cfg4py
 from dateutil import tz
+from omega.config.schema import Config
+from omega.core.events import Events
+from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omicron import cache
 from omicron.core.errors import FetcherQuotaError
 from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
 from omicron.models.securities import Securities
 from pyemit import emit
-
-from omega.config.cfg4py_auto_gen import Config
-from omega.core.events import Events
-from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 
 logger = logging.getLogger(__name__)
 cfg: Config = cfg4py.get_instance()

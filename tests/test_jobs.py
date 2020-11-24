@@ -3,7 +3,6 @@ import datetime
 import logging
 import os
 import unittest
-
 from pathlib import Path
 from unittest import mock
 from unittest.mock import MagicMock
@@ -15,11 +14,9 @@ import omega.core.sanity
 import omega.jobs
 import omega.jobs.sync as sync
 import omicron
-
 from dateutil import tz
-from omega.config.cfg4py_auto_gen import Config
-from omega.core.events import Events
-from omega.core.events import ValidationError
+from omega.config.schema import Config
+from omega.core.events import Events, ValidationError
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omega.jobs import load_additional_jobs
 from omicron import cache
@@ -27,9 +24,7 @@ from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
 from omicron.models.securities import Securities
 from pyemit import emit
-from tests import init_test_env
-from tests import start_omega
-
+from tests import init_test_env, start_omega
 
 logger = logging.getLogger(__name__)
 cfg: Config = cfg4py.get_instance()
