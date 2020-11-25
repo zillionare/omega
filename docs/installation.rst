@@ -4,9 +4,9 @@
 Installation
 ============
 
-
 Stable release
 --------------
+
 
 To install omega, run this command in your terminal:
 
@@ -24,7 +24,7 @@ you through the process.
 
 
 From sources
-------------
+-------------
 
 The sources for omega can be downloaded from the `Github repo`_.
 

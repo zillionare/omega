@@ -10,7 +10,6 @@ import cfg4py
 
 from omega.core import get_config_dir
 
-
 cfg = cfg4py.get_instance()
 logger = logging.getLogger(__name__)
 
@@ -67,8 +66,8 @@ async def start_omega(port: int = 3181):
         ],
         env=os.environ,
     )
-    for i in range(5, 0, -1):
-        time.sleep(2)
+    for i in range(15, 0, -1):
+        time.sleep(1)
         if await is_local_omega_alive():
             # return the process id, the caller should shutdown it later
             return process

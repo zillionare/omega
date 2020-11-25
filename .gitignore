@@ -103,13 +103,5 @@ ENV/
 
 # IDE settings
 .vscode/
-.github
-.eggs
-.emtpy
-.idea/*
-/omega/config/dev.yaml
-/omega/config/production.yaml
-/omega/config/test.yaml
-.empty/
-.history/
-.idea/workspace.xml
+.github/
+/.idea

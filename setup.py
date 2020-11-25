@@ -35,11 +35,10 @@ requirements = [
     "termcolor==1.1.0",
     "xxhash==1.4.4",
     "zillionare-omicron>=0.3.0",
+    "zillionare-omega-adaptors-jq>=0.2.4",
 ]
 
 setup_requirements = ["sh"]
-
-test_requirements = []
 
 
 def post_install():
@@ -90,8 +89,6 @@ setup(
     name="zillionare-omega",
     packages=find_packages(include=["omega", "omega.*"]),
     setup_requires=setup_requirements,
-    test_suite="tests",
-    tests_require=test_requirements,
     url="https://github.com/zillionare/omega",
     version="0.6.0",
     zip_safe=False,
