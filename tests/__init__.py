@@ -19,7 +19,6 @@ def init_test_env():
 
     cfg4py.init(get_config_dir(), False)
     # enable postgres for unittest
-    cfg = cfg4py.get_instance()
     cfg.postgres.enabled = True
     return cfg
 
