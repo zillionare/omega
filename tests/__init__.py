@@ -7,8 +7,7 @@ import time
 
 import aiohttp
 import cfg4py
-
-from omega.core import get_config_dir
+from omega.config import get_config_dir
 
 cfg = cfg4py.get_instance()
 logger = logging.getLogger(__name__)

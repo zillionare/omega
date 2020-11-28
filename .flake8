@@ -1,9 +1,9 @@
 [flake8]
-# required by black
+# required by black, https://github.com/psf/black/blob/master/.flake8
 max-line-length = 88
-ignore = E501, W503
-# required by black
-extend-ignore = E203
+max-complexity = 18
+extend-ignore = E203, E266, E501
+select = B,C,E,F,W,T4,B9
 per-file-ignores =
     __init__.py:F401
 exclude =

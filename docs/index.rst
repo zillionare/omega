@@ -1,18 +1,17 @@
-Welcome to omega's documentation!
-======================================
+大富翁 - AI量化交易开源框架
+===========================
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: 内容:
 
    readme
-   installation
+   deployment
    usage
    modules
    contributing
    authors
    history
-   zillionare
 
 Indices and tables
 ==================

@@ -11,7 +11,6 @@ Subpackages
    omega.core
    omega.fetcher
    omega.jobs
-   omega.tools
 
 Submodules
 ----------

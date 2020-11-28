@@ -4,7 +4,6 @@
 """
 Author: Aaron-Yang [code@jieyu.ai]
 Contributors:
-
 """
 import logging
 import pickle
@@ -15,8 +14,8 @@ import cfg4py
 import fire
 import omicron
 from omega import __version__
+from omega.config import get_config_dir
 from omega.config.schema import Config
-from omega.core import get_config_dir
 from omega.core.events import Events
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omega.jobs import sync as sq

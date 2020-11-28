@@ -20,8 +20,8 @@ import omega.core.sanity
 import omega.jobs.sync as sq
 import omicron
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from omega.config import check_env, get_config_dir
 from omega.config.schema import Config
-from omega.core import check_env, get_config_dir
 from omicron import cache
 from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
@@ -34,7 +34,7 @@ cfg: Config = cfg4py.get_instance()
 scheduler: Optional[AsyncIOScheduler] = None
 
 
-async def init(app, loop):
+async def init(app, loop):  # noqa
     global scheduler
 
     config_dir = get_config_dir()
@@ -45,11 +45,6 @@ async def init(app, loop):
     await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
 
     scheduler = AsyncIOScheduler(timezone=cfg.tz)
-
-    # do validation daily
-    # todo: don't start at non-trade day
-    h, m = map(int, cfg.omega.validation.time.split(":"))
-    scheduler.add_job(omega.core.sanity.start_validation, "cron", hour=h, minute=m)
 
     # sync securities daily
     h, m = map(int, cfg.omega.sync.security_list.split(":"))
@@ -259,24 +254,6 @@ async def start_sync(request):
 
     app.add_task(sq.trigger_bars_sync(secs, sync_to))
     return response.text("sync task scheduled")
-
-
-def load_additional_jobs():
-    """从配置文件创建自定义的插件任务, for example, zillionare-checksum"""
-    global scheduler
-    for job in cfg.omega.jobs:
-        try:
-            module = importlib.import_module(job["module"])
-            entry = getattr(module, job["entry"])
-            scheduler.add_job(
-                entry,
-                trigger=job["trigger"],
-                args=job["params"],
-                **job["trigger_params"]
-            )
-        except Exception as e:
-            logger.exception(e)
-            logger.info("failed to create job: %s", job)
 
 
 def start(host: str = "0.0.0.0", port: int = 3180):

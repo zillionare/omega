@@ -96,12 +96,12 @@ async def trigger_bars_sync(
     Args:
         frame_type (FrameType): 将同步的周期
         sync_params (dict): 同步需要的参数
-        secs (List[str]): 将同步的证券代码,如果为None，则使用``sync_sec_type``定义的类型来
-        选择要同步的证券代码。
-        sync_sec_type: List[str]
-        start: 起始日
-        stop: 截止日。如未指定，同步到已收盘日
-        delay: seconds for sync to wait.
+            secs (List[str]): 将同步的证券代码,如果为None，则使用``sync_sec_type``定义的类型来
+            选择要同步的证券代码。
+            sync_sec_type: List[str]
+            start: 起始日
+            stop: 截止日。如未指定，同步到已收盘日
+            delay: seconds for sync to wait.
         force: 即使当前不是交易日，是否也强行进行同步。
     Returns:
 

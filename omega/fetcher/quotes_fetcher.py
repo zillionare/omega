@@ -69,25 +69,29 @@ class QuotesFetcher(ABC):
         """
         raise NotImplementedError
 
-    async def get_valuation(code: Union[str, List[str]], day: Frame) -> numpy.ndarray:
-        """读取code指定的股票在date指定日期的市值数据。返回数据包括：
-        code: 股票代码
-        day: 日期
-        captialization: 总股本
-        circulating_cap: 流通股本（万股）
-        market_cap: 总市值（亿元）
-        circulating_market_cap： 流通市值（亿元）
-        turnover_ration: 换手率（%）
-        pe_ratio: 市盈率（PE,TTM）每股市价为每股收益的倍数，反映投资人对每元净利润所愿支付的价
-        格，用来估计股票的投资报酬和风险
-        pe_ratio_lyr: 市盈率（PE），以上一年度每股盈利计算的静态市盈率. 股价/最近年度报告EPS
-        pb_ratio: 市净率（PB）
-        ps_ratio: 市销率(PS)
-        pcf_ratio: 市现率（PCF）
+    async def get_valuation(
+        self, code: Union[str, List[str]], day: Frame
+    ) -> numpy.ndarray:
+        """读取code指定的股票在date指定日期的市值数据。
+
+        返回数据包括：
+            code: 股票代码
+            day: 日期
+            captialization: 总股本
+            circulating_cap: 流通股本（万股）
+            market_cap: 总市值（亿元）
+            circulating_market_cap： 流通市值（亿元）
+            turnover_ration: 换手率（%）
+            pe_ratio: 市盈率（PE,TTM）每股市价为每股收益的倍数，反映投资人对每元净利润所愿支付的价
+            格，用来估计股票的投资报酬和风险
+            pe_ratio_lyr: 市盈率（PE），以上一年度每股盈利计算的静态市盈率. 股价/最近年度报告EPS
+            pb_ratio: 市净率（PB）
+            ps_ratio: 市销率(PS)
+            pcf_ratio: 市现率（PCF）
 
         Args:
             code (Union[str, List[str]]): [description]
-            date (Frame): [description]
+            day (Frame): [description]
 
         Returns:
             numpy.ndarray: [description]

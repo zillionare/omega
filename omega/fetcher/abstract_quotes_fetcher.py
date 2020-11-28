@@ -5,24 +5,19 @@
 import datetime
 import importlib
 import logging
-
-from typing import List
-from typing import Union
+from typing import List, Union
 
 import arrow
 import cfg4py
 import numpy as np
-
 from numpy.lib import recfunctions as rfn
 from omega.core.accelerate import merge
 from omega.fetcher.quotes_fetcher import QuotesFetcher
 from omicron import cache
 from omicron.core.lang import static_vars
 from omicron.core.timeframe import tf
-from omicron.core.types import Frame
-from omicron.core.types import FrameType
+from omicron.core.types import Frame, FrameType
 from omicron.models.valuation import Valuation
-
 
 logger = logging.getLogger(__file__)
 
@@ -84,7 +79,7 @@ class AbstractQuotesFetcher(QuotesFetcher):
     @classmethod
     async def get_bars_batch(
         cls,
-        secs: str,
+        secs: List[str],
         end: Frame,
         n_bars: int,
         frame_type: FrameType,

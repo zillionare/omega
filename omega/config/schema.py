@@ -48,9 +48,4 @@ class Config(object):
             calendar: Optional[str] = None
             bars: Optional[list] = None
 
-        class validation:
-            time: Optional[str] = None
-            start: Optional[str] = None
-            end: Optional[str] = None
-
     quotes_fetchers: Optional[list] = None

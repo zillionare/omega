@@ -23,10 +23,11 @@ requirements = [
     "arrow==0.15.5",
     "asyncpg==0.21.0",
     "cfg4py==0.8.0",
+    "fire==0.3.1",
     "gino==1.0.1",
     "hiredis==1.1.0",
     "numba==0.49.1",
-    "numpy>=1.18.1",
+    "numpy>=1.19.4",
     "psutil==5.7.3",
     "pytz>=2020.1",
     "ruamel.yaml==0.16",
@@ -39,35 +40,6 @@ requirements = [
 ]
 
 setup_requirements = ["sh"]
-
-
-def post_install():
-    """将配置资源文件拷贝到用户目录.
-
-    这些资源文件无法被标准安装程序管理。
-    """
-    import sh
-
-    for item in ["config", "data/chksum"]:
-        folder = (pathlib.Path("~/zillionare/omega") / item).expanduser()
-        os.makedirs(folder, exist_ok=True)
-
-    dst = pathlib.Path("~/zillionare/omega/config/").expanduser()
-    for file in [
-        "config/defaults.yaml",
-        "config/30-omega-validation.conf",
-        "config/31-omega-quickscan.conf",
-        "config/32-omega-default.conf",
-    ]:
-        src = pkg_resources.resource_filename("omega", file)
-        sh.cp("-r", src, dst)
-
-
-class _InstallCommand(install):
-    def run(self):
-        install.run(self)
-        post_install()
-
 
 setup(
     author="Aaron Yang",
@@ -92,6 +64,5 @@ setup(
     url="https://github.com/zillionare/omega",
     version="0.6.0",
     zip_safe=False,
-    cmdclass={"install": _InstallCommand},
     entry_points={"console_scripts": ["omega=omega.cli:main"]},
 )

@@ -5,7 +5,6 @@ import os
 import unittest
 from pathlib import Path
 from unittest import mock
-from unittest.mock import MagicMock
 
 import arrow
 import cfg4py
@@ -18,7 +17,6 @@ from dateutil import tz
 from omega.config.schema import Config
 from omega.core.events import Events, ValidationError
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
-from omega.jobs import load_additional_jobs
 from omicron import cache
 from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
@@ -311,22 +309,6 @@ class TestJobs(unittest.IsolatedAsyncioTestCase):
         actual = await omega.core.sanity.get_checksum(20200512)
         for code in ["000001.XSHE", "000001.XSHG"]:
             self.assertDictEqual(expected.get(code), actual.get(code))
-
-    async def _test_load_additional_jobs(self):
-        # fixme: recover this test later
-
-        m = MagicMock()
-        with mock.patch("omega.jobs.scheduler", m):
-            load_additional_jobs()
-
-        self.assertDictEqual(
-            m.method_calls[0].kwargs["args"],
-            {
-                "save_to": "~/.zillionare/omega/server_data/chksum",
-                "start_date": "2020-01-01",
-                "end_date": "None",
-            },
-        )
 
     async def _test_quick_scan(self):
         # fixme: recover this test later
