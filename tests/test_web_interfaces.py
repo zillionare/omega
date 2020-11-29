@@ -5,6 +5,7 @@ import unittest
 import aiohttp
 import arrow
 import cfg4py
+
 from omega import __version__
 from tests import init_test_env, start_omega
 

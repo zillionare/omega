@@ -90,7 +90,7 @@ Omega的部署全景图如下，您可以根据自己的需要进行定制。
 
 对于个人研究，我们推荐可以在单台笔记本、台式机上进行部署。您可以将Omega, redis和Postgres安装在同一台机器上。如果您只做动量研究，也可以不安装Postgres。
 
-如果您的操作系统是Windows的话，建议您按照[这篇文章](http://blog.jieyu.ai/blog_2020/%E5%A6%82%E4%BD%95%E6%9E%84%E5%BB%BAPython%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83/)来安装WSL，以获得Omega安装需要的Ubuntu操作系统环境。
+如果您的操作系统是Windows的话，建议您按照 `这篇文章<http://blog.jieyu.ai/blog_2020/%E5%A6%82%E4%BD%95%E6%9E%84%E5%BB%BAPython%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83/>`_ 来安装WSL，以获得Omega安装需要的Ubuntu操作系统环境。
 
 如果您使用Mac机器的话，应该可以直接安装Omega。但您可能需要自行研究如何将rsyslog服务配置成功。
 
@@ -106,9 +106,9 @@ Omega的部署全景图如下，您可以根据自己的需要进行定制。
 3.1 创建Python虚拟环境
 ``````````````````````
 
-为避免与其它Python程序产生冲突，推荐您为Omega创建专属的运行环境。您可以使用[conda](https://docs.conda.io/en/latest/miniconda.html)或者venv来创建专属运行环境。这里以conda为例：
+为避免与其它Python程序产生冲突，推荐您为Omega创建专属的运行环境。您可以使用`conda <https://docs.conda.io/en/latest/miniconda.html>`_ 或者venv来创建专属运行环境。这里以conda为例：
 
-1. 从[这里](https://docs.conda.io/en/latest/miniconda.html)下载miniconda到本地，并运行安装。下载页面提供了多个版本，请下载Python3.8的Linux installer版本（假定您使用Ubuntu。如果使用windows，请参考这篇文章](http://blog.jieyu.ai/blog_2020/%E5%A6%82%E4%BD%95%E6%9E%84%E5%BB%BAPython%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83/)在Windows上启用WSL和Ubuntu。
+1. 从 `这里 <https://docs.conda.io/en/latest/miniconda.html>`_ 下载miniconda到本地，并运行安装。下载页面提供了多个版本，请下载Python3.8的Linux installer版本（假定您使用Ubuntu。如果使用windows，请参考 `这篇文章 <http://blog.jieyu.ai/blog_2020/%E5%A6%82%E4%BD%95%E6%9E%84%E5%BB%BAPython%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83/>`_ 在Windows上启用WSL和Ubuntu。
 
 2. 运行下面的命令以创建Omega运行环境:
 
@@ -178,14 +178,14 @@ $ pip install zillionare-omega
 从源代码安装Omega
 ::::::::::::::::::::
 
-Omega的源代码可以从[github](https://github.com/zillionare/omega)下载：
+Omega的源代码可以从 `github <https://github.com/zillionare/omega>`_ 下载：
 
 你可以clone代码库：
 
 ```
 $ git clone git://github.com/zillionare/omega
 ```
-或者下载[源码包](https://github.com/zillionare/omega/tarball/master):
+或者下载 `源码包 <https://github.com/zillionare/omega/tarball/master>`_:
 
 ```
 $ curl -OJL https://github.com/zillionare/omega/tarball/master

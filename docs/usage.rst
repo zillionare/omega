@@ -68,3 +68,10 @@ type选项中，支持的类型有stock和index。
     omega stop
     omega restart jobs
     omega restart
+
+4. 使用行情数据
+---------------
+
+虽然Omega提供了HTTP接口，但因为性能优化的原因，其通过HTTP接口提供的数据，都是二进制的。
+
+使用行情数据的正确方式是通过Omicron SDK来访问数据。请跳转至 `Omicron帮助文档 <https://zillionare-omicron.readthedocs.io>`_ 继续阅读。
