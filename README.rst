@@ -38,6 +38,8 @@ Omega为大富翁(Zillionare)智能量化交易平台提供数据服务。它是
 3. 优秀的可伸缩部署(scalability)特性。Omega可以在根据您对数据吞吐量的需求，在从一到多台服务器上按需部署，从而满足个人、工作室到大型团队的数据需求。
 
 
+`[更多] <https://zillionare-omega.readthedocs.io>`_
+
 鸣谢
 =========
 

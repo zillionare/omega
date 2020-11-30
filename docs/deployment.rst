@@ -1,14 +1,14 @@
 .. highlight:: shell
 
-=======
+=========
 部署指南
-=======
+=========
 
 1. 系统要求
 -----------
 
 1.1 硬件清单
-```````````
+`````````````
 
 内存
 :::::
@@ -171,9 +171,10 @@ Omega使用了rsyslog来收集和输出生产环境下的日志。请使用下�
 
 请运行以下命令来从pip安装zillionare-omega(以下称为Omega):
 
-``` bash
-$ pip install zillionare-omega
-```
+.. code:: console
+    
+    $ pip install zillionare-omega
+
 
 从源代码安装Omega
 ::::::::::::::::::::
@@ -182,19 +183,23 @@ Omega的源代码可以从 `github <https://github.com/zillionare/omega>`_ 下�
 
 你可以clone代码库：
 
-```
-$ git clone git://github.com/zillionare/omega
-```
+.. code:: console
+
+    $ git clone git://github.com/zillionare/omega
+
+
 或者下载 `源码包 <https://github.com/zillionare/omega/tarball/master>`_:
 
-```
-$ curl -OJL https://github.com/zillionare/omega/tarball/master
-```
+.. code:: console
+
+    $ curl -OJL https://github.com/zillionare/omega/tarball/master
+
 一旦源代码复制到本地，可以执行以下命令进行安装：
 
-```
-$ python setup.py install
-```
+.. code:: console
+
+    $ python setup.py install
+
 
 以上安装步骤适用于普通用户。协同开发者在将源代码下载到本地后，还需要进行一系列配置环境和工具配置，请参见开发者指南。
 
@@ -224,12 +229,12 @@ $ python setup.py install
 
 现在，您就可以开始进入到启动Omega前的最后一步了。请使用以下命令来进行初始化：
 
-.. code::
+.. code:: console
 
     omega setup
 
 3.4.2 检测安装环境
-:::::::::::::::::
+:::::::::::::::::::
 作为一种最佳实践，Omega推荐您为Omega创建专属虚拟运行环境，并始终在该虚拟环境中运行Omega。安装程序也会检测当前是否在虚拟环境中运行。
 
 Omega使用 cfg4py_ 来管理配置。Cfg4py要求您为部署机器设置场景（开发、测试、生产环境），以便根据对应的场景来应用配置。因此，在Omega安装时，也会检测当前机器是否正确地设置了场景。
@@ -237,7 +242,7 @@ Omega使用 cfg4py_ 来管理配置。Cfg4py要求您为部署机器设置场景
 .. image:: _static/setup_detect_env.jpg
 
 3.4.3 配置行情服务器
-:::::::::::::::::::
+:::::::::::::::::::::
 
 Omega通过插件来从上游服务器获取行情数据。当前支持的数据提供源有聚宽(JoinQuant)。
 
@@ -283,14 +288,14 @@ Omega支持多个数据源同时工作（但当前只提供了对聚宽的接口
 这些配置看上去比较复杂，但实际上，在您一开始的时候，可以完全按默认设置来使用。您甚至可以直接跳过这一步--如果您通过环境变量配置了聚宽的账号和密码的话。
 
 3.4.4 配置Redis服务器
-::::::::::::::::::::
+::::::::::::::::::::::
 
 行情数据都存放在Redis数据库里。您需要事先安装好Redis服务器，并告诉Omega如何连接：
 
 .. image:: _static/setup_redis.jpg
 
 3.4.5 配置Postgres数据库
-::::::::::::::::::::::::
+::::::::::::::::::::::::::
 
 如果您急于开始使用Omega,您可以略过Postgres的安装和配置。但是配置数据库将使得您访问财务数据时，能获得更好的性能。因为如果您没有配置Postgres数据库的话，这些数据都将从上游服务器去实时获取。
 
@@ -306,7 +311,7 @@ Omega支持多个数据源同时工作（但当前只提供了对聚宽的接口
 .. image:: _static/setup_finished.jpg
 
 
-.. _cfg4py: https://readthedocs.org/projects/cfg4py/
+.. _cfg4py: https://pypi.org/project/cfg4py/
 .. _聚宽: https://www.joinquant.com/
 
 
