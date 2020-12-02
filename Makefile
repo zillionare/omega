@@ -65,6 +65,7 @@ coverage: ## check code coverage quickly with the default Python
 docs: ## generate Sphinx HTML documentation, including API docs
 	rm -f docs/omega.rst
 	rm -f docs/modules.rst
+	wget https://raw.githubusercontent.com/zillionare/zillionare/master/CONTRIBUTING.rst -O CONTRIBUTING.rst
 	sphinx-apidoc -o docs/ omega
 	$(MAKE) -C docs clean
 	$(MAKE) -C docs html

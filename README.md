@@ -1,33 +1,37 @@
-=========
-关于Omega
-=========
 
+![](http://images.jieyu.ai/images/hot/zillionbanner.jpg)
 
-.. image:: https://img.shields.io/pypi/v/omega.svg
-        :target: https://pypi.python.org/pypi/omega
+<p align="center">
+<a href="https://pypi.python.org/pypi/omega">
+<img src="https://img.shields.io/pypi/v/omega.svg">
+</a>
 
-.. image:: https://img.shields.io/travis/zillionare/omega.svg
-        :target: https://travis-ci.com/zillionare/omega
+<a href="https://travis-ci.com/zillionare/omega">
+<img src="https://img.shields.io/travis/zillionare/omega.svg">
+</a>
 
-.. image:: https://readthedocs.org/projects/omega/badge/?version=latest
-        :target: https://omega.readthedocs.io/en/latest/?badge=latest
-        :alt: Documentation Status
+<a href="https://omega.readthedocs.io/en/latest/?badge=latest">
+<img src="https://readthedocs.org/projects/omega/badge/?version=latest">
+</a>
 
-.. image:: https://pepy.tech/badge/zillionare-omega
-    :target: https://pepy.tech/project/zillionare-omega
+<a href="https://pepy.tech/project/zillionare-omega">
+<img src="https://pepy.tech/badge/zillionare-omega">
+</a>
 
-.. image:: https://img.shields.io/badge/code%20style-black-000000.svg
-    :target: https://github.com/psf/black
+<a href="https://github.com/psf/black">
+<img src="https://img.shields.io/badge/code%20style-black-000000.svg">
+</a>
 
-.. image:: https://img.shields.io/badge/License-MIT-yellow.svg
-    :target: https://opensource.org/licenses/MIT
+<a href="https://opensource.org/licenses/MIT">
+<img src="https://img.shields.io/badge/License-MIT-yellow.svg">
+</a>
+</p>
 
 
 高速分布式本地行情服务器
 
 
-特点
-----
+# 简介
 
 Omega为大富翁(Zillionare)智能量化交易平台提供数据服务。它是一个分布式、高性能的行情服务器，核心功能有：
 

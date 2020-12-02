@@ -1,13 +1,9 @@
 #!/usr/bin/env python
 """The setup script."""
-import os
-import pathlib
 
-import pkg_resources
 from setuptools import find_packages, setup
-from setuptools.command.install import install
 
-with open("README.rst") as readme_file:
+with open("README.md") as readme_file:
     readme = readme_file.read()
 
 with open("HISTORY.rst") as history_file:

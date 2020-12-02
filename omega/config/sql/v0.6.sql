@@ -26,4 +26,3 @@ create unique index if not exists valuation_id_uindex
 
 create unique index if not exists valuation_code_frame_uindex
     on valuation (code, frame);
-
