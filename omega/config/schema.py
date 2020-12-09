@@ -29,6 +29,7 @@ class Config(object):
 
     class postgres:
         dsn: Optional[str] = None
+
         enabled: Optional[bool] = None
 
     class pickle:
@@ -39,13 +40,16 @@ class Config(object):
 
         class urls:
             checksum: Optional[str] = None
+
             quotes_server: Optional[str] = None
 
         heartbeat: Optional[int] = None
 
         class sync:
             security_list: Optional[str] = None
+
             calendar: Optional[str] = None
+
             bars: Optional[list] = None
 
     quotes_fetchers: Optional[list] = None

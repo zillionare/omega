@@ -7,10 +7,11 @@ import arrow
 import cfg4py
 import numpy as np
 import omicron
-from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omicron import cache
 from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
+
+from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from tests import init_test_env
 
 logger = logging.getLogger(__name__)

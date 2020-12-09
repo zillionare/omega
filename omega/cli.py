@@ -19,19 +19,20 @@ import aioredis
 import asyncpg
 import cfg4py
 import fire
-import omega
-import omega.jobs.sync as sync
 import omicron
 import psutil
 import sh
-from omega.config import get_config_dir
-from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher
 from omicron.core.lang import async_run
 from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
 from pyemit import emit
 from ruamel.yaml import YAML
 from termcolor import colored
+
+import omega
+import omega.jobs.sync as sync
+from omega.config import get_config_dir
+from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher
 
 logger = logging.getLogger(__name__)
 
@@ -54,12 +55,14 @@ def factory_config_dir():
 def format_msg(msg: str):
     """格式化msg并显示在控制台上
 
-    本函数允许在写代码时按格式要求进行缩进和排版，但在输出时，这些格式都会被移除；对较长的文本，按每80个字
-    符为一行进行输出。
+    本函数允许在写代码时按格式要求进行缩进和排版，但在输出时，这些格式都会被移除；对较长的文本，
+    按每80个字符为一行进行输出。
 
-    如果需要在msg中插入换行或者制表符，使用\\n和\\t。
-    :param msg:
-    :return:
+    如果需要在msg中插入换行或者制表符，使用`\\n`和`\\t`。
+    args:
+        msg:
+
+    returns:
     """
     msg = re.sub(r"\n\s+", "", msg)
     msg = re.sub(r"[\t\n]", "", msg)
@@ -251,11 +254,11 @@ def config_fetcher(settings):
     """配置jq_fetcher
 
     为Omega安装jqdatasdk, zillionare-omega-adaptors-jq, 配置jqdata访问账号
-    :return:
+
     """
     msg = """
         Omega需要配置上游行情服务器。当前支持的上游服务器有:\\n
-        [1] 聚宽<joinquant>\\n
+        [1] 聚宽`<joinquant>`\\n
     """
     print(format_msg(msg))
     more_account = True
@@ -323,8 +326,8 @@ async def check_redis(dsn: str):
 
 async def config_redis(settings):
     msg = """
-        Zillionare-omega使用Redis作为其数据库。请确认系统中已安装好redis。\\n请根据提示输入Redis
-        服务器连接信息。
+        Zillionare-omega使用Redis作为其数据库。请确认系统中已安装好redis。\\n请根据提示输入
+        Redis服务器连接信息。
     """
     print(format_msg(msg))
     action = "R"
@@ -470,13 +473,13 @@ def check_environment():
 def find_fetcher_processes():
     """查找所有的omega(fetcher)进程
 
-    Omega进程在ps -aux中显示应该包含 omega.app --impl=<fetcher> --port=<port>信息
+    Omega进程在ps -aux中显示应该包含 omega.app --impl=&ltfetcher&gt --port=&ltport&gt信息
     """
     result = {}
     for p in psutil.process_iter():
         cmd = " ".join(p.cmdline())
         if "omega.app start" in cmd and "--impl" in cmd and "--port" in cmd:
-            # fetchers
+
             m = re.search(r"--impl=([^\s]+)", cmd)
             impl = m.group(1) if m else ""
 
@@ -682,10 +685,7 @@ async def restart(service: str = ""):
 
 @async_run
 async def sync_sec_list():
-    """发起同步证券列表请求
-
-    :return:
-    """
+    """发起同步证券列表请求"""
     await _init()
 
     await sync.trigger_single_worker_sync("security_list")
@@ -693,10 +693,7 @@ async def sync_sec_list():
 
 @async_run
 async def sync_calendar():
-    """发起同步交易日历请求
-
-    :return:
-    """
+    """发起同步交易日历请求"""
     await _init()
     await sync.trigger_single_worker_sync("calendar")
 

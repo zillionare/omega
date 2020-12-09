@@ -7,6 +7,7 @@ import time
 
 import aiohttp
 import cfg4py
+
 from omega.config import get_config_dir
 
 cfg = cfg4py.get_instance()
@@ -14,6 +15,10 @@ logger = logging.getLogger(__name__)
 
 
 def init_test_env():
+    import logging
+
+    logging.captureWarnings(True)
+
     os.environ[cfg4py.envar] = "DEV"
 
     cfg4py.init(get_config_dir(), False)
@@ -35,11 +40,11 @@ async def is_local_omega_alive(port: int = 3181):
 
 
 async def start_omega(port: int = 3181):
-    msg = (
-        "omega is running on localhost. However, it may fails the test due to it's"
-        "not started with configurations required by unittest"
-    )
     if await is_local_omega_alive(port):
+        msg = (
+            "omega is running on localhost. However, it may fails the test due to it's"
+            "not started with configurations required by unittest"
+        )
         logger.warning(msg)
         return None
 

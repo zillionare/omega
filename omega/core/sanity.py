@@ -27,15 +27,16 @@ import xxhash
 from aiocache import cached
 from aiohttp import ClientError
 from dateutil import tz
-from omega.config import get_config_dir
-from omega.core.events import Events, ValidationError
-from omega.jobs.sync import cfg, logger
 from omicron import cache
 from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
 from omicron.models.securities import Securities
 from omicron.models.security import Security
 from pyemit import emit
+
+from omega.config import get_config_dir
+from omega.core.events import Events, ValidationError
+from omega.jobs.sync import cfg, logger
 
 validation_errors = []
 

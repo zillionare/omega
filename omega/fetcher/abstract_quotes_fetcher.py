@@ -11,13 +11,14 @@ import arrow
 import cfg4py
 import numpy as np
 from numpy.lib import recfunctions as rfn
-from omega.core.accelerate import merge
-from omega.fetcher.quotes_fetcher import QuotesFetcher
 from omicron import cache
 from omicron.core.lang import static_vars
 from omicron.core.timeframe import tf
 from omicron.core.types import Frame, FrameType
 from omicron.models.valuation import Valuation
+
+from omega.core.accelerate import merge
+from omega.fetcher.quotes_fetcher import QuotesFetcher
 
 logger = logging.getLogger(__file__)
 

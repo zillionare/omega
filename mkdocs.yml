@@ -1,0 +1,22 @@
+site_name: Omega帮助文档
+
+nav:
+  - 简介: index.md
+  - 安装: deployment.md
+  - 使用文档 : usage.md
+  - 社区: https://zillionare.readthedocs.io/zh_CN/latest/contributing.html
+  - 版本历史: history.md
+  - API文档: api.md
+
+theme:
+  name: material
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - toc:
+      baselevel: 2
+plugins:
+  - include-markdown
+  - mkdocstrings
+  - search

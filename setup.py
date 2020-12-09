@@ -6,24 +6,24 @@ from setuptools import find_packages, setup
 with open("README.md") as readme_file:
     readme = readme_file.read()
 
-with open("HISTORY.rst") as history_file:
+with open("HISTORY.md") as history_file:
     history = history_file.read()
 
 opts = {}
 
 requirements = [
     "aiocache==0.11.1",
-    "aiohttp==3.7.3",
+    "aiohttp>=3.7.3",
     "aioredis==1.3.1",
     "apscheduler==3.6.3",
-    "arrow==0.15.5",
+    "arrow>=0.15.5",
     "asyncpg==0.21.0",
-    "cfg4py==0.8.0",
+    "cfg4py>=0.9.0",
     "fire==0.3.1",
     "gino==1.0.1",
     "hiredis==1.1.0",
     "numba==0.49.1",
-    "numpy>=1.19.4",
+    "numpy>=1.18.1",
     "psutil==5.7.3",
     "pytz>=2020.1",
     "ruamel.yaml==0.16",
@@ -52,8 +52,9 @@ setup(
     install_requires=requirements,
     license="MIT license",
     long_description=readme + "\n\n" + history,
+    long_description_content_type="text/markdown",
     include_package_data=True,
-    keywords="omega",
+    keywords="omega,trade,quant,AI",
     name="zillionare-omega",
     packages=find_packages(include=["omega", "omega.*"]),
     setup_requires=setup_requirements,

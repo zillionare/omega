@@ -4,8 +4,10 @@ import unittest
 from unittest import mock
 
 import cfg4py
-from omega import cli
+import fire
 from ruamel.yaml import YAML
+
+from omega import cli
 from tests import init_test_env
 
 
@@ -146,4 +148,7 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
             cli.setup()
 
     def test_main(self):
-        cli.main()
+        try:
+            cli.main()
+        except fire.core.FireExit:
+            pass

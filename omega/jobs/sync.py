@@ -1,11 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""
-Author: Aaron-Yang [code@jieyu.ai]
-Contributors:
-
-"""
 import asyncio
 import datetime
 import logging
@@ -16,15 +11,16 @@ import aiohttp
 import arrow
 import cfg4py
 from dateutil import tz
-from omega.config.schema import Config
-from omega.core.events import Events
-from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omicron import cache
 from omicron.core.errors import FetcherQuotaError
 from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
 from omicron.models.securities import Securities
 from pyemit import emit
+
+from omega.config.schema import Config
+from omega.core.events import Events
+from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 
 logger = logging.getLogger(__name__)
 cfg: Config = cfg4py.get_instance()
@@ -43,14 +39,6 @@ async def _start_job_timer(job_name: str):
 
 
 async def _stop_job_timer(job_name: str) -> int:
-    """
-    stop timer, and return elapsed time in seconds
-    Args:
-        job_name:
-
-    Returns:
-
-    """
     key_start = f"jobs.bars_{job_name}.start"
     key_stop = f"jobs.bars_{job_name}.stop"
     key_elapsed = f"jobs.bars_{job_name}.elapsed"
@@ -96,7 +84,7 @@ async def trigger_bars_sync(
     Args:
         frame_type (FrameType): 将同步的周期
         sync_params (dict): 同步需要的参数
-            secs (List[str]): 将同步的证券代码,如果为None，则使用``sync_sec_type``定义的类型来
+            secs (List[str]): 将同步的证券代码,如果为None，则使用sync_sec_type定义的类型来
             选择要同步的证券代码。
             sync_sec_type: List[str]
             start: 起始日
@@ -320,30 +308,28 @@ async def sync_bars_for_security(
     logger.info("finished sync %s(%s), %s bars synced", code, frame_type, counters)
 
 
-async def trigger_single_worker_sync(kind: str, params: dict = None):
-    """
-    使用本方法来启动只需要单个quotes fetcher进程来完成的数据同步任务，比如交易日历、证券列表等
-    如果需要同时启动多个quotes fetcher进程来完成数据同步任务，应该通过pyemit来发送广播消息。
+async def trigger_single_worker_sync(_type: str, params: dict = None):
+    """启动只需要单个quotes fetcher进程来完成的数据同步任务
+
+    比如交易日历、证券列表等如果需要同时启动多个quotes fetcher进程来完成数据同步任务，应该通过
+    pyemit来发送广播消息。
+
     Args:
-        kind: str, the kind of data to be synced, 'calendar' or 'security list' is
-        acceptable.
-
-    Returns:
-
+        _type: the type of data to be synced, either ``calendar`` or ``ecurity_list``
     """
     url = cfg.omega.urls.quotes_server
-    if kind == "calendar":
+    if _type == "calendar":
         url += "/jobs/sync_calendar"
-    elif kind == "security_list":
+    elif _type == "security_list":
         url += "/jobs/sync_security_list"
     else:
-        raise ValueError(f"{kind} is not supported sync type.")
+        raise ValueError(f"{_type} is not supported sync type.")
 
     async with aiohttp.ClientSession() as client:
         try:
             async with client.post(url, data=params) as resp:
                 if resp.status != 200:
-                    logger.warning("failed to trigger %s sync", kind)
+                    logger.warning("failed to trigger %s sync", _type)
                 else:
                     return resp.json()
         except Exception as e:

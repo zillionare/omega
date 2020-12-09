@@ -9,19 +9,20 @@ from unittest import mock
 import arrow
 import cfg4py
 import numpy as np
-import omega.core.sanity
-import omega.jobs
-import omega.jobs.sync as sync
 import omicron
 from dateutil import tz
-from omega.config.schema import Config
-from omega.core.events import Events, ValidationError
-from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omicron import cache
 from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
 from omicron.models.securities import Securities
 from pyemit import emit
+
+import omega.core.sanity
+import omega.jobs
+import omega.jobs.sync as sync
+from omega.config.schema import Config
+from omega.core.events import Events, ValidationError
+from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from tests import init_test_env, start_omega
 
 logger = logging.getLogger(__name__)

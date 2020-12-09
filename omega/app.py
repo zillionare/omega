@@ -13,16 +13,17 @@ import arrow
 import cfg4py
 import fire
 import omicron
+from omicron.core.timeframe import tf
+from omicron.core.types import FrameType
+from pyemit import emit
+from sanic import Sanic, response
+
 from omega import __version__
 from omega.config import get_config_dir
 from omega.config.schema import Config
 from omega.core.events import Events
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omega.jobs import sync as sq
-from omicron.core.timeframe import tf
-from omicron.core.types import FrameType
-from pyemit import emit
-from sanic import Sanic, response
 
 cfg: Config = cfg4py.get_instance()
 
