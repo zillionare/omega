@@ -22,27 +22,11 @@ logging:
       address: /dev/log
       facility: local6
       formatter: default
-    validation:
-      class: logging.handlers.SysLogHandler
-      address: /dev/log
-      facility: local6
-      formatter: validation
-    quickscan:
-      class: logging.handlers.SysLogHandler
-      address: /dev/log
-      facility: local6
-      formatter: quickscan
   loggers:
     apscheduler:
       level: INFO
     pyemit:
       level: DEBUG
-    validation:
-      handlers:
-        - validation
-    quickscan:
-      handlers:
-        - quickscan
   root:
     handlers:
       - develop
@@ -66,22 +50,32 @@ omega:
     security_list: 02:00
     calendar: 02:00
     bars:
+      - frame: '1W'
+        start: '2005-1-1'
+        type:
+            - stock
+      - frame: '1M'
+        start: '2005-1-1'
+        type:
+            - stock
+      - frame: '1Q'
+        start: '2005-1-1'
+        type:
+            - stock
+      - frame: '1Y'
+        start: '2005-1-1'
+        type:
+            - stock
       - frame: '1d'
-        start: '2020-10-11'
+        start: '2018-1-1'
         delay: 0 # delay * seconds after the frame is done
-        include: '300057.XSHE'
-        exclude: ''
         type:
-          - stock
+          - stock # stock | index
       - frame: '30m'
-        start: '2020-11-11'
-        delay: 60
+        start: '2020-1-1'
+        delay: 60 # delay 1 minute
         type:
           - stock
-  validation:
-    time: 02:00
-    start: '2020-05-11'
-    end: '2020-05-13'
 
 quotes_fetchers:
   - impl: jqadaptor    # there must be a create_instance method in this module

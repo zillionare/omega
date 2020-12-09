@@ -9,17 +9,6 @@ class Config(object):
         self.__access_counter__ = 0
 
     def __getattribute__(self, name):
-        """
-        keep tracking if the config is accessed. If there's no access, then even the
-         refresh interval is reached, we
-        will not call the remote fetcher.
-
-        Args:
-            name:
-
-        Returns:
-
-        """
         obj = object.__getattribute__(self, name)
         if name.startswith("__") and name.endswith("__"):
             return obj
@@ -40,6 +29,7 @@ class Config(object):
 
     class postgres:
         dsn: Optional[str] = None
+
         enabled: Optional[bool] = None
 
     class pickle:
@@ -50,18 +40,16 @@ class Config(object):
 
         class urls:
             checksum: Optional[str] = None
+
             quotes_server: Optional[str] = None
 
         heartbeat: Optional[int] = None
 
         class sync:
             security_list: Optional[str] = None
-            calendar: Optional[str] = None
-            bars: Optional[list] = None
 
-        class validation:
-            time: Optional[str] = None
-            start: Optional[str] = None
-            end: Optional[str] = None
+            calendar: Optional[str] = None
+
+            bars: Optional[list] = None
 
     quotes_fetchers: Optional[list] = None

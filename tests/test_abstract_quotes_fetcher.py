@@ -1,3 +1,4 @@
+import datetime
 import logging
 import os
 import unittest
@@ -6,14 +7,12 @@ import arrow
 import cfg4py
 import numpy as np
 import omicron
-
 from omicron import cache
 from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
 
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from tests import init_test_env
-
 
 logger = logging.getLogger(__name__)
 
@@ -225,3 +224,17 @@ class TestAbstractQuotesFetcher(unittest.IsolatedAsyncioTestCase):
         vals = await aq.get_valuation(secs, date, fields=["frame", "code"])
         self.assertEqual(set(secs), set(vals["code"].tolist()))
         self.assertSequenceEqual(vals.dtype.names, ["frame", "code"])
+
+    async def test_get_bars_batch(self):
+        secs = ["000001.XSHE", "000001.XSHG"]
+        end_dt = arrow.get("2020-11-01").date()
+        frame_type = FrameType.DAY
+
+        bars = await aq.get_bars_batch(secs, end_dt, 5, frame_type)
+        self.assertSetEqual(set(secs), set(bars.keys()))
+        self.assertEqual(5, len(bars["000001.XSHE"]))
+        self.assertAlmostEqual(18.2, bars["000001.XSHE"]["open"][0], places=2)
+
+    async def test_get_all_trade_days(self):
+        days = await aq.get_all_trade_days()
+        self.assertIn(datetime.date(2020, 12, 31), days)

@@ -7,29 +7,21 @@
 import itertools
 import logging
 import os
-import pathlib
 import re
 import signal
 import subprocess
 import sys
 import time
-
 from pathlib import Path
-from subprocess import CalledProcessError
-from subprocess import check_call
-from subprocess import check_output
-from typing import Any
-from typing import Callable
-from typing import List
-from typing import Union
+from typing import Any, Callable, List, Union
 
+import aioredis
+import asyncpg
 import cfg4py
 import fire
 import omicron
-import pkg_resources
 import psutil
 import sh
-
 from omicron.core.lang import async_run
 from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
@@ -37,26 +29,41 @@ from pyemit import emit
 from ruamel.yaml import YAML
 from termcolor import colored
 
+import omega
 import omega.jobs.sync as sync
-
-from omega.config.cfg4py_auto_gen import Config
-from omega.core import get_config_dir
-from omega.core.sanity import quick_scan
+from omega.config import get_config_dir
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher
 
-
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-git_url = "https://github.com/zillionare/omega"
-
-cfg: Config = cfg4py.get_instance()
 
 
-class EarlyJumpError(BaseException):
-    pass
+def load_factory_settings():
+    config_file = os.path.join(factory_config_dir(), "defaults.yaml")
+
+    with open(config_file, "r") as f:
+        parser = YAML()
+        _cfg = parser.load(f)
+
+    return _cfg
 
 
-def format_msg(msg):
+def factory_config_dir():
+    module_dir = os.path.dirname(omega.__file__)
+    return os.path.join(module_dir, "config")
+
+
+def format_msg(msg: str):
+    """格式化msg并显示在控制台上
+
+    本函数允许在写代码时按格式要求进行缩进和排版，但在输出时，这些格式都会被移除；对较长的文本，
+    按每80个字符为一行进行输出。
+
+    如果需要在msg中插入换行或者制表符，使用`\\n`和`\\t`。
+    args:
+        msg:
+
+    returns:
+    """
     msg = re.sub(r"\n\s+", "", msg)
     msg = re.sub(r"[\t\n]", "", msg)
 
@@ -70,76 +77,28 @@ def format_msg(msg):
     return "\n".join(msg)
 
 
-# noinspection PyUnresolvedReferences
-def update_config(root_key: str, conf: Any):
-    config_file = Path("~/zillionare/omega/config/defaults.yaml").expanduser()
-    with open(config_file, "r", encoding="utf-8") as f:
-        parser = YAML()
-        cfg = parser.load(f)
-        _cfg = cfg
+def update_config(settings: dict, root_key: str, conf: Any):
+    keys = root_key.split(".")
+    current_item = settings
+    for key in keys[:-1]:
+        v = current_item.get(key, {})
+        current_item[key] = v
+        current_item = current_item[key]
 
-        keys = root_key.split(".")
-        for key in keys[:-1]:
-            v = _cfg.get(key, {})
-            if len(v) == 0:
-                _cfg[key] = {}
-            _cfg = _cfg[key]
-
-        if isinstance(conf, dict):
-            if _cfg.get(keys[-1]):
-                _cfg[keys[-1]].update(conf)
-            else:
-                _cfg[keys[-1]] = conf
+    if isinstance(conf, dict):
+        if current_item.get(keys[-1]):
+            current_item[keys[-1]].update(conf)
         else:
-            _cfg[keys[-1]] = conf
-
-    try:
-        sh.cp(config_file, config_file.with_suffix(".bak"))
-        with open(config_file, "w", encoding="utf-8") as f:
-            parser = YAML()
-            parser.dump(cfg, f)
-    except Exception:
-        # restore the backup
-        sh.mv(config_file.with_suffix(".bak"), config_file)
-
-
-def redo(prompt, func, choice=None):
-    if choice is None:
-        choose = input(prompt)
-        while choose.upper() not in ["C", "Q", "R"]:
-            choose = input(prompt)
+            current_item[keys[-1]] = conf
     else:
-        print(prompt)
-        choose = choice
-
-    if choose.upper() == "R":
-        try:
-            func()
-        except EarlyJumpError:
-            return
-    elif choose.upper() == "C":
-        print("您选择了忽略错误继续安装。")
-        raise EarlyJumpError
-    else:
-        print("您选择了中止安装。")
-        sys.exit(-1)
+        current_item[keys[-1]] = conf
 
 
-def is_number(x):
-    try:
-        int(x)
-        return True
-    except Exception:
-        return False
+def append_fetcher(settings: dict, worker):
+    qf = settings.get("quotes_fetchers", [])
+    settings["quotes_fetchers"] = qf
 
-
-def is_valid_time(tm: str) -> bool:
-    try:
-        hour, minute = map(int, tm.split(":"))
-        if 0 <= hour <= 24 and 0 <= minute <= 60:
-            return True
-    except Exception:
-        return False
+    qf.append(worker)
 
 
 def is_in_venv():
@@ -160,87 +119,178 @@ def is_valid_port(port):
         port = int(port)
         if 1000 < port < 65535:
             return True
-    except Exception:
+    except (ValueError, Exception):
         return False
 
 
 def config_syslog():
+    """配置rsyslog
+
+    :return:
+    """
     msg = """
-    当使用多个工作者进程时，omega需要使用rsyslog作为日志输出设备。请确保rsyslog已经安装并能
-    正常工作。如果一切准备就绪，请按回车键继续设置：
+    当使用多个工作者进程时，omega需要使用rsyslog作为\\n请确保rsyslog已经安装并能
+    正常工作。\\n如果一切准备就绪，请按回车键继续设置：
     """
     # wait user's confirmation
     input(format_msg(msg))
-    src = Path("~/zillionare/omega/config/32-omega-default.conf").expanduser()
+    src = [os.path.join(factory_config_dir(), "32-omega-default.conf")]
     dst = "/etc/rsyslog.d"
 
     try:
         print("正在应用新的配置文件,请根据提示给予授权：")
-        sh.contrib.sudo.cp(src, dst)
+        for file in src:
+            sh.contrib.sudo.cp(src, dst)
         print("即将重启rsyslog服务，请给予授权：")
         sh.contrib.sudo.service("rsyslog", "restart")
     except Exception as e:
         print(e)
-        redo("配置rsyslog失败，请排除错误后重试", config_syslog)
+        print(f"[{colored('FAIL', 'green')}] 配置rsyslog失败，请手工配置", config_syslog)
 
 
-def config_logging():
-    msg = """
-    请指定日志文件存放位置，默认位置[/var/log/zillionare/]
-    """
-    folder = get_input(msg, None, "/var/log/zillionare")
-    folder = Path(folder).expanduser()
-
+async def check_postgres(dsn: str):
     try:
-        if not os.path.exists(folder):
-            print("正在创建日志目录，可能需要您授权：")
-            sh.contrib.sudo.mkdir(folder, "-p")
-            sh.contrib.sudo.chmod(777, folder)
-    except Exception as e:
-        print(e)
-        redo("创建日志目录失败，请排除错误重试，或者重新指定目录", config_logging)
+        conn = await asyncpg.connect(dsn=dsn)
 
-    update_config(
-        "logging.handlers.validation_report.filename", str(folder / "validation.log")
-    )
+        print("连接成功，正在初始化数据库...")
+        script_file = os.path.join(factory_config_dir(), "sql/v0.6.sql")
+        with open(script_file, "r") as f:
+            script = "".join(f.readlines())
+
+            await conn.execute(script)
+        print("数据库初始化完成。")
+        return True
+    except asyncpg.InvalidCatalogNameError:
+        print("数据库<zillionare>不存在，请联系管理员创建后，再运行本程序")
+    except asyncpg.InvalidPasswordError:
+        print("账号或者密码错误，请重新输入!")
+        return False
+    except OSError:
+        print("无效的地址或者端口")
+        return False
+    except Exception as e:
+        print("出现未知错误。")
+        logger.exception(e)
+    return False
+
+
+async def config_postgres(settings):
+    """配置数据连接并进行测试"""
+    msg = """
+        配置数据库并非必须。如果您仅限于在某些场景下使用Zillionare-omega，也可以不配置
+        数据库更多信息，\\n请参阅https://readthedocs.org/projects/zillionare-omega/
+
+        \\n跳过此项[S], 任意键继续:
+    """
+    choice = input(format_msg(msg))
+    if choice.upper() == "S":
+        return
+
+    action = "R"
+    while action == "R":
+        host = get_input("请输入服务器地址，", None, "localhost")
+        port = get_input("请输入服务器端口，", is_valid_port, 5432)
+        account = get_input("请输入账号,", None, "")
+        password = get_input("请输入密码,", None, "")
+
+        print("正在测试Postgres连接...")
+        dsn = f"postgres://{account}:{password}@{host}:{port}/zillionare"
+        if await check_postgres(dsn):
+            update_config(settings, "postgres.dsn", dsn)
+            update_config(settings, "postgres.enabled", True)
+            print(f"[{colored('PASS', 'green')}] 数据库连接成功，并成功初始化！")
+            return
+        else:
+            hint = f"[{colored('FAIL', 'red')}] 忽略错误[C]，重新输入[R]，退出[Q]"
+            action = choose_action(hint)
+
+
+def choose_action(prompt: str, actions: tuple = None, default_action="R"):
+    print(format_msg(prompt))
+    actions = ("C", "R", "Q")
+
+    answer = input().upper()
+
+    while answer not in actions:
+        print(f"请在{actions}中进行选择")
+        answer = input().upper()
+
+    if answer == "Q":
+        print("您选择了放弃安装。安装程序即将退出")
+        sys.exit(0)
+
+    if answer == "C":
+        print("您选择了忽略本项。您可以在此后重新运行安装程序，或者手动修改配置文件")
+
+    return answer
+
+
+def config_logging(settings):
+    msg = """
+    请指定日志文件存放位置:
+    """
+    action = "R"
+    while action == "R":
+        try:
+            folder = get_input(msg, None, "/var/log/zillionare")
+            folder = Path(folder).expanduser()
+
+            if not os.path.exists(folder):
+                print("正在创建日志目录，可能需要您授权：")
+                sh.contrib.sudo.mkdir(folder, "-p")
+                sh.contrib.sudo.chmod(777, folder)
+
+            action = None
+        except Exception as e:
+            print(e)
+
+            prompt = "创建日志目录失败，请排除错误重试，或者重新指定目录"
+            action = choose_action(prompt)
+
     config_syslog()
 
 
-def config_jq_fetcher():
-    msg = """
-        Omega需要配置数据获取插件才能工作，当前支持的插件列表有:\\n
-        [1] jqdatasdk\\n
-        请输入序号开始配置[1]:
+def config_fetcher(settings):
+    """配置jq_fetcher
+
+    为Omega安装jqdatasdk, zillionare-omega-adaptors-jq, 配置jqdata访问账号
+
     """
-    index = input(format_msg(msg))
-    if index == "" or index == "1":
-        account = input("请输入账号:")
-        password = input("请输入密码:")
-
-        config = [
+    msg = """
+        Omega需要配置上游行情服务器。当前支持的上游服务器有:\\n
+        [1] 聚宽`<joinquant>`\\n
+    """
+    print(format_msg(msg))
+    more_account = True
+    workers = []
+    port = 3181
+    while more_account:
+        account = get_input("请输入账号:", None, None, "")
+        password = get_input("请输入密码:", None, None, "")
+        sessions = get_input("请输入并发会话数", None, 1, "默认值[1]")
+        workers.append(
             {
-                "name": "jqdatasdk",
-                "module": "jqadaptor",
-                "parameters": {"account": account, "password": password},
+                "account": account,
+                "password": password,
+                "sessions": sessions,
+                "port": port,
             }
-        ]
-        update_config("quotes_fetchers", config)
-    else:
-        redo("请输入正确的序号，C跳过，Q退出", config_jq_fetcher)
-
-    try:
-        import jqadaptor as jq  # noqa
-    except ModuleNotFoundError:
-        check_call(
-            [sys.executable, "-m", "pip", "install", "zillionare-omega-adaptors-jq"]
         )
+        port += 1
+        more_account = input("继续配置新的账号[y|n]?\n").upper() == "Y"
+
+    settings["quotes_fetchers"] = []
+    append_fetcher(settings, {"impl": "jqadaptor", "workers": workers})
 
 
 def get_input(
-    prompt: str, validation: Union[List, Callable], default: Any, op_hint: str = None
+    prompt: str,
+    validation: Union[None, List, Callable],
+    default: Any,
+    op_hint: str = None,
 ):
     if op_hint is None:
-        op_hint = "直接回车接受默认值，忽略此项(C)，退出(Q):"
+        op_hint = f"忽略此项(C)，退出(Q)，回车选择默认值[{default}]："
     value = input(format_msg(prompt + op_hint))
 
     while True:
@@ -257,7 +307,7 @@ def get_input(
             return None
         elif value == "":
             return default
-        elif value == "Q":
+        elif value.upper() == "Q":
             print("您选择了退出")
             sys.exit(-1)
         elif is_valid_input:
@@ -268,119 +318,168 @@ def get_input(
             value = input(prompt + op_hint)
 
 
-def config_sync():
+async def check_redis(dsn: str):
+    redis = await aioredis.create_redis(dsn)
+    redis.close()
+    await redis.wait_closed()
+
+
+async def config_redis(settings):
     msg = """
-    请根据提示配置哪些k线数据需要同步到本地数据库。
-    \\n提示：
-    \\n\\t存储4年左右（1000 bars）A股日线数据大约需要500MB的内存。建议始终同步月线数据和年线数
-    据，这些数据样本较少，占用内存少
+        Zillionare-omega使用Redis作为其数据库。请确认系统中已安装好redis。\\n请根据提示输入
+        Redis服务器连接信息。
     """
     print(format_msg(msg))
+    action = "R"
+    while action == "R":
+        host = get_input("请输入Reids服务器，", None, "localhost")
+        port = get_input("请输入Redis服务器端口，", is_valid_port, 6379)
+        password = get_input("请输入Redis服务器密码，", None, None)
 
-    op_hint = ",直接回车接受默认值, 不同步(C)，退出(Q):"
-    frames = {
-        "1d": get_input("同步日线数据[1000]", is_number, 1000, op_hint),
-        "1w": get_input("同步周线线数据[1000]", is_number, 1000, op_hint),
-        "1M": get_input("同步月线数据", is_number, 1000, op_hint),
-        "1y": get_input("同步年线数据", is_number, 1000, op_hint),
-        "1m": get_input("同步1分钟数据[1000]", is_number, 1000, op_hint),
-        "5m": get_input("同步5分钟数据[1000]", is_number, 1000, op_hint),
-        "15m": get_input("同步15分钟数据[1000]", is_number, 1000, op_hint),
-        "30m": get_input("同步30分钟数据[1000]", is_number, 1000, op_hint),
-        "60m": get_input("同步60分钟数据[1000]", is_number, 1000, op_hint),
-    }
+        try:
+            if password:
+                dsn = f"redis://{password}@{host}:{port}"
+            else:
+                dsn = f"redis://{host}:{port}"
+            await check_redis(dsn)
+            print(f"[{colored('PASS', 'green')}] redis连接成功: {dsn}")
+            if password:
+                update_config(
+                    settings, "redis.dsn", f"redis://{password}@{host}:{port}"
+                )
+            else:
+                update_config(settings, "redis.dsn", f"redis://{host}:{port}")
 
-    sync_time = get_input("设置行情同步时间[15:05]", is_valid_time, "15:05", op_hint)
-
-    frames = {k: v for k, v in frames.items() if v is not None}
-
-    update_config("omega.sync.frames", frames)
-    if sync_time:
-        update_config("omega.sync.time", sync_time)
-
-    os.makedirs(Path("~/zillionare/omega/data/chksum"), exist_ok=True)
-    # for unittest
-    return frames, sync_time
+            return
+        except Exception as e:
+            logger.exception(e)
+            action = choose_action(
+                f"[{colored('FAIL', 'red')}]连接失败。忽略错误[C]," f"重输入[R]，放弃安装[Q]"
+            )
 
 
-def config_redis():
-    msg = """
-        Zillionare-omega使用Redis作为其数据库。请确认系统中已安装好redis。请根据提示输入Redis
-        服务器连接信息。
+def print_title(msg):
+    print(colored(msg, "green"))
+    print(colored("".join(["-"] * len(msg)), "green"))
+
+
+@async_run
+async def setup(reset_factory=False, force=False):
+    """安装初始化入口
+
+    Args:
+        reset_factory: reset to factory settings
+        force: if true, force setup no matter if run already
+
+    Returns:
+
     """
-    print(format_msg(msg))
-    host = get_input("请输入Reids服务器域名或者IP地址[localhost]，", None, "localhost")
-    port = get_input("请输入Redis服务器端口[6379]，", is_valid_port, 6379)
-    password = get_input("请输入Redis服务器密码，", None, None)
-
-    if password:
-        cmd = f"redis-main -h {host} -p {port} -a {password} ping".split(" ")
-    else:
-        cmd = f"redis-main -h {host} -p {port} ping".split(" ")
-
-    try:
-        print(f"正在测试Redis连接: {' '.join(cmd)}")
-        result = check_output(cmd).decode("utf-8")
-        if result.find("PONG") != -1:
-            print("连接成功！")
-        else:
-            print(f"测试返回结果为:{result}")
-            msg = "输入的连接信息有误。忽略错误继续安装[C](default)，重新输入(R),退出安装(Q):"
-            redo(msg, config_redis)
-    except EarlyJumpError:
-        return
-    except FileNotFoundError:
-        print("未在本机找到命令redis-main，无法运行检测。安装程序将继续。")
-    except CalledProcessError as e:
-        print(f"错误信息:{e}")
-        msg = "无法连接指定服务器。忽略错误继续安装[C](default)，重新输入(R),退出安装(Q):"
-        redo(msg, config_redis)
-
-    if password:
-        update_config("redis.dsn", f"redis://{password}@{host}:{port}")
-    else:
-        update_config("redis.dsn", f"redis://{host}:{port}")
-
-
-def setup(reset_factory=False):
     msg = """
     Zillionare-omega (大富翁)\\n
     -------------------------\\n
-    感谢使用! Zillionare(大富翁)是一系列证券分析工具，其中Omega是其中获取行情和其它关键信息、
-    数据的组件。\\n
+    感谢使用Zillionare-omega -- 高速分布式行情服务器！\\n
     """
-    if not is_in_venv():
-        msg = """
-            检测到当前未处于任何虚拟环境中。运行Zillionare的正确方式是为其创建单独的虚拟运行环境。
-            建议您通过conda或者venv来为Zillionare-omega创建单独的运行环境。
-        """
-        print(format_msg(msg))
+
+    print(format_msg(msg))
+
+    if not force:
+        config_file = os.path.join(get_config_dir(), "defaults.yaml")
+        if os.path.exists(config_file):
+            print(f"{colored('[PASS]', 'green')} 安装程序已在本机上成功运行")
+            sys.exit(0)
 
     if reset_factory:
         import sh
 
-        dst = pathlib.Path("~/zillionare/omega/config/").expanduser()
+        dst = get_config_dir()
         os.makedirs(dst, exist_ok=True)
 
-        for file in ["config/defaults.yaml", "config/32-omega-default.conf"]:
-            src = pkg_resources.resource_filename("omega", file)
-            sh.cp("-r", src, dst)
+        src = os.path.join(factory_config_dir(), "defaults.yaml")
+        dst = os.path.join(get_config_dir(), "defaults.yaml")
+        sh.cp("-r", src, dst)
 
-    config_redis()
-    config_logging()
-    config_jq_fetcher()
-    config_sync()
+    print_title("Step 1. 检测安装环境...")
+    settings = load_factory_settings()
 
-    print("配置已完成，建议通过supervisor来管理Omega服务，祝顺利开启财富之旅！")
+    if not check_environment():
+        sys.exit(-1)
+
+    print_title("Step 2. 配置上游服务器")
+    config_fetcher(settings)
+    print_title("Step 3. 配置Redis服务器")
+    await config_redis(settings)
+    print_title("Step 4. 配置Postgres服务器")
+    await config_postgres(settings)
+    save_config(settings)
+    print_title("Step 5. 配置日志系统")
+    config_syslog()
+
+    print_title("配置已完成。现在为您启动Omega,开启财富之旅！")
+
+    start()
+    time.sleep(5)
+    start("jobs")
+    status()
+
+
+def save_config(settings):
+    os.makedirs(get_config_dir(), exist_ok=True)
+    config_file = os.path.join(get_config_dir(), "defaults.yaml")
+    settings["version"] = omega.__version__
+
+    try:
+        with open(config_file, "w", encoding="utf-8") as f:
+            parser = YAML()
+            parser.indent(sequence=4, offset=2)
+            parser.dump(settings, f)
+    except Exception:  # noqa
+        # restore the backup
+        print(f"[{colored('FAIL', 'green')}] 无法保存文件。安装失败。")
+
+
+def check_environment():
+    role = os.environ.get(cfg4py.envar)
+    if role not in ["PRODUCTION", "DEV", "TEST"]:
+        print("在运行之前，请为服务器选择一个合适的角色：")
+        print("\t 生产环境 - PRODUCTION")
+        print("\t 测试用机 - TEST")
+        print("\t 开发环境 - DEV")
+        print(f"请将 {cfg4py.envar}= [PRODUCTION|TEST|DEV] (任选一）写入环境变量，再次运行本程序")
+        return False
+
+    print(f"[{colored('PASS', 'green')}] 当前服务器角色设置为 {colored(role,'green')}")
+
+    if not is_in_venv():
+        msg = """
+            检测到当前未处于任何虚拟环境中。\\n运行Zillionare的正确方式是为其创建单独的虚拟运行环境。\\n
+            建议您通过conda或者venv来为Zillionare-omega创建单独的运行环境。
+        """
+        hint = "按任意键忽略错误继续安装，退出安装[Q]:\n"
+
+        prompt = f"[{colored('FAIL','green')}] {msg} \\n{hint}"
+        print(format_msg(prompt))
+        if input().upper() == "Q":
+            print("您选择了终止安装程序")
+            sys.exit(0)
+    else:
+        print(f"[{colored('PASS', 'green')}] 当前运行在虚拟环境下")
+
+    # create /var/log/zillionare for logging
+    if not os.path.exists("/var/log/zillionare"):
+        sh.contrib.sudo.mkdir("/var/log/zillionare", "-m", "777")
+    return True
 
 
 def find_fetcher_processes():
-    """查找进程名为app的进程"""
+    """查找所有的omega(fetcher)进程
+
+    Omega进程在ps -aux中显示应该包含 omega.app --impl=&ltfetcher&gt --port=&ltport&gt信息
+    """
     result = {}
     for p in psutil.process_iter():
         cmd = " ".join(p.cmdline())
         if "omega.app start" in cmd and "--impl" in cmd and "--port" in cmd:
-            # fetchers
+
             m = re.search(r"--impl=([^\s]+)", cmd)
             impl = m.group(1) if m else ""
 
@@ -396,7 +495,7 @@ def find_fetcher_processes():
 
 
 def start(service: str = ""):
-    """
+    """启动omega主进程或者任务管理进程
 
     Args:
         service: if service is '', then starts fetcher processes.
@@ -418,15 +517,16 @@ def start(service: str = ""):
     cfg4py.init(config_dir, False)
 
     if service == "jobs":
-        return start_jobs()
+        return _start_jobs()
 
-    start_fetcher_processes()
+    _start_fetcher_processes()
 
 
-def start_fetcher_processes():
+def _start_fetcher_processes():
     procs = find_fetcher_processes()
 
     # fetcher processes are started by groups
+    cfg = cfg4py.get_instance()
     for fetcher in cfg.quotes_fetchers:
         impl = fetcher.get("impl")
         workers = fetcher.get("workers")
@@ -484,11 +584,11 @@ def _start_fetcher(
     )
 
 
-def start_jobs():
+def _start_jobs():
     subprocess.Popen([sys.executable, "-m", "omega.jobs", "start"])
 
     retry = 0
-    while find_jobs_process() is None and retry < 5:
+    while _find_jobs_process() is None and retry < 5:
         print("等待omega.jobs启动中")
         retry += 1
         time.sleep(0.5)
@@ -500,19 +600,19 @@ def start_jobs():
         return
 
 
-def restart_jobs():
-    pid = find_jobs_process()
+def _restart_jobs():
+    pid = _find_jobs_process()
     if pid is None:
         print("omega.jobs未运行。正在启动中...")
-        start_jobs()
+        _start_jobs()
     else:
         # 如果omega.jobs已经运行
-        stop_jobs()
-        start_jobs()
+        _stop_jobs()
+        _start_jobs()
 
 
-def stop_jobs():
-    pid = find_jobs_process()
+def _stop_jobs():
+    pid = _find_jobs_process()
     retry = 0
     while pid is not None and retry < 5:
         try:
@@ -521,18 +621,18 @@ def stop_jobs():
             time.sleep(0.5)
         except Exception:
             pass
-        pid = find_jobs_process()
+        pid = _find_jobs_process()
 
 
-def show_jobs_process():
-    pid = find_jobs_process()
+def _show_jobs_process():
+    pid = _find_jobs_process()
     if pid:
         print(pid)
     else:
         print("None")
 
 
-def find_jobs_process():
+def _find_jobs_process():
     for p in psutil.process_iter():
         cmd = " ".join(p.cmdline())
         if cmd.find("-m omega.jobs") != -1:
@@ -540,7 +640,7 @@ def find_jobs_process():
     return None
 
 
-def stop_fetcher_processes():
+def _stop_fetcher_processes():
     retry = 0
     while retry < 5:
         procs = find_fetcher_processes()
@@ -561,14 +661,14 @@ def status():
     show_fetcher_processes()
     print("\n")
     print(f"正在运行中的jobs进程:\n{'=' * 40}")
-    show_jobs_process()
+    _show_jobs_process()
 
 
 def stop(service: str = ""):
     if service == "jobs":
-        return stop_jobs()
+        return _stop_jobs()
 
-    stop_fetcher_processes()
+    _stop_fetcher_processes()
 
 
 @async_run
@@ -577,32 +677,15 @@ async def restart(service: str = ""):
     await _init()
 
     if service == "jobs":
-        return restart_jobs
+        return _restart_jobs
 
-    stop_fetcher_processes()
-    start_fetcher_processes()
-
-
-@async_run
-async def scan():
-    await _init()
-
-    # todo: read file location from 31-quickscan.conf
-    print("将根据系统配置的同步设置来检查数据完整性，错误日志将写入到/var/log/zillionare/quickscan.log中。")
-
-    counters = await quick_scan()
-
-    print("扫描完成，发现的错误汇总如下：")
-    print("frame errors  total")
-    print("===== ======  =====")
-    for frame, errors in counters.items():
-        print(f"{frame:5}", f"{errors[0]:6}", f"{errors[1]:6}")
-
-    await emit.stop()
+    _stop_fetcher_processes()
+    _start_fetcher_processes()
 
 
 @async_run
 async def sync_sec_list():
+    """发起同步证券列表请求"""
     await _init()
 
     await sync.trigger_single_worker_sync("security_list")
@@ -610,13 +693,16 @@ async def sync_sec_list():
 
 @async_run
 async def sync_calendar():
+    """发起同步交易日历请求"""
     await _init()
     await sync.trigger_single_worker_sync("calendar")
 
 
 @async_run
 async def sync_bars(frame: str = None, codes: str = None):
-    """read sync config from config file, if frame/codes is not provided
+    """立即同步行情数据
+
+    如果`frame`, `codes`没有提供，则从配置文件中读取相关信息
 
     Args:
         frame:
@@ -644,13 +730,11 @@ async def sync_bars(frame: str = None, codes: str = None):
 
 
 async def _init():
-    global cfg
-
     config_dir = get_config_dir()
     cfg = cfg4py.init(config_dir, False)
 
     impl = cfg.quotes_fetchers[0]["impl"]
-    params = cfg.quotes_fetchers[0]["groups"][0]
+    params = cfg.quotes_fetchers[0]["workers"][0]
 
     await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
     await AbstractQuotesFetcher.create_instance(impl, **params)
@@ -658,6 +742,9 @@ async def _init():
 
 
 def main():
+    import warnings
+
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
     fire.Fire(
         {
             "start": start,
@@ -665,7 +752,6 @@ def main():
             "stop": stop,
             "status": status,
             "restart": restart,
-            "scan": scan,
             "sync_sec_list": sync_sec_list,
             "sync_calendar": sync_calendar,
             "sync_bars": sync_bars,

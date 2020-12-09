@@ -1,7 +1,5 @@
 import logging
-import os
 import pickle
-import signal
 import unittest
 
 import aiohttp
@@ -9,20 +7,14 @@ import arrow
 import cfg4py
 
 from omega import __version__
-from tests import init_test_env
-from tests import start_omega
-
+from tests import init_test_env, start_omega
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
 
 
 class TestWebInterfaces(unittest.IsolatedAsyncioTestCase):
-    """app lifecycle related tests
-
-    Args:
-        unittest ([type]): [description]
-    """
+    """app lifecycle related tests"""
 
     async def asyncSetUp(self) -> None:
         init_test_env()
@@ -48,9 +40,6 @@ class TestWebInterfaces(unittest.IsolatedAsyncioTestCase):
     async def test_sever_version(self):
         ver = await self.server_get("sys", "version", is_pickled=False)
         self.assertEqual(__version__, ver)
-
-    def stop_server(self) -> None:
-        os.kill(self.server_process.pid, signal.SIGTERM)
 
     async def test_get_security_list(self):
         secs = await self.server_get("quotes", "security_list")

@@ -15,10 +15,8 @@ import signal
 import subprocess
 import sys
 import time
-
 from pathlib import Path
-from typing import List
-from typing import Optional
+from typing import List, Optional
 
 import aiohttp
 import arrow
@@ -26,7 +24,6 @@ import cfg4py
 import omicron
 import psutil
 import xxhash
-
 from aiocache import cached
 from aiohttp import ClientError
 from dateutil import tz
@@ -37,12 +34,9 @@ from omicron.models.securities import Securities
 from omicron.models.security import Security
 from pyemit import emit
 
-from omega.core import get_config_dir
-from omega.core.events import Events
-from omega.core.events import ValidationError
-from omega.jobs.sync import cfg
-from omega.jobs.sync import logger
-
+from omega.config import get_config_dir
+from omega.core.events import Events, ValidationError
+from omega.jobs.sync import cfg, logger
 
 validation_errors = []
 
@@ -292,7 +286,7 @@ async def start_validation():
 
     # fixme: do validation per frame_type
     # fixme: test fail. Rewrite this before 0.6 releases
-    codes = secs.choose(cfg.omega.sync.type)
+    codes = secs.choose(cfg.omega.sync)
     await cache.sys.delete("jobs.bars_validation.scope")
     await cache.sys.lpush("jobs.bars_validation.scope", *codes)
 

@@ -17,9 +17,11 @@ script: tox
 deploy:
   provider: pypi
   distributions: sdist bdist_wheel
-  user: Aaron-Yang
+  skip_clean: true
+  skip_exist: true
+  user: __token__
   password:
-    secure: PLEASE_REPLACE_ME
+  secure: "oDTrSryG5s4ySWyAQm4/v9H0DnhOPSFaenm0pYrYIpUw7lL8gGtoEjpRUDhYbf3jjfkaSYEA3pebh+6uQ2kUjIoM8a7BebDQsKArX6B/bPo0D94sH+CCCW6jp4mfl9t4VOGQUcywyaYyNCPP/xrhBHNPFnLU2QOtUVuWGguRs/42Icy2c6clAEXtGosuI+bXEherk2kkVmopT5wq6Vml51nnNTCAFiRd26l6PaCicrYBaac1yF3Q5T+jxRJvHod0aKcFvm1lbAzZhpQb5jY+JvkP/YF5XhPoOv/j9iGMDZQsdi9BR4ViBZ1vCki9ELGZDzZ9/BwSfpRRvc5aclXmrWN6rc9BbH3p3i+a//ihKRywSD/MR0wIbOrobAIwfKXAZCyJB/6cmw1VCW0sPUWDJNEWPZSgE/eqBC4EGMiuUEW9ujPiNICFIp6vTy7sIm3UQHhT45XYzct8n17v2KbICsoOcxeNJKl8BJFjw1TbjnkZeqeUttIbrV0FOC3znVTxHD0jSTurr5FcY5q+N4bsSKEvCC5/CMDZCK/ofYR2lQM4WJ/C9EFtTeMPWZJqGcSSBO9c5vwon1ts79tIuoLVE4jZ2GwQONfG+8wz8X05NHzt6fPZ8blgkM3GtpplqiP7Ry+L8/2jrzsZ8F8jt+cM86KMzLtLiOoBIfTANxH82PE="
   on:
     tags: true
     repo: zillionare/omega
