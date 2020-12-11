@@ -2,12 +2,12 @@
 ![](http://images.jieyu.ai/images/hot/zillionbanner.jpg)
 
 <p align="center">
-<a href="https://pypi.python.org/pypi/omega">
-<img src="https://img.shields.io/pypi/v/omega.svg">
+<a href="https://pypi.python.org/pypi/zillionare-omega">
+    <img src="http://img.shields.io/pypi/v/zillionare-omega?color=brightgreen" >
 </a>
 
 <a href="https://travis-ci.com/zillionare/omega">
-<img src="https://img.shields.io/travis/zillionare/omega.svg">
+<img src="https://api.travis-ci.com/zillionare/omega.svg?branch=release">
 </a>
 
 <a href="https://omega.readthedocs.io/en/latest/?badge=latest">
