@@ -181,10 +181,11 @@ class TestJobs(unittest.IsolatedAsyncioTestCase):
     async def test_100_sync_calendar(self):
         await omega.jobs.sync.sync_calendar()
 
+        async_mock = mock.AsyncMock(return_value = None)
         with mock.patch(
             "omega.fetcher.abstract_quotes_fetcher.AbstractQuotesFetcher"
             ".get_all_trade_days",
-            side_effect=[None],
+            side_effect=async_mock
         ):
             await omega.jobs.sync.sync_calendar()
 
