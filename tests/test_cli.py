@@ -5,6 +5,7 @@ from unittest import mock
 
 import cfg4py
 import fire
+from pyemit import emit
 from ruamel.yaml import YAML
 
 from omega import cli
@@ -12,8 +13,11 @@ from tests import init_test_env
 
 
 class TestCLI(unittest.IsolatedAsyncioTestCase):
-    def setUp(self) -> None:
+    async def asyncSetUp(self) -> None:
         self.cfg = init_test_env()
+
+    async def asyncTearDown(self) -> None:
+        await emit.stop()
 
     def yaml_dumps(self, settings):
         stream = io.StringIO()
@@ -58,10 +62,14 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
         cli.sync_sec_list()
 
     def test_sync_calendar(self):
+        cli.start("omega")
         cli.sync_calendar()
+        cli.stop("omega")
 
     def test_sync_bars(self):
+        cli.start("omega")
         cli.sync_bars("1d", codes="000001.XSHE")
+        cli.stop("omega")
 
     def test_load_factory_settings(self):
         settings = cli.load_factory_settings()
