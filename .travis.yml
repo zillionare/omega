@@ -18,7 +18,7 @@ before_script:
   - psql -c 'create database zillionare;' -U postgres
   - psql -c "create user zillionare with password '123456';" -U postgres
   - psql -c "grant all privileges on database zillionare to zillionare;" -U postgres
-  - psql --dbname=zillionare --file=omicron/config/sql/v0.6.sql
+  - psql --dbname=zillionare --file=omega/config/sql/v0.6.sql
 # Command to run tests, e.g. python setup.py test
 script: tox
 
