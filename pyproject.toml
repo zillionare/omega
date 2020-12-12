@@ -1,35 +1,100 @@
+[[tool.poetry.source]]
+name = "ali"
+url = "https://mirrors.aliyun.com/pypi/simple/"
+default = true
 
 [tool.poetry]
-name = "omega"
-version = "0.7.0"
-description = "分布式高速行情服务器"
+name = "zillionare-omega"
+packages = [
+  {include = "omega"}
+]
+
+description = "高速分布式行情服务器"
 authors = ["jieyu <code@jieyu.ai>"]
 license = "MIT"
+readme = "README.md"
+homepage = "https://zillionare-omega.readthedocs.io"
+repository = "https://github.com/zillionare/omega"
+documentation = "https://zillionare-omega.readthedocs.io"
+keywords = ["AI", "quant", "trade", "stock"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Programming Language :: Python :: 3.8",
+]
+
+include = [
+    "LICENSE",
+    "README.md",
+    "HISTORY.md",
+    "AUTHORS.md",
+    "docs/*",
+    "tests/*"
+]
+
+version = "0.7.0"
 
 [tool.poetry.dependencies]
-python = ">=3.8,<3.9"
-aiocache = "^0.11.1"
+python=">=3.8,<3.9"
+zillionare-omicron = "^0.3.2alpha"
 aiohttp = "^3.7.3"
+pyemit = "^0.4.0"
+arrow = "^0.15"
+numpy = "^1.18"
 aioredis = "^1.3.1"
-APScheduler = "^3.6.3"
-arrow = "0.15.5"
-asyncpg = "^0.21.0"
-cfg4py = "^0.8.0"
-fire = "^0.3.1"
-gino = "^1.0.1"
-hiredis = "^1.1.0"
-numba = "0.49.1"
-psutil = "^5.7.3"
-pytz = "^2020.4"
-"ruamel.yaml" = "^0.16.0"
-sanic = "^20.9.1"
+numba = "^0.49.1"
+asyncpg = "^0.21"
+gino = "^1.0"
+SQLAlchemy = "^1.3.20"
 sh = "^1.14.1"
-termcolor = "^1.1.0"
+aiocache = "^0.11.1"
+APScheduler = "^3.6"
+zillionare-omega-adaptors-jq = "^0.3.3"
 xxhash = "^2.0.0"
-zillionare-omicron = "0.3.0"
-numpy = "1.19.4"
+sanic = "^20.9.1"
+cfg4py = "^0.9.0"
 
-[tool.poetry.dev-dependencies]
+black  = { version = "20.8b1", optional = true}
+isort  = { version = "5.6.4", optional = true}
+doc8  = { version = "0.8.1", optional = true}
+flake8  = { version = "3.8.4", optional = true}
+pre-commit  = { version = "2.8.2", optional = true}
+pytest  = { version = "6.1.2", optional = true}
+pytest-cov  = { version = "2.10.1", optional = true}
+tox  = { version = "^3.20.1", optional = true}
+virtualenv  = { version = "^20.2.2", optional = true}
+pip  = { version = "^20.3.1", optional = true}
+psutil  = { version = "^5.7.3", optional = true}
+mkdocs  = { version = "^1.1.2", optional = true}
+mkdocs-include-markdown-plugin  = { version = "^1.0.0", optional = true}
+mkdocs-material  = { version = "^6.1.7", optional = true}
+mkdocstrings  = { version = "^0.13.6", optional = true}
+mkdocs-material-extensions  = { version = "^1.0.1", optional = true}
+twine  = { version = "^3.2.0", optional = true}
+
+
+[tool.poetry.extras]
+test = [
+    "pytest",
+    "black",
+    "isort",
+    "doc8",
+    "flake8",
+    "pytest-cov",
+    "psutil"
+    ]
+
+dev = ["tox", "pre-commit", "virtualenv", "pip", "twine"]
+
+doc = [
+    "mkdocs",
+    "mkdocs-include-markdown-plugin",
+    "mkdocs-material",
+    "mkdocstrings",
+    "mkdocs-material-extension"
+  ]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
@@ -56,17 +121,3 @@ exclude = '''
   | tests/.*/setup.py
 )/
 '''
-
-[tool.isort]
-# black compatible settings, see https://github.com/psf/black/blob/master/docs/compatible_configs
-line_length = 88
-force_single_line = true
-atomic = true
-include_trailing_comma = true
-lines_after_imports = 2
-lines_between_types = 1
-multi_line_output = 3
-use_parentheses = true
-not_skip = "__init__.py"
-skip_glob = ["*/setup.py"]
-filter_files = true

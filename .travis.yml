@@ -7,22 +7,40 @@ python:
 # Command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
 install: pip install -U tox-travis
 
+services:
+  - redis
+  - postgres
+
+before_script:
+  - export TZ=Asia/Shanghai
+  - sudo mkdir -p /var/log/zillionare
+  - sudo chmod 777 /var/log/zillionare
+  - psql -c 'create database zillionare;' -U postgres
+  - psql -c "create user zillionare with password '123456';" -U postgres
+  - psql -c "grant all privileges on database zillionare to zillionare;" -U postgres
+  - psql --dbname=zillionare --file=omicron/config/sql/v0.6.sql
 # Command to run tests, e.g. python setup.py test
 script: tox
 
-# Assuming you have installed the travis-ci CLI tool, after you
-# create the Github repo and add it to Travis, run the
-# following command to finish PyPI deployment setup:
-# $ travis encrypt --add deploy.password
+before_deploy:
+- pip install poetry
+- poetry config repositories.testpypi https://test.pypi.org/legacy/
+
+- poetry config pypi-token.testpypi $TESTPYPI_TOKEN
+- poetry config pypi-token.pypi $PYPI_TOKEN
+
 deploy:
-  provider: pypi
-  distributions: sdist bdist_wheel
-  skip_clean: true
-  skip_exist: true
-  user: __token__
-  password:
-  secure: "oDTrSryG5s4ySWyAQm4/v9H0DnhOPSFaenm0pYrYIpUw7lL8gGtoEjpRUDhYbf3jjfkaSYEA3pebh+6uQ2kUjIoM8a7BebDQsKArX6B/bPo0D94sH+CCCW6jp4mfl9t4VOGQUcywyaYyNCPP/xrhBHNPFnLU2QOtUVuWGguRs/42Icy2c6clAEXtGosuI+bXEherk2kkVmopT5wq6Vml51nnNTCAFiRd26l6PaCicrYBaac1yF3Q5T+jxRJvHod0aKcFvm1lbAzZhpQb5jY+JvkP/YF5XhPoOv/j9iGMDZQsdi9BR4ViBZ1vCki9ELGZDzZ9/BwSfpRRvc5aclXmrWN6rc9BbH3p3i+a//ihKRywSD/MR0wIbOrobAIwfKXAZCyJB/6cmw1VCW0sPUWDJNEWPZSgE/eqBC4EGMiuUEW9ujPiNICFIp6vTy7sIm3UQHhT45XYzct8n17v2KbICsoOcxeNJKl8BJFjw1TbjnkZeqeUttIbrV0FOC3znVTxHD0jSTurr5FcY5q+N4bsSKEvCC5/CMDZCK/ofYR2lQM4WJ/C9EFtTeMPWZJqGcSSBO9c5vwon1ts79tIuoLVE4jZ2GwQONfG+8wz8X05NHzt6fPZ8blgkM3GtpplqiP7Ry+L8/2jrzsZ8F8jt+cM86KMzLtLiOoBIfTANxH82PE="
-  on:
-    tags: true
-    repo: zillionare/omega
-    python: 3.8
+  - provider: script
+    script: poetry publish --build
+    on:
+      tags: true
+      python: 3.8
+      branch: release
+
+notifications:
+  email:
+    if: branch IN (master, release)
+    recipients:
+      - aaron_yang@jieyu.ai
+    on_failure: always
+    on_success: always
