@@ -27,7 +27,7 @@ from omega.jobs import sync as sq
 
 cfg: Config = cfg4py.get_instance()
 
-app = Sanic("Omega")
+sanic = Sanic("Omega")
 
 logger = logging.getLogger(__name__)
 
@@ -53,19 +53,19 @@ class Application(object):
         await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
 
         # register route here
-        app.add_route(self.get_version, "/sys/version")
-        app.add_route(self.get_security_list_handler, "/quotes/security_list")
-        app.add_route(self.get_bars_handler, "/quotes/bars")
-        app.add_route(self.get_bars_batch_handler, "/quotes/bars_batch")
-        app.add_route(self.get_all_trade_days_handler, "/quotes/all_trade_days")
-        app.add_route(self.bars_sync_handler, "/jobs/sync_bars", methods=["POST"])
-        app.add_route(
+        sanic.add_route(self.get_version, "/sys/version")
+        sanic.add_route(self.get_security_list_handler, "/quotes/security_list")
+        sanic.add_route(self.get_bars_handler, "/quotes/bars")
+        sanic.add_route(self.get_bars_batch_handler, "/quotes/bars_batch")
+        sanic.add_route(self.get_all_trade_days_handler, "/quotes/all_trade_days")
+        sanic.add_route(self.bars_sync_handler, "/jobs/sync_bars", methods=["POST"])
+        sanic.add_route(
             self.sync_calendar_handler, "/jobs/sync_calendar", methods=["POST"]
         )
-        app.add_route(
+        sanic.add_route(
             self.sync_seurity_list_handler, "jobs/sync_security_list", methods=["POST"]
         )
-        app.add_route(self.get_valuation, "quotes/valuation")
+        sanic.add_route(self.get_valuation, "quotes/valuation")
 
         logger.info("<<< init %s process done", self.__class__.__name__)
 
@@ -165,7 +165,7 @@ class Application(object):
             secs = None
             frames_to_sync = None
 
-        app.add_task(sq.trigger_bars_sync(secs, frames_to_sync))
+        sanic.add_task(sq.trigger_bars_sync(secs, frames_to_sync))
         return response.text(f"sync_bars with {secs}, {frames_to_sync} is scheduled.")
 
 
@@ -198,12 +198,12 @@ def start(impl: str, cfg: dict = None, **fetcher_params):
     """
     sessions = fetcher_params.get("sessions", 1)
     port = fetcher_params.get("port", 3181)
-    omega = Application(impl, cfg, **fetcher_params)
+    app = Application(impl, cfg, **fetcher_params)
 
-    app.register_listener(omega.init, "before_server_start")
+    sanic.register_listener(app.init, "before_server_start")
 
     logger.info("starting omega group listen on %s with %s workers", port, sessions)
-    app.run(host="0.0.0.0", port=port, workers=sessions, register_sys_signals=True)
+    sanic.run(host="0.0.0.0", port=port, workers=sessions, register_sys_signals=True)
 
 
 if __name__ == "__main__":
