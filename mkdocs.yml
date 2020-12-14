@@ -14,9 +14,11 @@ theme:
 markdown_extensions:
   - admonition
   - pymdownx.details
+  - markdown_include.include:
+      base_path: docs
   - toc:
       baselevel: 2
 plugins:
-  - include-markdown
   - mkdocstrings
-  - search
+  - search:
+      lang: 'ja'

@@ -1,3 +1,1 @@
-{%
-    include-markdwon "../README.md"
-%}
+{! ../README.md !}
