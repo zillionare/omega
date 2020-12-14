@@ -1464,13 +1464,13 @@ doc = ["mkdocs (>=1.1.2,<2.0.0)", "mkdocs-include-markdown-plugin (>=1.0.0,<2.0.
 
 [extras]
 dev = ["tox", "pre-commit", "virtualenv", "pip", "twine"]
-doc = ["mkdocs", "mkdocs-include-markdown-plugin", "mkdocs-material", "mkdocstrings", "mkdocs-material-extensions"]
-test = ["pytest", "black", "isort", "doc8", "flake8", "pytest-cov", "psutil"]
+doc = ["mkdocs", "mkdocs-include-markdown-plugin", "mkdocs-material", "mkdocstrings"]
+test = ["pytest", "black", "isort", "doc8", "flake8", "pytest-cov"]
 
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.8,<3.9"
-content-hash = "d005a421af99bb8ba2070fc7adc1413c092e3308ae132942519f0f28c6087a98"
+content-hash = "eda01dc3e632cd91c0794fb4771d71debe5508d79be16493a4836876c5591a59"
 
 [metadata.files]
 aiocache = [
