@@ -42,22 +42,13 @@ Omega为大富翁(Zillionare)智能量化交易平台提供数据服务。它是
 3. 优秀的可伸缩部署(scalability)特性。Omega可以在根据您对数据吞吐量的需求，在从一到多台服务器上按需部署，从而满足个人、工作室到大型团队的数据需求。
 
 
-`[更多] <https://zillionare-omega.readthedocs.io>`_
+[帮助文档](https://zillionare-omega.readthedocs.io)
 
 鸣谢
 =========
 
 Zillionare-Omega采用以下技术构建:
 
-    * Pycharm开源项目支持计划_
+[Pycharm开源项目支持计划](https://www.jetbrains.com/?from=zillionare-omega)
 
-    .. image:: _static/jetbrains-variant-3.svg
-        :target: https://www.jetbrains.com/?from=zillionare-omega
-
-    * Cookiecutter_
-    * Cookiecutter-pypackage_
-
-
-.. _Pycharm开源项目支持计划: https://www.jetbrains.com/?from=zillionare-omega
-.. _Cookiecutter: https://github.com/audreyr/cookiecutter
-.. _Cookiecutter-pypackage: https://github.com/audreyr/cookiecutter-pypackage
+![](_static/jetbrains-variant-3.svg)
