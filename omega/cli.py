@@ -531,9 +531,10 @@ def _start_fetcher_processes():
         impl = fetcher.get("impl")
         workers = fetcher.get("workers")
 
+        ports = [3181 + i for i in range(len(workers))]
         for group in workers:
             sessions = group.get("sessions")
-            port = group.get("port")
+            port = group.get("port") or ports.pop()
             account = group.get("account")
             password = group.get("password")
             started_sessions = procs.get(f"{impl}:{port}", [])
