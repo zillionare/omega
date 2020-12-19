@@ -75,4 +75,4 @@ async def start_omega(port: int = 3181):
             # return the process id, the caller should shutdown it later
             return process
 
-    raise EnvironmentError("Omega server is not started.")
+    raise TimeoutError("Omega server is not started.")
