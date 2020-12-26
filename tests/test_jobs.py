@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import logging
 import os
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -46,6 +47,9 @@ class TestJobs(unittest.IsolatedAsyncioTestCase):
         await omicron.shutdown()
         if self.omega:
             self.omega.kill()
+            # await omega exit
+            time.sleep(1)
+
 
     async def create_quotes_fetcher(self):
         cfg: Config = cfg4py.get_instance()
