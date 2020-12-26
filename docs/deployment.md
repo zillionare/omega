@@ -47,7 +47,7 @@ Omega对硬盘的性能和容量几乎没有要求。一般而言，在安装Ome
 
 ???+ note
 
-    Omega不适合部署在Windows操作系统上。Omega被设计为多进程分布式运行，当在同一台机器上运行多个Omega实例时，Omega使用rsyslogd来收集日志以及其它辅助性数据（比如validation记录）。
+    Omega不适合部署在Windows操作系统上。Omega被设计为多进程分布式运行，当在同一台机器上运行多个Omega实例时，Omega使用rsyslogd来收集日志以及其它辅助性数据（比如validation记录）,而rsyslogd是一个类Unix机器上才有的服务。
 
 Zillionare-Omega(以下简称Omega)使用Python 3.8开发，理论上可以部署在任何类Unix的机器上。但只在Ubuntu 18.0上经过严格的测试。以下为软件环境类清单：
 
@@ -60,6 +60,7 @@ Zillionare-Omega(以下简称Omega)使用Python 3.8开发，理论上可以部�
 | 负载均衡  | Nginx     |       | 选装 |
 | 行情服务  | jqdatasdk | >1.8  |    |
 | 日志服务  | rsyslog   |       |    |
+| 编译工具 | gcc | latest | jqdatasdk使用了thrift2，需要gcc进行编译|
 
 如果无须使用财务数据，则可以不安装Postgres。在动量策略研究中，使用财务数据的主要目标是用于计算换手率（因为流通股本属于财务数据）。即使不安装Postgres数据库，Omega也会根据需要从上游数据服务器获取相关数据用于计算换手率，但这些数据不会在本地保存，也会影响计算速度。
 
@@ -107,10 +108,10 @@ Omega使用cfg4py来解析和管理配置。作为最佳实践，cfg4py要求您
 
 您可以在/etc/profile，或者~/.bashrc中加上这样一行：
 
-```bsh
+```bash
 
     # 可选项包括 PRODUCTION, TEST, DEV
-    export __cfg4py_server_role = PRODUCTION
+    export __cfg4py_server_role__ = PRODUCTION
 ```
 
 如果您只是普通用户，那么一般来说，应该设置为PRODUCTION。
