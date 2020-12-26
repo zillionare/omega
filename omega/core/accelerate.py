@@ -7,11 +7,6 @@ Contributors:
 
 """
 import logging
-import warnings
-
-from numba import NumbaPendingDeprecationWarning
-
-warnings.filterwarnings("ignore", category=NumbaPendingDeprecationWarning)
 
 logger = logging.getLogger(__name__)
 
