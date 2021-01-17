@@ -1,7 +1,8 @@
 import logging
 
-from sanic.blueprints import Blueprint
 from sanic import response
+from sanic.blueprints import Blueprint
+
 from omega.jobs import sync as sq
 
 bp = Blueprint("jobs", url_prefix="/jobs/")

@@ -1,7 +1,6 @@
-from sanic import response
+from sanic import Blueprint, response
 
 from omega import __version__
-from sanic import Blueprint
 
 bp = Blueprint("sys", url_prefix="/sys/")
 

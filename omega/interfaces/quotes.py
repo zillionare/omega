@@ -1,16 +1,14 @@
 import logging
 import pickle
 
-from omicron.core.types import FrameType
-
-from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
-
-import cfg4py
 import arrow
+import cfg4py
 from omicron.core.timeframe import tf
-from sanic import response
+from omicron.core.types import FrameType
+from sanic import Blueprint, response
 
-from sanic import Blueprint
+import omega.jobs.sync as sq
+from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 
 bp = Blueprint("quotes", url_prefix="/quotes/")
 

@@ -9,15 +9,21 @@ from pyemit import emit
 from ruamel.yaml import YAML
 
 from omega import cli
-from tests import init_test_env
+from tests import init_test_env, start_archive_server, start_omega
 
 
 class TestCLI(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         self.cfg = init_test_env()
+        self.omega = await start_omega()
+        self.archive = await start_archive_server()
 
     async def asyncTearDown(self) -> None:
         await emit.stop()
+        if self.omega:
+            self.omega.kill()
+        if self.archive:
+            self.archive.kill()
 
     def yaml_dumps(self, settings):
         stream = io.StringIO()
@@ -41,15 +47,15 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
 
         return count
 
-    def test_omega_lifecycle(self):
-        cli.start("omega")
+    async def test_omega_lifecycle(self):
+        await cli.start("omega")
         procs = cli.find_fetcher_processes()
         self.assertTrue(len(procs) >= 1)
 
-        cli.restart("omega")
-        cli.status()
+        await cli.restart("omega")
+        await cli.status()
 
-        cli.stop("omega")
+        await cli.stop("omega")
         procs = cli.find_fetcher_processes()
         self.assertEqual(0, len(procs))
 
@@ -155,8 +161,16 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
         with mock.patch("omega.cli.save_config", save_config):
             cli.setup()
 
-    def test_main(self):
-        try:
-            cli.main()
-        except fire.core.FireExit:
-            pass
+    def test_parse_years(self):
+        years = "2019"
+        self.assertListEqual([2019], cli.parse_years(years))
+
+        years = "2019,2020"
+        self.assertListEqual([2019, 2020], cli.parse_years(years))
+
+        years = "2019-2020"
+        self.assertListEqual([2019, 2020], cli.parse_years(years))
+
+    async def test_download_archived(self):
+        with mock.patch("builtins.input", return_value="2019"):
+            await cli.download_archived()

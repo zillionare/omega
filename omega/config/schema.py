@@ -39,9 +39,9 @@ class Config(object):
         home: Optional[str] = None
 
         class urls:
-            checksum: Optional[str] = None
-
             quotes_server: Optional[str] = None
+
+            archive: Optional[str] = None
 
         heartbeat: Optional[int] = None
 

@@ -12,13 +12,15 @@ import cfg4py
 import fire
 import omicron
 from pyemit import emit
-from sanic import Sanic, Blueprint
+from sanic import Blueprint, Sanic
+from sanic.websocket import WebSocketProtocol
 
 from omega.config import get_config_dir
 from omega.config.schema import Config
 from omega.core.events import Events
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omega.interfaces import jobs, quotes, sys
+from omega.interfaces.websockets.archive import ArchiveSession
 from omega.jobs import sync as sq
 
 cfg: Config = cfg4py.get_instance()
@@ -46,6 +48,7 @@ class Omega(object):
 
         interfaces = Blueprint.group(jobs.bp, quotes.bp, sys.bp)
         app.blueprint(interfaces)
+        ArchiveSession().register(app, "/ws/quotes/archive")
 
         # listen on omega events
         emit.register(Events.OMEGA_DO_SYNC, sq.sync_bars_worker)
@@ -57,7 +60,7 @@ class Omega(object):
 def get_fetcher_info(fetchers: List, impl: str):
     for fetcher_info in fetchers:
         if fetcher_info.get("impl") == impl:
-            return fetcher_info   
+            return fetcher_info
     return None
 
 
@@ -88,7 +91,13 @@ def start(impl: str, cfg: dict = None, **fetcher_params):
     app.register_listener(omega.init, "before_server_start")
 
     logger.info("starting sanic group listen on %s with %s workers", port, sessions)
-    app.run(host="0.0.0.0", port=port, workers=sessions, register_sys_signals=True)
+    app.run(
+        host="0.0.0.0",
+        port=port,
+        workers=sessions,
+        register_sys_signals=True,
+        protocol=WebSocketProtocol,
+    )
 
 
 if __name__ == "__main__":

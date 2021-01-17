@@ -43,8 +43,8 @@ pickle:
 omega:
   home: ~/zillionare/omgea
   urls:
-    checksum: http://stock.jieyu.ai/chksum
     quotes_server: http://localhost:3181
+    archive: http://stocks.jieyu.ai
   heartbeat: 10
   sync:
     security_list: 02:00

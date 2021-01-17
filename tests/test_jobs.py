@@ -50,7 +50,6 @@ class TestJobs(unittest.IsolatedAsyncioTestCase):
             # await omega exit
             time.sleep(1)
 
-
     async def create_quotes_fetcher(self):
         cfg: Config = cfg4py.get_instance()
         fetcher_info = cfg.quotes_fetchers[0]
@@ -293,32 +292,6 @@ class TestJobs(unittest.IsolatedAsyncioTestCase):
             },
         }
         return end, expected
-
-    async def test_get_checksum(self):
-        end, expected = await self.prepare_checksum_data()
-
-        save_to = (Path(cfg.omega.home) / "data/chksum").expanduser()
-        chksum_file = os.path.join(save_to, "chksum-20200512.json")
-        try:
-            os.remove(chksum_file)
-        except FileNotFoundError:
-            pass
-
-        # read from remote, and cache it
-        actual = await omega.core.sanity.get_checksum(20200512)
-
-        for code in ["000001.XSHE", "000001.XSHG"]:
-            self.assertDictEqual(expected.get(code), actual.get(code))
-
-        # read from local cached file
-        self.assertTrue(os.path.exists(chksum_file))
-        actual = await omega.core.sanity.get_checksum(20200512)
-        for code in ["000001.XSHE", "000001.XSHG"]:
-            self.assertDictEqual(expected.get(code), actual.get(code))
-
-    async def _test_quick_scan(self):
-        # fixme: recover this test later
-        await omega.core.sanity.quick_scan()
 
     async def _test_sync_bars(self):
         # fixme: recover this test later
