@@ -420,7 +420,10 @@ async def setup(reset_factory=False, force=False):
     save_config(settings)
     print_title("Step 5. 配置日志系统")
     config_syslog()
+
     print_title("Step 6. 下载历史数据")
+    config_dir = get_config_dir()
+    cfg4py.init(config_dir, False)
     await download_archived()
 
     print_title("配置已完成。现在为您启动Omega,开启财富之旅！")
@@ -792,7 +795,8 @@ async def download_archived():
                 prompt = f"现有{avail_years}的数据可供下载，是否下载？"
             else:
                 prompt = f"现有{avail_years[0]}-{avail_years[-1]}的数据可供下载，是否下载？"
-            years = get_input(prompt, validate_years, default=None)
+            op_hint = "请输入要下载数据的年份，格式为年份|起始年-结束年，比如2019,2019-2019:"
+            years = get_input(prompt, validate_years, default=None, op_hint=op_hint)
             if not years:
                 return
 
@@ -835,19 +839,24 @@ async def _init():
     await omicron.init(AbstractQuotesFetcher)
 
 
-def run(func, *args, **kwargs):
-    async def wrapper():
-        try:
-            await _init()
-            os.system("clear")
-            await func(*args, **kwargs)
-        except CancelError:
-            pass
-        finally:
-            await omicron.cache.close()
+def run(func):
+    def wrapper(*args, **kwargs):
+        async def init_and_run(*args, **kwargs):
+            try:
+                await _init()
+                os.system("clear")
+                await func(*args, **kwargs)
+            except CancelError:
+                pass
+            finally:
+                await omicron.cache.close()
 
-    asyncio.run(wrapper(*args, **kwargs))
+        asyncio.run(init_and_run(*args, **kwargs))
 
+    return wrapper
+
+def _setup(*args, **kwargs):
+    asyncio.run(setup(*args, **kwargs))
 
 def main():
     import warnings
@@ -857,7 +866,7 @@ def main():
     fire.Fire(
         {
             "start": run(start),
-            "setup": run(setup),
+            "setup": _setup,
             "stop": run(stop),
             "status": run(status),
             "restart": run(restart),
