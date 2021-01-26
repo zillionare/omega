@@ -11,6 +11,8 @@ import functools
 import importlib
 import itertools
 import logging
+from omega.logging import receiver
+from omega.logging.receiver.redis import RedisLogReceiver
 import time
 from typing import Optional
 
@@ -33,8 +35,22 @@ app = Sanic("Omega-jobs")
 logger = logging.getLogger(__name__)
 cfg: Config = cfg4py.get_instance()
 scheduler: Optional[AsyncIOScheduler] = None
+receiver: RedisLogReceiver = None
 
+async def start_logging():
+    global receiver
+    if getattr(cfg, 'logreceiver') is None:
+        return
 
+    if cfg.logreceiver.klass == "omega.logging.receiver.redis.RedisLogReceiver":
+        dsn = cfg.logreceiver.dsn
+        channel = cfg.logreceiver.channel
+        filename = cfg.logreceiver.filename
+        backup_count = cfg.logreceiver.backup_count
+        max_bytes = cfg.logreceiver.max_bytes
+        receiver = RedisLogReceiver(dsn, channel, filename, backup_count, max_bytes)
+        await receiver.start()
+    
 async def init(app, loop):  # noqa
     global scheduler
 
@@ -256,6 +272,11 @@ async def start_sync(request):
     app.add_task(sq.trigger_bars_sync(secs, sync_to))
     return response.text("sync task scheduled")
 
+@app.listener('after_server_stop')
+async def on_shutdown(app,loop):
+    global receiver
+    await receiver.stop()
+    await omicron.shutdown()
 
 def start(host: str = "0.0.0.0", port: int = 3180):
     check_env()

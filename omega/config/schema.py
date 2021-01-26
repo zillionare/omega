@@ -24,6 +24,19 @@ class Config(object):
 
     tz: Optional[str] = None
 
+    class logreceiver:
+        klass: Optional[str] = None
+
+        dsn: Optional[str] = None
+
+        channel: Optional[str] = None
+
+        filename: Optional[str] = None
+
+        backup_count: Optional[int] = None
+
+        max_bytes: Optional[str] = None
+
     class redis:
         dsn: Optional[str] = None
 
