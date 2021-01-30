@@ -424,7 +424,7 @@ async def setup(reset_factory=False, force=False):
     print_title("Step 6. 下载历史数据")
     config_dir = get_config_dir()
     cfg4py.init(config_dir, False)
-    await download_archived()
+    await download_archived(None)
 
     print_title("配置已完成。现在为您启动Omega,开启财富之旅！")
 
@@ -754,59 +754,42 @@ async def http_get(url, content_type: str = "json"):
 
     return None
 
-
-def parse_years(years):
-    matched = re.match(r"(\d{4})\s*-\s*(\d{4})", years)
-    if matched and matched.groups():
-        start = int(matched.group(1))
-        end = int(matched.group(2))
-        years = list(range(start, end + 1))
-    elif re.match(r"(\d{4},*)+", years):
-        years = [int(y) for y in years.split(",") if y]
-    else:
-        years = None
-
-    return years
-
-
-def validate_years(years):
-    try:
-        if len(parse_years(years)) > 0:
-            return True
-    except Exception:
-        pass
-
-    print("只接受以下格式: 2019 | 2019,2020 | 2018-2020")
-    return False
-
-
-async def download_archived():
+async def download_archived(ask=True):
     url = cfg.omega.urls.quotes_server + "/ws/quotes/archive"
 
     async with aiohttp.ClientSession() as session:
         async with session.ws_connect(url) as ws:
             await ws.send_json({"request": "index"})
-            avail_years = await ws.receive_json()
+            index = await ws.receive_json()
 
-            if avail_years is None:
+            avail_months = [int(m) for m in index.get("stock")]
+            avail_months.sort()
+            if avail_months is None:
                 print("当前没有历史数据可供下载。")
                 return
-            elif len(avail_years) == 1:
-                prompt = f"现有{avail_years}的数据可供下载，是否下载？"
             else:
-                prompt = f"现有{avail_years[0]}-{avail_years[-1]}的数据可供下载，是否下载？"
-            op_hint = "请输入要下载数据的年份，格式为年份|起始年-结束年，比如2019,2019-2019:"
-            years = get_input(prompt, validate_years, default=None, op_hint=op_hint)
-            if not years:
+                prompt = f"现有截止到{avail_months[-1]}的{len(avail_months)}个月的数据可供下载。"
+
+            if ask:
+                op_hint = "请输入要下载的数据的月数，0表示不下载："
+                def is_valid(x):
+                    try:
+                        return 0 < int(x) <= len(avail_months)
+                    except Exception:
+                        return False
+
+                n = int(get_input(prompt, is_valid, None, op_hint=op_hint))
+            else:
+                n = os.environ.get("ARCHIVE_BARS")
+                n = int(n) if n is not None else None
+            if n is None or not 0 < n < len(avail_months):
                 return
 
             await ws.send_json(
                 {
                     "request": "bars",
                     "params": {
-                        "years": list(
-                            map(lambda x: int(x.strip(" ")), years.split(","))
-                        ),
+                        "months": avail_months[-n:],
                         "cats": ["stock"],
                     },
                 }
@@ -819,7 +802,6 @@ async def download_archived():
                     await ws.close()
                     break
 
-
 async def _init():
     config_dir = get_config_dir()
     cfg = cfg4py.init(config_dir, False)
@@ -830,13 +812,16 @@ async def _init():
         if isinstance(h, logging.StreamHandler):
             root_logger.removeHandler(h)
             break
+    try:
+        await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
+    except Exception:
+        print(f"dsn is {cfg.redis.dsn}")
+    
+    await omicron.init(AbstractQuotesFetcher)
 
     impl = cfg.quotes_fetchers[0]["impl"]
     params = cfg.quotes_fetchers[0]["workers"][0]
-
-    await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
     await AbstractQuotesFetcher.create_instance(impl, **params)
-    await omicron.init(AbstractQuotesFetcher)
 
 
 def run(func):
@@ -873,6 +858,7 @@ def main():
             "sync_sec_list": run(sync_sec_list),
             "sync_calendar": run(sync_calendar),
             "sync_bars": run(sync_bars),
+            "download": run(download_archived)
         }
     )
 

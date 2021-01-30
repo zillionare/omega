@@ -98,12 +98,13 @@ class TestWebInterfaces(unittest.IsolatedAsyncioTestCase):
             async with session.ws_connect(url) as ws:
                 await ws.send_json({"request": "index"})
                 resp = await ws.receive_json()
-                self.assertListEqual([2019], resp)
+                self.assertSetEqual(set(['index', 'stock']), set(resp.keys()))
+                self.assertSetEqual(set(["201901", "201902"]), set(resp['stock']))
 
                 await ws.send_json(
                     {
                         "request": "bars",
-                        "params": {"years": [2019, 2020], "cats": ["stock"]},
+                        "params": {"months": ["201901","201902"], "cats": ["stock"]},
                     }
                 )
 
@@ -112,9 +113,9 @@ class TestWebInterfaces(unittest.IsolatedAsyncioTestCase):
                     set(
                         [
                             "200 读取索引成功",
-                            "200 服务器没有2020的stock数据",
                             "404 服务器上没有2019年02月的stock数据",
                             "200 成功导入2019年01月的stock数据",
+                            "200 DONE"
                         ]
                     ),
                     results,

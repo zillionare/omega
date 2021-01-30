@@ -1,6 +1,7 @@
 import asyncio
 import io
 import logging
+import os
 import tarfile
 from typing import List, Tuple
 
@@ -120,7 +121,17 @@ async def get_index(url: str):
         url, content = await get_file(url)
         if content is not None:
             yaml = YAML(typ="safe")
-            return 200, yaml.load(content)
+            index = yaml.load(content)
+            parsed = {}
+            for key in ["index", "stock"]:
+                files = index[key]
+                parsed[key] = {}
+
+                for file in files:
+                    month = "".join(os.path.basename(file).split("-")[:2])
+                    parsed[key].update({month:file})
+
+            return 200, parsed
     except aiohttp.ClientConnectionError as e:
         logger.exception(e)
         return 500, f"无法建立与服务器{url}的连接"
@@ -132,7 +143,7 @@ async def get_index(url: str):
         return 500, "未知错误"
 
 
-async def get_bars(server, years: List[int], cats: List[str]) -> Tuple[int, str]:
+async def get_bars(server, months: List[str], cats: List[str]) -> Tuple[int, str]:
     if not server.endswith("/"):
         server += "/"
     status, response = await get_index(server + "index.yml")
@@ -146,13 +157,13 @@ async def get_bars(server, years: List[int], cats: List[str]) -> Tuple[int, str]
     index = response
 
     files = []
-    for year in years:
+    for month in months:
         for cat in cats:
-            if index.get(year) is None or index.get(year).get(cat) is None:
-                yield 200, f"服务器没有{year}的{cat}数据"
+            file = index.get(cat, {}).get(month)
+            if file is None:
+                yield 200, f"服务器没有{month}的{cat}数据"
                 continue
-
-            for file in index[year][cat].values():
+            else:
                 files.append(server + file)
 
     if len(files) == 0:
@@ -174,7 +185,8 @@ async def get_archive_index(server):
         server += "/"
 
     status, index = await get_index(server + "/index.yml")
+    index = {cat: list(index[cat].keys()) for cat in index.keys()}
     if status == 200:
-        return list(index.keys())
+        return index
     else:
         return None

@@ -1,7 +1,6 @@
-2019:
-  stock:
-    jan: 2019-01-stock.tgz
-    feb: 2019-02-stock.tgz
-  index:
-    jan: 2019-01-index.tgz
-    feb: 2019-02-index.tgz
+stock:
+  - 2019-01-stock.tgz
+  - 2019-02-stock.tgz
+index:
+  - 2019-01-index.tgz
+  - 2019-02-index.tgz

@@ -48,6 +48,9 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
         return count
 
     async def test_omega_lifecycle(self):
+        if self.omega:
+            self.omega.kill()
+
         await cli.start("omega")
         procs = cli.find_fetcher_processes()
         self.assertTrue(len(procs) >= 1)
@@ -68,14 +71,10 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
         cli.sync_sec_list()
 
     def test_sync_calendar(self):
-        cli.start("omega")
         cli.sync_calendar()
-        cli.stop("omega")
 
     def test_sync_bars(self):
-        cli.start("omega")
         cli.sync_bars("1d", codes="000001.XSHE")
-        cli.stop("omega")
 
     def test_load_factory_settings(self):
         settings = cli.load_factory_settings()
@@ -161,16 +160,9 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
         with mock.patch("omega.cli.save_config", save_config):
             cli.setup()
 
-    def test_parse_years(self):
-        years = "2019"
-        self.assertListEqual([2019], cli.parse_years(years))
-
-        years = "2019,2020"
-        self.assertListEqual([2019, 2020], cli.parse_years(years))
-
-        years = "2019-2020"
-        self.assertListEqual([2019, 2020], cli.parse_years(years))
-
     async def test_download_archived(self):
-        with mock.patch("builtins.input", return_value="2019"):
+        with mock.patch("builtins.input", return_value="2"):
             await cli.download_archived()
+
+        # no mock
+        await cli.download_archived(ask=False)
