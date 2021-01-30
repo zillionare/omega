@@ -21,6 +21,10 @@ def init_test_env():
     logging.captureWarnings(True)
 
     os.environ[cfg4py.envar] = "DEV"
+    os.environ["REDIS_HOST"] = "localhost"
+    os.environ["REDIS_PORT"] = "6379"
+    os.environ["POSTGRES_USER"] = "zillionare"
+    os.environ["POSTGRES_PASSWORD"] = "123456"
 
     cfg4py.init(get_config_dir(), False)
     # enable postgres for unittest
@@ -51,8 +55,8 @@ async def start_omega(port: int = 3181):
         return None
 
     cfg.omega.urls.quotes_server = f"http://localhost:{port}"
-    account = os.environ["jq_account"]
-    password = os.environ["jq_password"]
+    account = os.environ["JQ_ACCOUNT"]
+    password = os.environ["JQ_PASSWORD"]
 
     # hack: by default postgres is disabled, but we need it enabled for ut
     cfg_ = json.dumps({"postgres": {"dsn": cfg.postgres.dsn, "enabled": "true"}})

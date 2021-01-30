@@ -14,22 +14,12 @@ class TestOmega(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         self.cfg = init_test_env()
 
-    def test_report_logging(self):
-        """Omega使用rsyslog来consolidate多个进程的日志。"""
-        validation = logging.getLogger("validation")
-        validation.info("this is a test, should go to validation")
-
-        quickscan = logging.getLogger("quickscan")
-        quickscan.info("this is a test should go to quickscan")
-
-        logging.info("this is default, should go to omega.log")
-
     async def test_redis_logging(self):
         # remove handlers set by config file, if there is.
         root = logging.getLogger()
         root.handlers.clear()
 
-        channel = "omega"
+        channel = "test_redis_logging"
         redis_logger = logging.getLogger("test_redis")
         fmt = '%(asctime)s %(levelname)-1.1s %(process)d %(name)s:%(funcName)s:%(lineno)s | %(message)s'
 
@@ -42,7 +32,7 @@ class TestOmega(unittest.IsolatedAsyncioTestCase):
             )
         redis_logger.addHandler(handler)
 
-        _dir = "/tmp/omega/test_omega"
+        _dir = "/tmp/omega/test_redis_logging"
         shutil.rmtree(_dir, ignore_errors=True)
         receiver = RedisLogReceiver(
             dsn="redis://localhost:6379",

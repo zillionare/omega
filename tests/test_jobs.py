@@ -336,7 +336,7 @@ class TestJobs(unittest.IsolatedAsyncioTestCase):
         root.handlers.clear()
 
         fmt = '%(asctime)s %(levelname)-1.1s %(process)d %(name)s:%(funcName)s:%(lineno)s | %(message)s'
-        channel = "omega"
+        channel = "test_start_logging"
         redis_logger = logging.getLogger("test_redis")
         handler = rlog.RedisHandler(
             channel=channel, 
@@ -354,7 +354,7 @@ class TestJobs(unittest.IsolatedAsyncioTestCase):
             "logreceiver": {
                 "klass": "omega.logging.receiver.redis.RedisLogReceiver",
                 "dsn": "redis://localhost:6379",
-                "channel": "omega",
+                "channel": channel,
                 "filename": "/tmp/omega/test_jobs/omega.log",
                 "backup_count": 2,
                 "max_bytes": '0.08K'

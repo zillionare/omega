@@ -12,9 +12,9 @@ logging:
     redis:
       class: rlog.RedisHandler
       formatter: default
-      host: localhost
-      port: 6379
-      channel: omega
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      channel: omega.log
   loggers:
     apscheduler:
       level: INFO
@@ -28,15 +28,15 @@ logging:
 tz: Asia/Shanghai
 logreceiver:
   klass: omega.logging.receiver.redis.RedisLogReceiver
-  dsn: redis://localhost:6379
-  channel: omega
+  dsn: redis://${REDIS_HOST}:${REDIS_PORT}
+  channel: omega.log
   filename: /var/log/zillionare/omega.log
   backup_count: 7
   max_bytes: 10M
 redis:
   dsn: redis://localhost:6379
 postgres:
-  dsn: postgres://${pg_account}:${pg_password}@localhost/zillionare
+  dsn: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost/zillionare
   enabled: false
 pickle:
   ver: 4
@@ -80,8 +80,8 @@ omega:
 quotes_fetchers:
   - impl: jqadaptor    # there must be a create_instance method in this module
     workers:
-      - account: ${jq_account}
-        password: ${jq_password}
+      - account: ${JQ_ACCOUNT}
+        password: ${JQ_PASSWORD}
         port: 3181
         # note! for the first group, if you set n, then you'll get n + 1 workers
         sessions: 2
