@@ -129,7 +129,7 @@ async def get_index(url: str):
 
                 for file in files:
                     month = "".join(os.path.basename(file).split("-")[:2])
-                    parsed[key].update({month:file})
+                    parsed[key].update({month: file})
 
             return 200, parsed
     except aiohttp.ClientConnectionError as e:

@@ -1,16 +1,23 @@
 import asyncio
+import datetime
 import json
-from typing import Union
-import aioredis
 import os
 import re
-import datetime
+from typing import Union
+
+import aioredis
 
 
 class RedisLogReceiver:
-    def __init__(self, dsn:str, channel_name:str, filename:str, backup_count: int=7, 
-    max_bytes:Union[str,int]=10*1024*1024,
-    fmt:str=None):
+    def __init__(
+        self,
+        dsn: str,
+        channel_name: str,
+        filename: str,
+        backup_count: int = 7,
+        max_bytes: Union[str, int] = 10 * 1024 * 1024,
+        fmt: str = None,
+    ):
         self._dsn = dsn
         self._channel_name = channel_name
         self._backup_count = backup_count
@@ -20,7 +27,10 @@ class RedisLogReceiver:
             os.makedirs(self._dir)
 
         self._filename = os.path.split(filename)[-1]
-        self._fmt = fmt or "%(asctime)s %(levelname)-1.1s %(process)d %(name)s:%(funcName)s:%(lineno)s | %(message)s"
+        self._fmt = (
+            fmt
+            or "%(asctime)s %(levelname)-1.1s %(process)d %(name)s:%(funcName)s:%(lineno)s | %(message)s"
+        )
 
         # the file handler to save log messages
         self._fh = open(filename, mode="a", encoding="utf-8")
@@ -50,19 +60,19 @@ class RedisLogReceiver:
                     files.append(file)
             files.sort()
             for file in files[::-1]:
-                    old_file = os.path.join(self._dir, file)
-                    matched = re.match(fr"{self._filename}\.(\d+)", file)
-                    if matched:
-                        seq = int(matched.group(1))
-                        if seq + 1 > self._backup_count:
-                            continue
-                    else:
-                        seq = 0
-                    
-                    new_file = os.path.join(self._dir, f"{self._filename}.{seq+1}")
-                    if os.path.exists(new_file):
-                        os.remove(new_file)
-                    os.rename(old_file, new_file)
+                old_file = os.path.join(self._dir, file)
+                matched = re.match(fr"{self._filename}\.(\d+)", file)
+                if matched:
+                    seq = int(matched.group(1))
+                    if seq + 1 > self._backup_count:
+                        continue
+                else:
+                    seq = 0
+
+                new_file = os.path.join(self._dir, f"{self._filename}.{seq+1}")
+                if os.path.exists(new_file):
+                    os.remove(new_file)
+                os.rename(old_file, new_file)
         except Exception as e:
             err_msg = str(e)
 
@@ -72,8 +82,8 @@ class RedisLogReceiver:
 
         if err_msg:
             self._fh.write(err_msg)
-        
-    def _write(self, msg:str):
+
+    def _write(self, msg: str):
         self._written_bytes += len(msg)
         if self._written_bytes > self._max_bytes:
             self.rotate()
@@ -83,12 +93,12 @@ class RedisLogReceiver:
         else:
             self._fh.write(msg)
             self._fh.write("\n")
-    
+
     async def stop(self):
         self._fh.flush()
         self._fh.close()
         self._fh = None
-        
+
         await self._redis.unsubscribe(self._channel_name)
         await self._reader_task
         self._redis.close()
@@ -100,12 +110,12 @@ class RedisLogReceiver:
         self._reader_task = asyncio.create_task(self.reader())
 
     async def reader(self):
-        while (await self._channel.wait_message()):
-            msg = (await self._channel.get()).decode('utf-8')
+        while await self._channel.wait_message():
+            msg = (await self._channel.get()).decode("utf-8")
             self._write(msg)
 
     @staticmethod
-    def parse_max_bytes(max_bytes:Union[str,int]):
+    def parse_max_bytes(max_bytes: Union[str, int]):
         if isinstance(max_bytes, str):
             size, unit = re.match(r"([.\d]+)([MK])", max_bytes.upper()).groups()
             if unit == "M":
@@ -120,4 +130,3 @@ class RedisLogReceiver:
             raise ValueError(f"type of max_bytes({type(max_bytes)}) is not supported.")
 
         return max_bytes
-

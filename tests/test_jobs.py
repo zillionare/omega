@@ -7,12 +7,12 @@ import time
 import unittest
 from pathlib import Path
 from unittest import mock
-import rlog
 
 import arrow
 import cfg4py
 import numpy as np
 import omicron
+import rlog
 from dateutil import tz
 from omicron import cache
 from omicron.core.timeframe import tf
@@ -26,8 +26,8 @@ import omega.jobs.sync as sync
 from omega.config.schema import Config
 from omega.core.events import Events, ValidationError
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
-from tests import init_test_env, start_omega
 from omega.jobs import receiver
+from tests import init_test_env, start_omega
 
 logger = logging.getLogger(__name__)
 cfg: Config = cfg4py.get_instance()
@@ -335,31 +335,33 @@ class TestJobs(unittest.IsolatedAsyncioTestCase):
         root = logging.getLogger()
         root.handlers.clear()
 
-        fmt = '%(asctime)s %(levelname)-1.1s %(process)d %(name)s:%(funcName)s:%(lineno)s | %(message)s'
+        fmt = "%(asctime)s %(levelname)-1.1s %(process)d %(name)s:%(funcName)s:%(lineno)s | %(message)s"
         channel = "test_start_logging"
         redis_logger = logging.getLogger("test_redis")
         handler = rlog.RedisHandler(
-            channel=channel, 
+            channel=channel,
             level=logging.DEBUG,
             host="localhost",
             port="6379",
-            formatter=logging.Formatter(fmt)
-            )
-            
+            formatter=logging.Formatter(fmt),
+        )
+
         redis_logger.addHandler(handler)
 
         _dir = "/tmp/omega/test_jobs"
         shutil.rmtree(_dir, ignore_errors=True)
-        cfg4py.update_config({
-            "logreceiver": {
-                "klass": "omega.logging.receiver.redis.RedisLogReceiver",
-                "dsn": "redis://localhost:6379",
-                "channel": channel,
-                "filename": "/tmp/omega/test_jobs/omega.log",
-                "backup_count": 2,
-                "max_bytes": '0.08K'
+        cfg4py.update_config(
+            {
+                "logreceiver": {
+                    "klass": "omega.logging.receiver.redis.RedisLogReceiver",
+                    "dsn": "redis://localhost:6379",
+                    "channel": channel,
+                    "filename": "/tmp/omega/test_jobs/omega.log",
+                    "backup_count": 2,
+                    "max_bytes": "0.08K",
+                }
             }
-        })
+        )
 
         await omega.jobs.start_logging()
         for i in range(5):
@@ -371,4 +373,3 @@ class TestJobs(unittest.IsolatedAsyncioTestCase):
             content = f.readlines()[0]
             msg = content.split("|")[1]
             self.assertEqual(" this is 2th test log\n", msg)
-        

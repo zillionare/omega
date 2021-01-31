@@ -754,6 +754,7 @@ async def http_get(url, content_type: str = "json"):
 
     return None
 
+
 async def download_archived(ask=True):
     url = cfg.omega.urls.quotes_server + "/ws/quotes/archive"
 
@@ -772,6 +773,7 @@ async def download_archived(ask=True):
 
             if ask:
                 op_hint = "请输入要下载的数据的月数，0表示不下载："
+
                 def is_valid(x):
                     try:
                         return 0 < int(x) <= len(avail_months)
@@ -802,6 +804,7 @@ async def download_archived(ask=True):
                     await ws.close()
                     break
 
+
 async def _init():
     config_dir = get_config_dir()
     cfg = cfg4py.init(config_dir, False)
@@ -816,7 +819,7 @@ async def _init():
         await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
     except Exception:
         print(f"dsn is {cfg.redis.dsn}")
-    
+
     await omicron.init(AbstractQuotesFetcher)
 
     impl = cfg.quotes_fetchers[0]["impl"]
@@ -840,8 +843,10 @@ def run(func):
 
     return wrapper
 
+
 def _setup(*args, **kwargs):
     asyncio.run(setup(*args, **kwargs))
+
 
 def main():
     import warnings
@@ -858,7 +863,7 @@ def main():
             "sync_sec_list": run(sync_sec_list),
             "sync_calendar": run(sync_calendar),
             "sync_bars": run(sync_bars),
-            "download": run(download_archived)
+            "download": run(download_archived),
         }
     )
 
