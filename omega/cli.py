@@ -4,6 +4,7 @@
 """
 管理应用程序生命期、全局对象、任务、全局消息响应
 """
+import asyncio
 import itertools
 import logging
 import os
@@ -15,6 +16,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable, List, Union
 
+import aiohttp
 import aioredis
 import asyncpg
 import cfg4py
@@ -22,6 +24,7 @@ import fire
 import omicron
 import psutil
 import sh
+import websockets
 from omicron.core.lang import async_run
 from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
@@ -35,6 +38,11 @@ from omega.config import get_config_dir
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher
 
 logger = logging.getLogger(__name__)
+cfg = cfg4py.get_instance()
+
+
+class CancelError(BaseException):
+    pass
 
 
 def load_factory_settings():
@@ -363,7 +371,6 @@ def print_title(msg):
     print(colored("".join(["-"] * len(msg)), "green"))
 
 
-@async_run
 async def setup(reset_factory=False, force=False):
     """安装初始化入口
 
@@ -386,7 +393,7 @@ async def setup(reset_factory=False, force=False):
         config_file = os.path.join(get_config_dir(), "defaults.yaml")
         if os.path.exists(config_file):
             print(f"{colored('[PASS]', 'green')} 安装程序已在本机上成功运行")
-            sys.exit(0)
+            raise CancelError()
 
     if reset_factory:
         import sh
@@ -413,6 +420,11 @@ async def setup(reset_factory=False, force=False):
     save_config(settings)
     print_title("Step 5. 配置日志系统")
     config_syslog()
+
+    print_title("Step 6. 下载历史数据")
+    config_dir = get_config_dir()
+    cfg4py.init(config_dir, False)
+    await download_archived(None)
 
     print_title("配置已完成。现在为您启动Omega,开启财富之旅！")
 
@@ -494,7 +506,7 @@ def find_fetcher_processes():
     return result
 
 
-def start(service: str = ""):
+async def start(service: str = ""):
     """启动omega主进程或者任务管理进程
 
     Args:
@@ -657,7 +669,7 @@ def _stop_fetcher_processes():
         time.sleep(1)
 
 
-def status():
+async def status():
     print(f"正在运行中的omega-fetchers进程：\n{'=' * 40}")
     show_fetcher_processes()
     print("\n")
@@ -665,14 +677,13 @@ def status():
     _show_jobs_process()
 
 
-def stop(service: str = ""):
+async def stop(service: str = ""):
     if service == "jobs":
         return _stop_jobs()
 
     _stop_fetcher_processes()
 
 
-@async_run
 async def restart(service: str = ""):
     print("正在重启动服务...")
     await _init()
@@ -684,7 +695,6 @@ async def restart(service: str = ""):
     _start_fetcher_processes()
 
 
-@async_run
 async def sync_sec_list():
     """发起同步证券列表请求"""
     await _init()
@@ -692,14 +702,12 @@ async def sync_sec_list():
     await sync.trigger_single_worker_sync("security_list")
 
 
-@async_run
 async def sync_calendar():
     """发起同步交易日历请求"""
     await _init()
     await sync.trigger_single_worker_sync("calendar")
 
 
-@async_run
 async def sync_bars(frame: str = None, codes: str = None):
     """立即同步行情数据
 
@@ -730,32 +738,132 @@ async def sync_bars(frame: str = None, codes: str = None):
             logger.info("request %s,%s send to workers.", params, codes)
 
 
+async def http_get(url, content_type: str = "json"):
+    try:
+        async with aiohttp.ClientSession() as client:
+            async with client.get(url) as resp:
+                if resp.status == 200:
+                    if content_type == "json":
+                        return await resp.json()
+                    elif content_type == "text":
+                        return await resp.text()
+                    else:
+                        return await resp.content.read(-1)
+    except Exception as e:
+        logger.exception(e)
+
+    return None
+
+
+async def download_archived(ask=True):
+    url = cfg.omega.urls.quotes_server + "/ws/quotes/archive"
+
+    async with aiohttp.ClientSession() as session:
+        async with session.ws_connect(url) as ws:
+            await ws.send_json({"request": "index"})
+            index = await ws.receive_json()
+
+            avail_months = [int(m) for m in index.get("stock")]
+            avail_months.sort()
+            if avail_months is None:
+                print("当前没有历史数据可供下载。")
+                return
+            else:
+                prompt = f"现有截止到{avail_months[-1]}的{len(avail_months)}个月的数据可供下载。"
+
+            if ask:
+                op_hint = "请输入要下载的数据的月数，0表示不下载："
+
+                def is_valid(x):
+                    try:
+                        return 0 < int(x) <= len(avail_months)
+                    except Exception:
+                        return False
+
+                n = int(get_input(prompt, is_valid, None, op_hint=op_hint))
+            else:
+                n = os.environ.get("ARCHIVE_BARS")
+                n = int(n) if n is not None else None
+            if n is None or not 0 < n < len(avail_months):
+                return
+
+            await ws.send_json(
+                {
+                    "request": "bars",
+                    "params": {
+                        "months": avail_months[-n:],
+                        "cats": ["stock"],
+                    },
+                }
+            )
+
+            while True:
+                resp = await ws.receive_str()
+                print(resp)
+                if resp.upper() == "200 DONE":
+                    await ws.close()
+                    break
+
+
 async def _init():
     config_dir = get_config_dir()
     cfg = cfg4py.init(config_dir, False)
 
+    # remove console log, so the output message will looks prettier
+    root_logger = logging.getLogger()
+    for h in root_logger.handlers:
+        if isinstance(h, logging.StreamHandler):
+            root_logger.removeHandler(h)
+            break
+    try:
+        await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
+    except Exception:
+        print(f"dsn is {cfg.redis.dsn}")
+
+    await omicron.init(AbstractQuotesFetcher)
+
     impl = cfg.quotes_fetchers[0]["impl"]
     params = cfg.quotes_fetchers[0]["workers"][0]
-
-    await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
     await AbstractQuotesFetcher.create_instance(impl, **params)
-    await omicron.init(AbstractQuotesFetcher)
+
+
+def run(func):
+    def wrapper(*args, **kwargs):
+        async def init_and_run(*args, **kwargs):
+            try:
+                await _init()
+                os.system("clear")
+                await func(*args, **kwargs)
+            except CancelError:
+                pass
+            finally:
+                await omicron.cache.close()
+
+        asyncio.run(init_and_run(*args, **kwargs))
+
+    return wrapper
+
+
+def _setup(*args, **kwargs):
+    asyncio.run(setup(*args, **kwargs))
 
 
 def main():
     import warnings
 
-    warnings.filterwarnings("ignore", category=DeprecationWarning)
+    warnings.simplefilter("ignore")
+
     fire.Fire(
         {
-            "start": start,
-            "setup": setup,
-            "stop": stop,
-            "status": status,
-            "restart": restart,
-            "sync_sec_list": sync_sec_list,
-            "sync_calendar": sync_calendar,
-            "sync_bars": sync_bars,
+            "start": run(start),
+            "setup": _setup,
+            "stop": run(stop),
+            "status": run(status),
+            "restart": run(restart),
+            "sync_sec_list": run(sync_sec_list),
+            "sync_calendar": run(sync_calendar),
+            "sync_bars": run(sync_bars),
+            "download": run(download_archived),
         }
     )
 

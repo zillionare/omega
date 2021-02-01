@@ -2,6 +2,8 @@ import asyncio
 import datetime
 import logging
 import os
+import shutil
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -10,6 +12,7 @@ import arrow
 import cfg4py
 import numpy as np
 import omicron
+import rlog
 from dateutil import tz
 from omicron import cache
 from omicron.core.timeframe import tf
@@ -23,6 +26,7 @@ import omega.jobs.sync as sync
 from omega.config.schema import Config
 from omega.core.events import Events, ValidationError
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
+from omega.jobs import receiver
 from tests import init_test_env, start_omega
 
 logger = logging.getLogger(__name__)
@@ -46,6 +50,8 @@ class TestJobs(unittest.IsolatedAsyncioTestCase):
         await omicron.shutdown()
         if self.omega:
             self.omega.kill()
+            # await omega exit
+            time.sleep(1)
 
     async def create_quotes_fetcher(self):
         cfg: Config = cfg4py.get_instance()
@@ -290,32 +296,6 @@ class TestJobs(unittest.IsolatedAsyncioTestCase):
         }
         return end, expected
 
-    async def test_get_checksum(self):
-        end, expected = await self.prepare_checksum_data()
-
-        save_to = (Path(cfg.omega.home) / "data/chksum").expanduser()
-        chksum_file = os.path.join(save_to, "chksum-20200512.json")
-        try:
-            os.remove(chksum_file)
-        except FileNotFoundError:
-            pass
-
-        # read from remote, and cache it
-        actual = await omega.core.sanity.get_checksum(20200512)
-
-        for code in ["000001.XSHE", "000001.XSHG"]:
-            self.assertDictEqual(expected.get(code), actual.get(code))
-
-        # read from local cached file
-        self.assertTrue(os.path.exists(chksum_file))
-        actual = await omega.core.sanity.get_checksum(20200512)
-        for code in ["000001.XSHE", "000001.XSHG"]:
-            self.assertDictEqual(expected.get(code), actual.get(code))
-
-    async def _test_quick_scan(self):
-        # fixme: recover this test later
-        await omega.core.sanity.quick_scan()
-
     async def _test_sync_bars(self):
         # fixme: recover this test later
         config_items = [
@@ -349,3 +329,47 @@ class TestJobs(unittest.IsolatedAsyncioTestCase):
             {"start": "2020-01-01", "stop": None, "frame_type": FrameType.DAY},
             sync_request[0],
         )
+
+    async def test_start_logging(self):
+        # remove handlers set by config file, if there is.
+        root = logging.getLogger()
+        root.handlers.clear()
+
+        fmt = "%(asctime)s %(levelname)-1.1s %(process)d %(name)s:%(funcName)s:%(lineno)s | %(message)s"
+        channel = "test_start_logging"
+        redis_logger = logging.getLogger("test_redis")
+        handler = rlog.RedisHandler(
+            channel=channel,
+            level=logging.DEBUG,
+            host="localhost",
+            port="6379",
+            formatter=logging.Formatter(fmt),
+        )
+
+        redis_logger.addHandler(handler)
+
+        _dir = "/tmp/omega/test_jobs"
+        shutil.rmtree(_dir, ignore_errors=True)
+        cfg4py.update_config(
+            {
+                "logreceiver": {
+                    "klass": "omega.logging.receiver.redis.RedisLogReceiver",
+                    "dsn": "redis://localhost:6379",
+                    "channel": channel,
+                    "filename": "/tmp/omega/test_jobs/omega.log",
+                    "backup_count": 2,
+                    "max_bytes": "0.08K",
+                }
+            }
+        )
+
+        await omega.jobs.start_logging()
+        for i in range(5):
+            redis_logger.info("this is %sth test log", i)
+
+        await asyncio.sleep(0.5)
+        self.assertEqual(3, len(os.listdir(_dir)))
+        with open(f"{_dir}/omega.log.2", "r", encoding="utf-8") as f:
+            content = f.readlines()[0]
+            msg = content.split("|")[1]
+            self.assertEqual(" this is 2th test log\n", msg)
