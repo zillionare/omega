@@ -34,7 +34,7 @@ logreceiver:
   backup_count: 7
   max_bytes: 10M
 redis:
-  dsn: redis://localhost:6379
+  dsn: redis://${REDIS_HOST}:${REDIS_PORT}
 postgres:
   dsn: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost/zillionare
   enabled: false
