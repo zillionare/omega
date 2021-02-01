@@ -1,7 +1,8 @@
 [[tool.poetry.source]]
 name = "ali"
 url = "https://mirrors.aliyun.com/pypi/simple/"
-default = true
+#default = true
+secondary = true
 
 [tool.poetry]
 name = "zillionare-omega"
@@ -38,6 +39,8 @@ version = "1.0.0-alpha.0"
 
 [tool.poetry.dependencies]
 python=">=3.8,<3.9"
+zillionare_omega_adaptors_jq=">=0.3.5"
+zillionare_omicron=">=1.0.0.a0"
 aiohttp = "^3.7.3"
 pyemit = "^0.4.0"
 arrow = "^0.15"
@@ -56,6 +59,7 @@ psutil  = "^5.7.3"
 fire = "^0.3.1"
 pyarrow = "^2.0.0"
 rlog = "0.3"
+pandas = "^1.2.0"
 
 black  = { version = "20.8b1", optional = true}
 isort  = { version = "5.6.4", optional = true}
@@ -73,7 +77,6 @@ mkdocstrings  = { version = "^0.13.6", optional = true}
 mkdocs-material-extensions  = { version = "^1.0.1", optional = true}
 twine  = { version = "^3.2.0", optional = true}
 markdown-include = {version = "^0.6.0", optional = true}
-pandas = { version = "^1.2.0", optional = true}
 
 [tool.poetry.extras]
 test = [
@@ -82,8 +85,7 @@ test = [
     "isort",
     "doc8",
     "flake8",
-    "pytest-cov",
-    "pandas"
+    "pytest-cov"
     ]
 
 dev = ["tox", "pre-commit", "virtualenv", "pip", "twine"]
