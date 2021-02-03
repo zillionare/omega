@@ -75,7 +75,7 @@ async def start_omega(port: int = 3181):
         ],
         env=os.environ,
     )
-    for i in range(30, 0, -1):
+    for i in range(60, 0, -1):
         time.sleep(1)
         if await is_local_omega_alive():
             # return the process id, the caller should shutdown it later
