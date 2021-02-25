@@ -12,13 +12,13 @@ theme:
   name: material
 
 markdown_extensions:
+  - pymdownx.highlight:
+      linenums: true
+  - pymdownx.superfences
   - admonition
-  - pymdownx.details
-  - markdown_include.include:
-      base_path: docs
   - toc:
       baselevel: 2
 plugins:
+  - include-markdown
   - mkdocstrings
-  - search:
-      lang: 'ja'
+  - search
