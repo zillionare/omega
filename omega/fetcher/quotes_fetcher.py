@@ -35,17 +35,15 @@ class QuotesFetcher(ABC):
         frame_type: FrameType,
         allow_unclosed=True,
     ) -> numpy.ndarray:
-        """
-        fetch quotes of sec. Return a numpy rec array with n_bars length, and last
-        frame is end。
-        取n个单位的k线数据，k线周期由frame_type指定。最后结束周期为end。股票停牌期间的数据
-        会使用None填充。
+        """取n个单位的k线数据。
+
+        k线周期由frame_type指定。最后结束周期为end。股票停牌期间的数据会使用None填充。
         Args:
-            sec:
-            end:
-            n_bars:
-            frame_type:
-            allow_unclosed: 为真时，当前未结束的桢数据也获取
+            sec (str): 证券代码
+            end (Frame):
+            n_bars (int):
+            frame_type (FrameType):
+            allow_unclosed (bool): 为真时，当前未结束的帧数据也获取
 
         Returns:
             a numpy.ndarray, with each element is:
