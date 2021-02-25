@@ -99,7 +99,7 @@ async def is_local_archive_server_alive(port):
     return False
 
 
-async def start_archive_server(port=8000):
+async def start_archive_server(port=8003):
     _dir = os.path.join(os.path.dirname(__file__), "data")
 
     process = subprocess.Popen(

@@ -15,6 +15,7 @@ from tests import init_test_env, start_archive_server, start_omega
 class TestCLI(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         self.cfg = init_test_env()
+        self.cfg.omega.urls.archive = "http://localhost:8003"
         self.omega = await start_omega()
         self.archive = await start_archive_server()
 
@@ -62,19 +63,19 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
         procs = cli.find_fetcher_processes()
         self.assertEqual(0, len(procs))
 
-    def test_omega_jobs(self):
-        cli.start("jobs")
-        cli.status()
-        cli.stop("jobs")
+    async def test_omega_jobs(self):
+        await cli.start("jobs")
+        await cli.status()
+        await cli.stop("jobs")
 
-    def test_sync_sec_list(self):
-        cli.sync_sec_list()
+    async def test_sync_sec_list(self):
+        await cli.sync_sec_list()
 
-    def test_sync_calendar(self):
-        cli.sync_calendar()
+    async def test_sync_calendar(self):
+        await cli.sync_calendar()
 
-    def test_sync_bars(self):
-        cli.sync_bars("1d", codes="000001.XSHE")
+    async def test_sync_bars(self):
+        await cli.sync_bars("1d", codes="000001.XSHE")
 
     def test_load_factory_settings(self):
         settings = cli.load_factory_settings()
