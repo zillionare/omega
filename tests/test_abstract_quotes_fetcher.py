@@ -166,50 +166,53 @@ class TestAbstractQuotesFetcher(unittest.IsolatedAsyncioTestCase):
 
     async def test_get_bars_014(self):
         """测试周线级别未结束的frame能否对齐"""
+        # 4/29停牌，4/30复牌, 4/30周线结束
         sec = "600721.XSHG"
         frame_type = FrameType.WEEK
+
+        end = arrow.get("2020-4-29 15:00").datetime  # 周三，该周周四结束
+        bars = await aq.get_bars(sec, end, 3, FrameType.WEEK)
+        print(bars)
         """
         [(datetime.date(2020, 4, 17), 6.02, 6.69, 5.84, 6.58, 22407., 1.407e+08, 1.455)
          (datetime.date(2020, 4, 24), 6.51, 6.57, 5.68, 5.72, 25911., 1.92e+08, 1.455)
-         (datetime.date(2020, 4, 29),  nan,  nan,  nan,  nan,    nan,    nan,   nan)]
-
-        [(datetime.date(2020, 4, 17), 6.02, 6.69, 5.84, 6.58, 2241., 1.4e+08, 1.455)
-         (datetime.date(2020, 4, 24), 6.51, 6.57, 5.68, 5.72, 2511., 1.55e+08, 1.455)
-         (datetime.date(2020, 4, 30),  nan,  nan,  nan,  nan,       nan, nan,   nan)]
-
+         (datetime.date(2020, 4, 28), 5.7, 5.71, 5.17, 5.36, 11879667,6.39341393e+07, 1.455)]
         """
-        end = arrow.get("2020-4-29 15:00").datetime  # 周三，当周周四结束
-        bars = await aq.get_bars(sec, end, 3, FrameType.WEEK)
-        print(bars)
-        self.assertEqual(arrow.get("2020-4-17").date(), bars[0]["frame"])
-        self.assertEqual(arrow.get("2020-4-24").date(), bars[1]["frame"])
-        self.assertEqual(arrow.get("2020-4-29").date(), bars[-1]["frame"])
+        self.assertEqual(datetime.date(2020, 4, 17), bars[0]["frame"])
+        self.assertEqual(datetime.date(2020, 4, 24), bars[1]["frame"])
+        self.assertEqual(datetime.date(2020, 4, 28), bars[-1]["frame"])
 
-        self.assertAlmostEqual(6.02, bars[0]["open"], places=2)
-        self.assertAlmostEqual(6.51, bars[1]["open"], places=2)
-        self.assertTrue(np.isnan(bars[-1]["open"]))
+        self.assertAlmostEqual(6.58, bars[0]["close"], places=2)
+        self.assertAlmostEqual(5.72, bars[1]["close"], places=2)
+        self.assertAlmostEqual(5.36, bars[-1]["close"], places=2)
 
         end = arrow.get("2020-04-30 15:00").datetime
         bars = await aq.get_bars(sec, end, 3, frame_type)
         print(bars)
+        """
+        [(datetime.date(2020, 4, 17), 6.02, 6.69, 5.84, 6.58, 2241., 1.4e+08, 1.455)
+         (datetime.date(2020, 4, 24), 6.51, 6.57, 5.68, 5.72, 2511., 1.55e+08, 1.455)
+         (datetime.date(2020, 4, 30), 5.7, 5.71, 5.17, 5.39, 15645495, 84086903, 1.455)]
+        """
 
-        self.assertEqual(arrow.get("2020-4-17").date(), bars[0]["frame"])
-        self.assertEqual(arrow.get("2020-4-24").date(), bars[1]["frame"])
-        self.assertEqual(arrow.get("2020-4-30").date(), bars[-1]["frame"])
+        self.assertEqual(datetime.date(2020, 4, 17), bars[0]["frame"])
+        self.assertEqual(datetime.date(2020, 4, 24), bars[1]["frame"])
+        self.assertEqual(datetime.date(2020, 4, 30), bars[-1]["frame"])
 
-        self.assertAlmostEqual(6.02, bars[0]["open"], places=2)
-        self.assertAlmostEqual(6.51, bars[1]["open"], places=2)
-        self.assertAlmostEqual(5.7, bars[-1]["open"], places=2)
+        self.assertAlmostEqual(6.58, bars[0]["close"], places=2)
+        self.assertAlmostEqual(5.72, bars[1]["close"], places=2)
+        self.assertAlmostEqual(5.39, bars[-1]["close"], places=2)
 
     async def test_get_bars_015(self):
-        sec = "300677.XSHE"
-        frame_type = FrameType.DAY
-        end = arrow.now().datetime
+        """test when include_unclosed is False"""
+        sec = "000001.XSHG"
+        frame_type = FrameType.WEEK
+        end = datetime.date(2021, 2, 9)
 
         # without cache
-        # await self.clear_cache(sec, frame_type)
-        bars = await aq.get_bars(sec, end, 10, frame_type)
-        print(bars)
+        await self.clear_cache(sec, frame_type)
+        bars = await aq.get_bars(sec, end, 1, frame_type, include_unclosed=False)
+        self.assertEqual(datetime.date(2021, 2, 5), bars["frame"][0])
 
     async def test_get_valuation(self):
         secs = ["000001.XSHE", "600000.XSHG"]
