@@ -334,7 +334,7 @@ async def trigger_single_worker_sync(_type: str, params: dict = None):
                 if resp.status != 200:
                     logger.warning("failed to trigger %s sync", _type)
                 else:
-                    return resp.json()
+                    return await resp.json()
         except Exception as e:
             logger.exception(e)
 
