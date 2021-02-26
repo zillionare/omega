@@ -93,7 +93,7 @@ dev = ["tox", "pre-commit", "virtualenv", "pip", "twine"]
 
 doc = [
     "mkdocs",
-    "markdown-include",
+    "mkdocs-include-markdown-plugin",
     "mkdocs-material",
     "mkdocstrings",
     "mkdocs-material-extension"
