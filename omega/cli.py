@@ -29,12 +29,14 @@ from omicron.core.lang import async_run
 from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
 from pyemit import emit
+from ruamel import yaml
 from ruamel.yaml import YAML
 from termcolor import colored
 
 import omega
 import omega.jobs.sync as sync
 from omega.config import get_config_dir
+from omega.fetcher import archive
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher
 
 logger = logging.getLogger(__name__)
@@ -753,6 +755,107 @@ async def http_get(url, content_type: str = "json"):
         logger.exception(e)
 
     return None
+
+
+async def get_archive_index():
+    url = cfg.omega.urls.archive + "/index.yml"
+    content = await http_get(url, "text")
+    if content is None:
+        print("当前没有历史数据可供下载")
+        return
+
+    return archive.parse_index(content)
+
+
+def bin_cut(arr: list, n: int):
+    """将数组arr切分成n份
+
+    Args:
+        arr ([type]): [description]
+        n ([type]): [description]
+
+    Returns:
+        [type]: [description]
+    """
+    result = []
+
+    sz = len(arr) // n
+    if sz * n != len(arr):
+        sz += 1
+    for i in range(n):
+        result.append(arr[i * sz : (i + 1) * sz])
+
+    return result
+
+
+async def show_subprocess_output(stream):
+    while True:
+        try:
+            line = await stream.readline()
+            line = line.decode("utf-8")
+            if not line:
+                break
+            print(line)
+        except Exception:
+            pass
+
+
+async def download_archive_v2(ask=True):
+    index = await get_archive_index()
+
+    avail_months = [int(m) for m in index.get("stock")]
+    avail_months.sort()
+    if avail_months is None:
+        print("当前没有历史数据可供下载")
+        return
+    else:
+        prompt = f"现有截止到{avail_months[-1]}的{len(avail_months)}个月的数据可供下载。"
+
+    if ask:
+        op_hint = "请输入要下载的数据的月数，0表示不下载:"
+
+        def is_valid(x):
+            try:
+                return 0 < int(x) <= len(avail_months)
+            except Exception:
+                return False
+
+        n = int(get_input(prompt, is_valid, None, op_hint=op_hint))
+    else:
+        n = os.environ.get("ARCHIVE_BARS")
+        n = int(n) if n is not None else None
+    if n is None or n == 0:
+        return
+
+    n = min(n, len(avail_months))
+    # months = ",".join([str(x) for x in avail_months[-n:]])
+    cats = "index,stock"
+
+    cpus = psutil.cpu_count()
+
+    months_groups = bin_cut(avail_months[-n:], cpus)
+    tasks = []
+    for m in months_groups:
+        if len(m) == 0:
+            break
+        months = ",".join([str(x) for x in m])
+
+        proc = await asyncio.create_subprocess_exec(
+            sys.executable,
+            "-m",
+            "omega.fetcher.archive",
+            "main",
+            f"'{months}'",
+            f"'{cats}'",
+            limit=1024 * 128,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        tasks.append(show_subprocess_output(proc.stdout))
+        tasks.append(show_subprocess_output(proc.stderr))
+
+    await asyncio.gather(*tasks)
 
 
 async def download_archived(ask=True):
