@@ -15,7 +15,7 @@ from tests import init_test_env, start_archive_server, start_omega
 class TestCLI(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         self.cfg = init_test_env()
-        self.cfg.omega.urls.archive = "http://localhost:8003"
+        # self.cfg.omega.urls.archive = "http://localhost:8003"
         self.omega = await start_omega()
         self.archive = await start_archive_server()
 
@@ -162,8 +162,12 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
             cli.setup()
 
     async def test_download_archived(self):
-        with mock.patch("builtins.input", return_value="2"):
+        with mock.patch("builtins.input", return_value="1"):
             await cli.download_archived()
 
         # no mock
-        await cli.download_archived(ask=False)
+        # await cli.download_archived(ask=False)
+
+    async def test_download_archive_v2(self):
+        with mock.patch("builtins.input", return_value="2"):
+            await cli.download_archive_v2()

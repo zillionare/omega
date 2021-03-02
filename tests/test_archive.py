@@ -11,7 +11,7 @@ from omicron.core.types import FrameType
 from omicron.dal import cache
 
 from omega.fetcher import archive
-from tests import init_test_env
+from tests import init_test_env, start_archive_server, start_omega
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,17 @@ class TestArchieveFetcher(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         init_test_env()
         self.cfg = cfg4py.get_instance()
+        self.omega = await start_omega()
+        self.archive = await start_archive_server()
+
         await omicron.init()
+
+    async def asyncTearDown(self) -> None:
+        if self.omega:
+            self.omega.kill()
+
+        if self.archive:
+            self.archive.kill()
 
     async def test_archived_bars_handler_save(self):
         await cache.security.delete("000001.XSHE* ")
@@ -45,3 +55,6 @@ class TestArchieveFetcher(unittest.IsolatedAsyncioTestCase):
             )
 
             self.assertEqual(datetime.date(2019, 1, 4), bars[0]["frame"])
+
+    async def test_main(self):
+        await archive._main([201901], ["stock"])

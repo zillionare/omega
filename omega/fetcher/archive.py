@@ -1,17 +1,26 @@
 import asyncio
+import glob
 import io
 import logging
 import os
 import tarfile
+import tempfile
+from os.path import basename
 from typing import List, Tuple
 
 import aiohttp
 import cfg4py
+import fire
+import omicron
 import pandas as pd
 from omicron import cache
 from omicron.core.types import FrameType
+from pandas.core import base
 from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
+from ruamel.yaml.main import parse
+
+from omega.config import get_config_dir
 
 logger = logging.getLogger(__name__)
 
@@ -28,60 +37,77 @@ class ArchivedBarsHandler(FileHandler):
         self.url = url
 
     async def process(self, stream):
+        extract_to = tempfile.mkdtemp(prefix="omega-archive")
         try:
-            fileobj = io.BytesIO(await stream.read(-1))
-            tar = tarfile.open(fileobj=fileobj, mode="r:gz")
-            count = 0
-            for member in tar.getmembers():
-                f = tar.extractfile(member)
-                df = pd.read_parquet(f)
-
-                sec = member.name.split("/")[-1]
-
-                await self.save(sec, df)
-                count += 1
-
             year, month, cat = parse_url(self.url)
+
+            fileobj = io.BytesIO(await stream.read(-1))
+            tar = tarfile.open(fileobj=fileobj, mode="r")
+            logger.info("extracting %s into %s", self.url, extract_to)
+            tar.extractall(extract_to)
+
+            pattern = os.path.join(extract_to, "**/*.XSH?")
+            print(glob.glob(pattern, recursive=True))
+            tasks = [self.save(file) for file in glob.glob(pattern, recursive=True)]
+            await asyncio.gather(*tasks)
+            # for file in glob.glob(pattern, recursive=True):
+            #     await self.save(file)
+
+            logger.info("%s数据导入完成", self.url)
             return self.url, f"200 成功导入{year}年{month}月的{cat}数据"
         except Exception as e:
             logger.exception(e)
-            return self.url, "500 导入数据失败"
+            return self.url, f"500 导入数据{year}/{month}:{cat}失败"
 
-    async def save(self, code: str, df: pd.DataFrame):
-        pipeline = cache.security.pipeline()
+        try:
+            os.rmdir(extract_to)
+        except OSError as e:
+            logger.exception(e)
+            logger.warning("failed to remove temp dir %s", extract_to)
 
-        ranges = {}
+    async def save(self, file: str):
+        try:
+            logger.debug("saving file %s", file)
+            df = pd.read_parquet(file)
+            code = os.path.split(file)[-1]
+            pipeline = cache.security.pipeline()
 
-        # retrieve rng from cache
-        for frame_type in set(df["frame_type"]):
-            key = f"{code}:{FrameType.from_int(frame_type).value}"
+            ranges = {}
 
-            head = await cache.security.hget(key, "head")
-            tail = await cache.security.hget(key, "tail")
-            ranges[key] = {
-                "head": int(head) if head else None,
-                "tail": int(tail) if tail else None,
-            }
+            # retrieve rng from cache
+            for frame_type in set(df["frame_type"]):
+                key = f"{code}:{FrameType.from_int(frame_type).value}"
 
-        for frame, (o, h, l, c, v, a, fq, frame_type) in df.iterrows():
-            key = f"{code}:{FrameType.from_int(frame_type).value}"
+                head = await cache.security.hget(key, "head")
+                tail = await cache.security.hget(key, "tail")
+                ranges[key] = {
+                    "head": int(head) if head else None,
+                    "tail": int(tail) if tail else None,
+                }
 
-            pipeline.hset(
-                key, frame, f"{o:.2f} {h:.2f} {l:.2f} {c:.2f} {v} {a:.2f} {fq:.2f}"
-            )
-            ranges[key]["head"] = (
-                min(ranges[key]["head"], frame) if ranges[key]["head"] else frame
-            )
-            ranges[key]["tail"] = (
-                min(ranges[key]["tail"], frame) if ranges[key]["tail"] else frame
-            )
+            for frame, (o, h, l, c, v, a, fq, frame_type) in df.iterrows():
+                key = f"{code}:{FrameType.from_int(frame_type).value}"
 
-        for frame_type in set(df["frame_type"]):
-            key = f"{code}:{FrameType.from_int(frame_type).value}"
-            pipeline.hset(key, "head", ranges[key]["head"])
-            pipeline.hset(key, "tail", ranges[key]["tail"])
+                pipeline.hset(
+                    key, frame, f"{o:.2f} {h:.2f} {l:.2f} {c:.2f} {v} {a:.2f} {fq:.2f}"
+                )
+                ranges[key]["head"] = (
+                    min(ranges[key]["head"], frame) if ranges[key]["head"] else frame
+                )
+                ranges[key]["tail"] = (
+                    max(ranges[key]["tail"], frame) if ranges[key]["tail"] else frame
+                )
 
-        await pipeline.execute()
+            for frame_type in set(df["frame_type"]):
+                key = f"{code}:{FrameType.from_int(frame_type).value}"
+                # workaround for previous collected data
+                pipeline.hset(key, "head", int(ranges[key]["head"]))
+                pipeline.hset(key, "tail", int(ranges[key]["tail"]))
+
+            await pipeline.execute()
+        except Exception as e:
+            logger.info("导入%s失败", file)
+            logger.exception(e)
 
 
 def parse_url(url: str):
@@ -97,6 +123,8 @@ async def get_file(url: str, timeout: int = 600, handler: FileHandler = None):
             async with aiohttp.ClientSession(timeout=timeout) as client:
                 async with client.get(url) as response:
                     if response.status == 200:
+                        logger.info("file %s downloaded", url)
+
                         if handler is None:
                             return url, await response.read()
                         else:
@@ -116,22 +144,26 @@ async def get_file(url: str, timeout: int = 600, handler: FileHandler = None):
     return url, None
 
 
+def parse_index(text):
+    yaml = YAML(typ="safe")
+    index = yaml.load(text)
+    parsed = {}
+    for key in ["index", "stock"]:
+        files = index.get(key) or []
+        parsed[key] = {}
+
+        for file in files:
+            month = "".join(os.path.basename(file).split("-")[:2])
+            parsed[key].update({int(month): file})
+
+    return parsed
+
+
 async def get_index(url: str):
     try:
         url, content = await get_file(url)
         if content is not None:
-            yaml = YAML(typ="safe")
-            index = yaml.load(content)
-            parsed = {}
-            for key in ["index", "stock"]:
-                files = index[key]
-                parsed[key] = {}
-
-                for file in files:
-                    month = "".join(os.path.basename(file).split("-")[:2])
-                    parsed[key].update({month: file})
-
-            return 200, parsed
+            return 200, parse_index(content)
     except aiohttp.ClientConnectionError as e:
         logger.exception(e)
         return 500, f"无法建立与服务器{url}的连接"
@@ -190,3 +222,31 @@ async def get_archive_index(server):
         return index
     else:
         return None
+
+
+async def _main(months: list, cats: list):
+    await omicron.init()
+
+    async for status, desc in get_bars(cfg.omega.urls.archive, months, cats):
+        print(status, desc)
+
+
+def main(months: str, cats: str):
+    """允许将本模块以独立进程运行，以支持多进程
+
+    Args:
+        months (str): 逗号分隔的月列表。格式如202012
+        cats (str): 逗号分隔的类别列表，如"stock,index"
+    """
+    config_dir = get_config_dir()
+    cfg4py.init(config_dir, False)
+
+    months = str(months)
+    months = [int(x) for x in months.split(",") if x]
+    cats = [x for x in cats.split(",")]
+
+    asyncio.run(_main(months, cats))
+
+
+if __name__ == "__main__":
+    fire.Fire({"main": main})
