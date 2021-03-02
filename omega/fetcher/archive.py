@@ -3,9 +3,9 @@ import glob
 import io
 import logging
 import os
+import shutil
 import tarfile
 import tempfile
-from os.path import basename
 from typing import List, Tuple
 
 import aiohttp
@@ -15,7 +15,6 @@ import omicron
 import pandas as pd
 from omicron import cache
 from omicron.core.types import FrameType
-from pandas.core import base
 from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
 from ruamel.yaml.main import parse
@@ -37,7 +36,7 @@ class ArchivedBarsHandler(FileHandler):
         self.url = url
 
     async def process(self, stream):
-        extract_to = tempfile.mkdtemp(prefix="omega-archive")
+        extract_to = tempfile.mkdtemp(prefix="omega-archive-")
         try:
             year, month, cat = parse_url(self.url)
 
@@ -50,20 +49,19 @@ class ArchivedBarsHandler(FileHandler):
             print(glob.glob(pattern, recursive=True))
             tasks = [self.save(file) for file in glob.glob(pattern, recursive=True)]
             await asyncio.gather(*tasks)
-            # for file in glob.glob(pattern, recursive=True):
-            #     await self.save(file)
 
             logger.info("%s数据导入完成", self.url)
-            return self.url, f"200 成功导入{year}年{month}月的{cat}数据"
         except Exception as e:
             logger.exception(e)
             return self.url, f"500 导入数据{year}/{month}:{cat}失败"
 
         try:
-            os.rmdir(extract_to)
-        except OSError as e:
+            shutil.rmtree(extract_to)
+        except Exception as e:
             logger.exception(e)
             logger.warning("failed to remove temp dir %s", extract_to)
+
+        return self.url, f"200 成功导入{year}年{month}月的{cat}数据"
 
     async def save(self, file: str):
         try:
@@ -193,7 +191,7 @@ async def get_bars(server, months: List[str], cats: List[str]) -> Tuple[int, str
         for cat in cats:
             file = index.get(cat, {}).get(month)
             if file is None:
-                yield 200, f"服务器没有{month}的{cat}数据"
+                yield 404, f"服务器没有{month}的{cat}数据"
                 continue
             else:
                 files.append(server + file)

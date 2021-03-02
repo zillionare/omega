@@ -99,12 +99,12 @@ class TestWebInterfaces(unittest.IsolatedAsyncioTestCase):
                 await ws.send_json({"request": "index"})
                 resp = await ws.receive_json()
                 self.assertSetEqual(set(["index", "stock"]), set(resp.keys()))
-                self.assertSetEqual(set(["201901", "201902"]), set(resp["stock"]))
+                self.assertSetEqual(set([201901, 201902]), set(resp["stock"]))
 
                 await ws.send_json(
                     {
                         "request": "bars",
-                        "params": {"months": ["201901", "201902"], "cats": ["stock"]},
+                        "params": {"months": [201901, 201902], "cats": ["stock"]},
                     }
                 )
 
