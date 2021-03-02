@@ -814,7 +814,6 @@ async def _init():
     for h in root_logger.handlers:
         if isinstance(h, logging.StreamHandler):
             root_logger.removeHandler(h)
-            break
     try:
         await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
     except Exception:
@@ -832,7 +831,7 @@ def run(func):
         async def init_and_run(*args, **kwargs):
             try:
                 await _init()
-                os.system("clear")
+                #os.system("clear")
                 await func(*args, **kwargs)
             except CancelError:
                 pass
