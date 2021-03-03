@@ -4,7 +4,8 @@ omit =
     */jobs/__main__.py
     */app.py
     */cli.py
-    */config/schema.py
+    */config/*
+    omega/interfaces/*
 [report]
 exclude_lines =
     pragma: no cover

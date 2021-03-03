@@ -20,7 +20,6 @@ from omega.config.schema import Config
 from omega.core.events import Events
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omega.interfaces import jobs, quotes, sys
-from omega.interfaces.websockets.archive import ArchiveSession
 from omega.jobs import sync as sq
 
 cfg: Config = cfg4py.get_instance()
@@ -48,7 +47,6 @@ class Omega(object):
 
         interfaces = Blueprint.group(jobs.bp, quotes.bp, sys.bp)
         app.blueprint(interfaces)
-        ArchiveSession().register(app, "/ws/quotes/archive")
 
         # listen on omega events
         emit.register(Events.OMEGA_DO_SYNC, sq.sync_bars_worker)

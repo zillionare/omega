@@ -46,7 +46,6 @@ class ArchivedBarsHandler(FileHandler):
             tar.extractall(extract_to)
 
             pattern = os.path.join(extract_to, "**/*.XSH?")
-            print(glob.glob(pattern, recursive=True))
             tasks = [self.save(file) for file in glob.glob(pattern, recursive=True)]
             await asyncio.gather(*tasks)
 
@@ -173,7 +172,7 @@ async def get_index(url: str):
         return 500, "未知错误"
 
 
-async def get_bars(server, months: List[str], cats: List[str]) -> Tuple[int, str]:
+async def get_bars(server, months: List[int], cats: List[str]) -> Tuple[int, str]:
     if not server.endswith("/"):
         server += "/"
     status, response = await get_index(server + "index.yml")
@@ -205,7 +204,8 @@ async def get_bars(server, months: List[str], cats: List[str]) -> Tuple[int, str
     for task in asyncio.as_completed(tasks):
         url, result = await task
         if result is not None:
-            yield result.split(" ")
+            status, desc = result.split(" ")
+            yield int(status), desc
 
     yield 200, "DONE"
 
