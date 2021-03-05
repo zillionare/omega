@@ -426,7 +426,7 @@ async def setup(reset_factory=False, force=False):
     print_title("Step 6. 下载历史数据")
     config_dir = get_config_dir()
     cfg4py.init(config_dir, False)
-    await download_archived(None)
+    await download_archive(None)
 
     print_title("配置已完成。现在为您启动Omega,开启财富之旅！")
 
@@ -800,7 +800,7 @@ async def show_subprocess_output(stream):
             pass
 
 
-async def download_archive_v2(ask=True):
+async def download_archive(ask=True):
     index = await get_archive_index()
 
     avail_months = [int(m) for m in index.get("stock")]
@@ -847,7 +847,6 @@ async def download_archive_v2(ask=True):
             "main",
             f"'{months}'",
             f"'{cats}'",
-            limit=1024 * 128,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -856,56 +855,6 @@ async def download_archive_v2(ask=True):
         tasks.append(show_subprocess_output(proc.stderr))
 
     await asyncio.gather(*tasks)
-
-
-async def download_archived(ask=True):
-    url = cfg.omega.urls.quotes_server + "/ws/quotes/archive"
-
-    async with aiohttp.ClientSession() as session:
-        async with session.ws_connect(url) as ws:
-            await ws.send_json({"request": "index"})
-            index = await ws.receive_json()
-
-            avail_months = [int(m) for m in index.get("stock")]
-            avail_months.sort()
-            if avail_months is None:
-                print("当前没有历史数据可供下载。")
-                return
-            else:
-                prompt = f"现有截止到{avail_months[-1]}的{len(avail_months)}个月的数据可供下载。"
-
-            if ask:
-                op_hint = "请输入要下载的数据的月数，0表示不下载："
-
-                def is_valid(x):
-                    try:
-                        return 0 < int(x) <= len(avail_months)
-                    except Exception:
-                        return False
-
-                n = int(get_input(prompt, is_valid, None, op_hint=op_hint))
-            else:
-                n = os.environ.get("ARCHIVE_BARS")
-                n = int(n) if n is not None else None
-            if n is None or not 0 < n < len(avail_months):
-                return
-
-            await ws.send_json(
-                {
-                    "request": "bars",
-                    "params": {
-                        "months": avail_months[-n:],
-                        "cats": ["stock"],
-                    },
-                }
-            )
-
-            while True:
-                resp = await ws.receive_str()
-                print(resp)
-                if resp.upper() == "200 DONE":
-                    await ws.close()
-                    break
 
 
 async def _init():
@@ -965,7 +914,7 @@ def main():
             "sync_sec_list": run(sync_sec_list),
             "sync_calendar": run(sync_calendar),
             "sync_bars": run(sync_bars),
-            "download": run(download_archived),
+            "download": run(download_archive),
         }
     )
 

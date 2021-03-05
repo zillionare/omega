@@ -161,13 +161,6 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
         with mock.patch("omega.cli.save_config", save_config):
             cli.setup()
 
-    async def test_download_archived(self):
-        with mock.patch("builtins.input", return_value="1"):
-            await cli.download_archived()
-
-        # no mock
-        # await cli.download_archived(ask=False)
-
-    async def test_download_archive_v2(self):
+    async def test_download_archive(self):
         with mock.patch("builtins.input", return_value="2"):
-            await cli.download_archive_v2()
+            await cli.download_archive()
