@@ -1,5 +1,6 @@
-from tests.interfaces.test_web_interfaces import TestWebInterfaces
 import arrow
+
+from tests.interfaces.test_web_interfaces import TestWebInterfaces
 
 
 class TestQuotes(TestWebInterfaces):

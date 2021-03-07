@@ -1,13 +1,13 @@
+import asyncio
+import logging
 import os
 import shutil
-import asyncio
-from tests import init_test_env
-import logging
+import unittest
+
 import rlog
 
 from omega.logging.receiver.redis import RedisLogReceiver
-
-import unittest
+from tests import init_test_env
 
 
 class TestRedisLogging(unittest.IsolatedAsyncioTestCase):

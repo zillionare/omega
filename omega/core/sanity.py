@@ -36,14 +36,14 @@ from pyemit import emit
 
 from omega.config import get_config_dir
 from omega.core.events import Events, ValidationError
-from omega.jobs.sync import cfg, logger
 
 validation_errors = []
+cfg = cfg4py.get_instance()
+logger = logging.getLogger(__name__)
 
 
 async def calc_checksums(day: datetime.date, codes: List) -> dict:
     """
-
     Args:
         day:
         codes:

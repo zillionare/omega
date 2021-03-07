@@ -7,7 +7,6 @@ from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
 from sanic import Blueprint, response
 
-import omega.jobs.sync as sq
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 
 bp = Blueprint("quotes", url_prefix="/quotes/")

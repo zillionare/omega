@@ -1,4 +1,5 @@
 import logging
+
 from omega import __version__
 from tests.interfaces.test_web_interfaces import TestWebInterfaces
 

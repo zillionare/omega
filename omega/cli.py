@@ -24,20 +24,17 @@ import fire
 import omicron
 import psutil
 import sh
-import websockets
-from omicron.core.lang import async_run
 from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
 from pyemit import emit
-from ruamel import yaml
 from ruamel.yaml import YAML
 from termcolor import colored
 
 import omega
-import omega.jobs.sync as sync
 from omega.config import get_config_dir
 from omega.fetcher import archive
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher
+from omega.jobs import syncjobs
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
@@ -600,7 +597,7 @@ def _start_fetcher(
 
 
 def _start_jobs():
-    subprocess.Popen([sys.executable, "-m", "omega.jobs", "start"])
+    subprocess.Popen([sys.executable, "-m", "omega.jobs.main", "start"])
 
     retry = 0
     while _find_jobs_process() is None and retry < 5:
@@ -701,13 +698,13 @@ async def sync_sec_list():
     """发起同步证券列表请求"""
     await _init()
 
-    await sync.trigger_single_worker_sync("security_list")
+    await syncjobs.trigger_single_worker_sync("security_list")
 
 
 async def sync_calendar():
     """发起同步交易日历请求"""
     await _init()
-    await sync.trigger_single_worker_sync("calendar")
+    await syncjobs.trigger_single_worker_sync("calendar")
 
 
 async def sync_bars(frame: str = None, codes: str = None):
@@ -726,16 +723,21 @@ async def sync_bars(frame: str = None, codes: str = None):
 
     if frame:
         frame_type = FrameType(frame)
-        params = sync.read_sync_params(FrameType(frame))
+        params = syncjobs.load_sync_params(frame_type)
         if codes:
-            params["secs"] = list(map(lambda x: x.strip(" "), codes.split(",")))
-        await sync.trigger_bars_sync(frame_type, params, force=True)
+            params["cat"] = None
+            params["include"] = codes
+        await syncjobs.trigger_bars_sync(params, force=True)
         logger.info("request %s,%s send to workers.", params, codes)
     else:
         for frame_type in itertools.chain(tf.day_level_frames, tf.minute_level_frames):
-            params = sync.read_sync_params(frame_type)
-            if params:
-                await sync.trigger_bars_sync(frame_type, params, force=True)
+            params = syncjobs.load_sync_params(frame_type)
+            if not params:
+                continue
+            if codes:
+                params["cat"] = None
+                params["include"] = codes
+            await syncjobs.trigger_bars_sync(params, force=True)
 
             logger.info("request %s,%s send to workers.", params, codes)
 

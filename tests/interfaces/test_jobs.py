@@ -1,4 +1,5 @@
 import logging
+
 from tests.interfaces import TestWebInterfaces
 
 logger = logging.getLogger(__name__)

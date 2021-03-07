@@ -20,7 +20,7 @@ from omega.config.schema import Config
 from omega.core.events import Events
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omega.interfaces import jobs, quotes, sys
-from omega.jobs import sync as sq
+from omega.jobs import syncjobs
 
 cfg: Config = cfg4py.get_instance()
 
@@ -49,7 +49,7 @@ class Omega(object):
         app.blueprint(interfaces)
 
         # listen on omega events
-        emit.register(Events.OMEGA_DO_SYNC, sq.sync_bars_worker)
+        emit.register(Events.OMEGA_DO_SYNC, syncjobs.sync_bars)
         await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
 
         logger.info("<<< init %s process done", self.__class__.__name__)

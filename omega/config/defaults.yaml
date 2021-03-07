@@ -52,29 +52,29 @@ omega:
     bars:
       - frame: '1W'
         start: '2005-1-1'
-        type:
+        cat:
             - stock
       - frame: '1M'
         start: '2005-1-1'
-        type:
+        cat:
             - stock
       - frame: '1Q'
         start: '2005-1-1'
-        type:
+        cat:
             - stock
       - frame: '1Y'
         start: '2005-1-1'
-        type:
+        cat:
             - stock
       - frame: '1d'
         start: '2018-1-1'
         delay: 0 # delay * seconds after the frame is done
-        type:
+        cat:
           - stock # stock | index
       - frame: '30m'
         start: '2020-1-1'
         delay: 60 # delay 1 minute
-        type:
+        cat:
           - stock
 
 quotes_fetchers:

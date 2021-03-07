@@ -3,8 +3,8 @@ import logging
 import unittest
 from unittest import mock
 from unittest.mock import call
-import aiohttp
 
+import aiohttp
 import cfg4py
 import omicron
 import pandas as pd
@@ -13,6 +13,7 @@ from omicron.dal import cache
 
 from omega.fetcher import archive
 from tests import init_test_env, start_archive_server, start_omega
+from omega.fetcher.archive import ArchivedBarsHandler
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +65,11 @@ class TestArchieveFetcher(unittest.IsolatedAsyncioTestCase):
     async def test_get_index(self):
         response = await archive.get_archive_index(self.cfg.omega.urls.archive)
         self.assertListEqual([201901, 201902], response.get("stock"))
+
+        func = 'omega.fetcher.archive.get_file'
+        with mock.patch(func, side_effect=aiohttp.ClientConnectionError()):
+            response = await archive.get_archive_index(self.cfg.omega.urls.archive)
+            self.assertEqual(500, response.status)
 
     @mock.patch("builtins.print")
     async def test_main(self, mock_print):
