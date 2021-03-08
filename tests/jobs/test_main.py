@@ -1,33 +1,28 @@
-import logging
-from tests import init_test_env
-from omicron.core.types import FrameType
-
-from omega.jobs.main import init, start_logging
-import unittest
 import asyncio
+import json
 import logging
 import os
 import shutil
+import subprocess
+import sys
 import unittest
-from pyemit import emit
-
+import aiohttp
 
 import cfg4py
 import rlog
+from omicron.core.types import FrameType
+from omega.jobs.main import app
 
 from omega.config.schema import Config
+from omega.jobs.main import init, start_logging
+from tests import find_free_port, init_test_env, start_job_server
 
 cfg: Config = cfg4py.get_instance()
 
+
 class TestJobsMain(unittest.IsolatedAsyncioTestCase):
-    async def asyncSetUp(self) -> None:
-        init_test_env()
-        await emit.start(engine=emit.Engine.REDIS, dsn=cfg.redis.dsn, start_server=True)
-
-    def setUp(self) -> None:
-        return super().setUp()
-
     async def test_start_logging(self):
+        init_test_env()
         # remove handlers set by config file, if there is.
         root = logging.getLogger()
         root.handlers.clear()
@@ -72,16 +67,42 @@ class TestJobsMain(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(" this is 2th test log\n", msg)
 
     async def test_init(self):
-        await init(None, None)
+        init_test_env()
+        # we don't want to sync too many bars in ut
+        # origin = cfg.omega.sync.bars
+        try:
+            # cfg.omega.sync.bars = [
+            #     {
+            #         "include": "000001.XSHE",
+            #         "frame": FrameType.MIN60,
+            #         "start": "2020-04-30",
+            #         "stop": "2020-05-07",
+            #     }
+            # ]
+            await init(None, None)
+        finally:
+            # cfg.omega.sync.bars = origin
+            pass
 
-    def test_start_sync(self):
-        from omega.jobs.main import app
+    async def test_start_sync(self):
+        init_test_env()
+        port = find_free_port()
+        url = f"http://localhost:{port}/jobs/sync_bars"
+        job_server = None
+        try:
+            job_server = await start_job_server(port)
+            sync_params = {
+                "include": "000001.XSHE",
+                "frame": FrameType.MIN60.value,
+                "start": "2020-04-30",
+                "stop": "2020-05-07",
+            }
 
-        sync_params = {
-            "include": "000001.XSHE",
-            "frame": FrameType.MIN60,
-            "start": "2020-04-30",
-            "stop": "2020-05-07",
-        }
-        request, response = app.test_client.get('/jobs/sync_bars', params=sync_params)
-        self.assertEqual(200, response.status)
+            async with aiohttp.ClientSession() as client:
+                async with client.get(url, json=sync_params) as resp:
+                    self.assertEqual(200, resp.status)
+                    result = await resp.text()
+                    print(result)
+        finally:
+            if job_server:
+                job_server.kill()

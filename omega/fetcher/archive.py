@@ -35,12 +35,12 @@ class ArchivedBarsHandler(FileHandler):
     def __init__(self, url: str):
         self.url = url
 
-    async def process(self, stream):
+    async def process(self, file_content):
         extract_to = tempfile.mkdtemp(prefix="omega-archive-")
         try:
             year, month, cat = parse_url(self.url)
 
-            fileobj = io.BytesIO(await stream.read(-1))
+            fileobj = io.BytesIO(file_content)
             tar = tarfile.open(fileobj=fileobj, mode="r")
             logger.info("extracting %s into %s", self.url, extract_to)
             tar.extractall(extract_to)
@@ -121,11 +121,11 @@ async def get_file(url: str, timeout: int = 600, handler: FileHandler = None):
                 async with client.get(url) as response:
                     if response.status == 200:
                         logger.info("file %s downloaded", url)
-
+                        content = await response.read()
                         if handler is None:
-                            return url, await response.read()
+                            return url, content
                         else:
-                            return await handler.process(response.content)
+                            return await handler.process(content)
                     elif response.status == 404:
                         year, month, cat = parse_url(url)
                         return url, f"404 服务器上没有{year}年{month}月的{cat}数据"
@@ -156,7 +156,15 @@ def parse_index(text):
     return parsed
 
 
-async def get_index(url: str):
+async def _load_index(url: str):
+    """load and parse index.yml
+
+    Args:
+        url (str): [description]
+
+    Returns:
+        [type]: [description]
+    """
     try:
         url, content = await get_file(url)
         if content is not None:
@@ -175,7 +183,7 @@ async def get_index(url: str):
 async def get_bars(server, months: List[int], cats: List[str]) -> Tuple[int, str]:
     if not server.endswith("/"):
         server += "/"
-    status, response = await get_index(server + "index.yml")
+    status, response = await _load_index(server + "index.yml")
     if status != 200:
         yield status, response
         yield 500, "读取索引失败，无法下载历史数据"
@@ -210,16 +218,15 @@ async def get_bars(server, months: List[int], cats: List[str]) -> Tuple[int, str
     yield 200, "DONE"
 
 
-async def get_archive_index(server):
+async def get_index(server):
     if not server.endswith("/"):
         server += "/"
 
-    status, index = await get_index(server + "/index.yml")
-    index = {cat: list(index[cat].keys()) for cat in index.keys()}
-    if status == 200:
-        return index
-    else:
-        return None
+    status, index = await _load_index(server + "/index.yml")
+    if status != 200 or (index is None):
+        return 500, None
+
+    return 200, {cat: list(index[cat].keys()) for cat in index.keys()}
 
 
 async def _main(months: list, cats: list):

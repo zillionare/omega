@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import fire
 import asyncio
 import functools
 import itertools
@@ -11,6 +10,7 @@ from typing import Optional
 
 import arrow
 import cfg4py
+import fire
 import omicron
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from omicron import cache
@@ -72,7 +72,7 @@ async def init(app, loop):  # noqa
         minute=m,
     )
 
-    # sync bars
+    # sync bars at startup
     syncjobs.load_bars_sync_jobs(scheduler)
 
     last_sync = await cache.sys.get("jobs.bars_sync.stop")
@@ -83,9 +83,7 @@ async def init(app, loop):  # noqa
         for frame_type in itertools.chain(tf.day_level_frames, tf.minute_level_frames):
             params = syncjobs.load_sync_params(frame_type)
             if params:
-                asyncio.create_task(
-                    syncjobs.trigger_bars_sync(frame_type, params, force=True)
-                )
+                asyncio.create_task(syncjobs.trigger_bars_sync(params, force=True))
     else:
         logger.info("%s: less than 24 hours since last sync", last_sync)
 
@@ -96,26 +94,35 @@ async def init(app, loop):  # noqa
 @app.route("/jobs/sync_bars")
 async def start_sync(request):
     logger.info("received http command sync_bars")
-    sync_params = request.args
+    sync_params = request.json
 
     app.add_task(syncjobs.trigger_bars_sync(sync_params, True))
     return response.text("sync task scheduled")
 
 
+@app.route("/jobs/status")
+async def get_status(request):
+    return response.empty(status=200)
+
+
 @app.listener("after_server_stop")
 async def on_shutdown(app, loop):
     global receiver
-    if receiver:
+    try:
         await receiver.stop()
+    except Exception:
+        pass
+
     await omicron.shutdown()
 
 
-def start(host: str = "0.0.0.0", port: int = 3180):
+def start(host: str = "0.0.0.0", port: int = 3180):  # pragma: no cover
     check_env()
     logger.info("staring omega jobs...")
     app.register_listener(init, "before_server_start")
     app.run(host=host, port=port, register_sys_signals=True)
     logger.info("omega jobs exited.")
+
 
 if __name__ == "__main__":
     fire.Fire({"start": start})

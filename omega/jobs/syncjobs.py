@@ -70,6 +70,7 @@ def load_sync_params(frame_type: FrameType) -> dict:
             except Exception as e:
                 logger.exception(e)
                 logger.warning("failed to parse %s", item)
+                return None
 
     return None
 

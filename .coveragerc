@@ -1,7 +1,6 @@
 [run]
 omit =
     */sanity.py
-    */jobs/__main__.py
     */app.py
     */cli.py
     */config/*
@@ -16,3 +15,4 @@ exclude_lines =
     raise NotImplementedError
     if 0:
     if __name__ == .__main__.:
+    def main

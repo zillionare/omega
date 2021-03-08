@@ -10,10 +10,11 @@ import omicron
 import pandas as pd
 from omicron.core.types import FrameType
 from omicron.dal import cache
+from ruamel.yaml.error import YAMLError
 
 from omega.fetcher import archive
-from tests import init_test_env, start_archive_server, start_omega
 from omega.fetcher.archive import ArchivedBarsHandler
+from tests import init_test_env, start_archive_server, start_omega
 
 logger = logging.getLogger(__name__)
 
@@ -63,13 +64,16 @@ class TestArchieveFetcher(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(datetime.date(2019, 1, 4), bars[0]["frame"])
 
     async def test_get_index(self):
-        response = await archive.get_archive_index(self.cfg.omega.urls.archive)
-        self.assertListEqual([201901, 201902], response.get("stock"))
+        status, index = await archive.get_index(self.cfg.omega.urls.archive)
+        self.assertEqual(200, status)
+        self.assertListEqual([201901, 201902], index.get("stock"))
 
-        func = 'omega.fetcher.archive.get_file'
-        with mock.patch(func, side_effect=aiohttp.ClientConnectionError()):
-            response = await archive.get_archive_index(self.cfg.omega.urls.archive)
-            self.assertEqual(500, response.status)
+        func = "omega.fetcher.archive.get_file"
+        for side_effect in [aiohttp.ClientConnectionError(), YAMLError(), Exception()]:
+            with mock.patch(func, side_effect=side_effect):
+                status, index = await archive.get_index(self.cfg.omega.urls.archive)
+                self.assertEqual(500, status)
+                self.assertEqual(index, None)
 
     @mock.patch("builtins.print")
     async def test_main(self, mock_print):
@@ -119,3 +123,20 @@ class TestArchieveFetcher(unittest.IsolatedAsyncioTestCase):
                     ),
                 ]
             )
+
+    async def test_archive_bars_handler_process(self):
+        handler = ArchivedBarsHandler("http://mock/2019-01-stock.tgz")
+        content = None
+        with open("tests/data/2019-01-stock.tgz", "rb") as f:
+            content = f.read(-1)
+        # 0. normal case
+        url, result = await handler.process(content)
+
+        # 1. test when processing cause exceptions
+        url, result = await handler.process(None)
+        self.assertTrue(result.startswith("500 导入数据"))
+
+        # 2. test when remove temp dir cause exceptions
+        with mock.patch("shutil.rmtree", side_effect=Exception()):
+            url, result = await handler.process(content)
+            self.assertTrue(result.startswith("200 成功导入"))
