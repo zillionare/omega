@@ -4,18 +4,17 @@ import unittest
 from unittest import mock
 
 import cfg4py
-import fire
 from pyemit import emit
 from ruamel.yaml import YAML
 
 from omega import cli
-from tests import init_test_env, start_archive_server, start_omega
+from tests import find_free_port, init_test_env, start_archive_server, start_omega
 
 
 class TestCLI(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         self.cfg = init_test_env()
-        # self.cfg.omega.urls.archive = "http://localhost:8003"
+
         self.omega = await start_omega()
         self.archive = await start_archive_server()
 

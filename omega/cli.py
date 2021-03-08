@@ -885,7 +885,7 @@ def run(func):
         async def init_and_run(*args, **kwargs):
             try:
                 await _init()
-                #os.system("clear")
+                # os.system("clear")
                 await func(*args, **kwargs)
             except CancelError:
                 pass
