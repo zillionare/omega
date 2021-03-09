@@ -94,7 +94,7 @@ class TestJobsMain(unittest.IsolatedAsyncioTestCase):
                 async with client.get(url, json=sync_params) as resp:
                     self.assertEqual(200, resp.status)
                     result = await resp.text()
-                    print(result)            
+                    print(result)
         finally:
             if job_server:
                 job_server.kill()

@@ -93,7 +93,7 @@ async def init(app, loop):  # noqa
 
 
 @app.route("/jobs/sync_bars")
-async def start_sync(request): # pragma: no cover :they're in another process
+async def start_sync(request):  # pragma: no cover :they're in another process
     logger.info("received http command sync_bars")
     sync_params = request.json
 
@@ -101,13 +101,13 @@ async def start_sync(request): # pragma: no cover :they're in another process
     return response.text("sync task scheduled")
 
 
-@app.route("/jobs/status") # pragma: no cover
+@app.route("/jobs/status")  # pragma: no cover
 async def get_status(request):
     return response.empty(status=200)
 
 
 @app.listener("after_server_stop")
-async def on_shutdown(app, loop): # pragma: no cover
+async def on_shutdown(app, loop):  # pragma: no cover
     global receiver
     try:
         await receiver.stop()
