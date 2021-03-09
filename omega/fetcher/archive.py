@@ -236,7 +236,7 @@ async def _main(months: list, cats: list):
         print(status, desc)
 
 
-def main(months: str, cats: str):
+def main(months: str, cats: str, archive_server: str = None):
     """允许将本模块以独立进程运行，以支持多进程
 
     Args:
@@ -244,7 +244,10 @@ def main(months: str, cats: str):
         cats (str): 逗号分隔的类别列表，如"stock,index"
     """
     config_dir = get_config_dir()
-    cfg4py.init(config_dir, False)
+    cfg = cfg4py.init(config_dir, False)
+
+    if archive_server:
+        cfg.omega.urls.archive = archive_server
 
     months = str(months)
     months = [int(x) for x in months.split(",") if x]
