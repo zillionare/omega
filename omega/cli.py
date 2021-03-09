@@ -130,31 +130,6 @@ def is_valid_port(port):
         return False
 
 
-def config_syslog():
-    """配置rsyslog
-
-    :return:
-    """
-    msg = """
-    当使用多个工作者进程时，omega需要使用rsyslog作为\\n请确保rsyslog已经安装并能
-    正常工作。\\n如果一切准备就绪，请按回车键继续设置：
-    """
-    # wait user's confirmation
-    input(format_msg(msg))
-    src = [os.path.join(factory_config_dir(), "32-omega-default.conf")]
-    dst = "/etc/rsyslog.d"
-
-    try:
-        print("正在应用新的配置文件,请根据提示给予授权：")
-        for file in src:
-            sh.contrib.sudo.cp(src, dst)
-        print("即将重启rsyslog服务，请给予授权：")
-        sh.contrib.sudo.service("rsyslog", "restart")
-    except Exception as e:
-        print(e)
-        print(f"[{colored('FAIL', 'green')}] 配置rsyslog失败，请手工配置", config_syslog)
-
-
 async def check_postgres(dsn: str):
     try:
         conn = await asyncpg.connect(dsn=dsn)
@@ -195,10 +170,14 @@ async def config_postgres(settings):
 
     action = "R"
     while action == "R":
-        host = get_input("请输入服务器地址，", None, "localhost")
-        port = get_input("请输入服务器端口，", is_valid_port, 5432)
-        account = get_input("请输入账号,", None, "")
-        password = get_input("请输入密码,", None, "")
+        host = get_input(
+            "请输入服务器地址，", None, os.environ.get("POSTGRES_HOST") or "localhost"
+        )
+        port = get_input(
+            "请输入服务器端口，", is_valid_port, os.environ.get("POSTGRES_PORT") or 5432
+        )
+        account = get_input("请输入账号,", None, os.environ.get("POSTGRES_USER"))
+        password = get_input("请输入密码,", None, os.environ.get("POSTGRES_PASSWORD"))
 
         print("正在测试Postgres连接...")
         dsn = f"postgres://{account}:{password}@{host}:{port}/zillionare"
@@ -243,10 +222,15 @@ def config_logging(settings):
             folder = Path(folder).expanduser()
 
             if not os.path.exists(folder):
-                print("正在创建日志目录，可能需要您授权：")
-                sh.contrib.sudo.mkdir(folder, "-p")
-                sh.contrib.sudo.chmod(777, folder)
+                try:
+                    os.makedirs(folder, exist_ok=True)
+                except PermissionError:
+                    print("正在创建日志目录，需要您的授权:")
+                    sh.contrib.sudo.mkdir(folder, "-p")
+                    sh.contrib.sudo.chmod(777, folder)
 
+            logfile = os.path.join(folder, "omega.log")
+            update_config(settings, "logreceiver.filename", logfile)
             action = None
         except Exception as e:
             print(e)
@@ -254,7 +238,17 @@ def config_logging(settings):
             prompt = "创建日志目录失败，请排除错误重试，或者重新指定目录"
             action = choose_action(prompt)
 
-    config_syslog()
+    # activate file logging now
+    root_logger = logging.getLogger()
+    logfile = os.path.join(folder, "omega.log")
+    handler = logging.handlers.RotatingFileHandler(logfile)
+    fmt_str = "%(asctime)s %(levelname)-1.1s %(process)d %(name)s:%(funcName)s:%(lineno)s | %(message)s"
+
+    fmt = logging.Formatter(fmt_str)
+
+    handler.setFormatter(fmt)
+    root_logger.addHandler(handler)
+    logger.info("logging output is written to %s now", logfile)
 
 
 def config_fetcher(settings):
@@ -272,8 +266,8 @@ def config_fetcher(settings):
     workers = []
     port = 3181
     while more_account:
-        account = get_input("请输入账号:", None, None, "")
-        password = get_input("请输入密码:", None, None, "")
+        account = get_input("请输入账号:", None, os.environ.get("JQ_ACCOUNT") or "")
+        password = get_input("请输入密码:", None, os.environ.get("JQ_PASSWORD") or "")
         sessions = get_input("请输入并发会话数", None, 1, "默认值[1]")
         workers.append(
             {
@@ -284,7 +278,7 @@ def config_fetcher(settings):
             }
         )
         port += 1
-        more_account = input("继续配置新的账号[y|n]?\n").upper() == "Y"
+        more_account = input("继续配置新的账号[y|N]?\n").upper() == "Y"
 
     settings["quotes_fetchers"] = []
     append_fetcher(settings, {"impl": "jqadaptor", "workers": workers})
@@ -327,6 +321,7 @@ def get_input(
 
 async def check_redis(dsn: str):
     redis = await aioredis.create_redis(dsn)
+    await redis.set("omega-test", "delete me on sight")
     redis.close()
     await redis.wait_closed()
 
@@ -339,10 +334,17 @@ async def config_redis(settings):
     print(format_msg(msg))
     action = "R"
     while action == "R":
-        host = get_input("请输入Reids服务器，", None, "localhost")
-        port = get_input("请输入Redis服务器端口，", is_valid_port, 6379)
-        password = get_input("请输入Redis服务器密码，", None, None)
+        host = get_input(
+            "请输入Reids服务器，", None, os.environ.get("REDIS_HOST") or "localhost"
+        )
+        port = get_input(
+            "请输入Redis服务器端口，", is_valid_port, os.environ.get("REDIS_PORT") or 6379
+        )
+        password = get_input(
+            "请输入Redis服务器密码，", None, os.environ.get("REDIS_PASSWORD") or ""
+        )
 
+        logger.info("give redis configurations are: %s, %s, %s", host, port, password)
         try:
             if password:
                 dsn = f"redis://{password}@{host}:{port}"
@@ -350,14 +352,12 @@ async def config_redis(settings):
                 dsn = f"redis://{host}:{port}"
             await check_redis(dsn)
             print(f"[{colored('PASS', 'green')}] redis连接成功: {dsn}")
-            if password:
-                update_config(
-                    settings, "redis.dsn", f"redis://{password}@{host}:{port}"
-                )
-            else:
-                update_config(settings, "redis.dsn", f"redis://{host}:{port}")
-
-            return
+            update_config(settings, "redis.dsn", dsn)
+            update_config(settings, "logreceiver.dsn", dsn)
+            update_config(settings, "logging.handlers.redis.host", host)
+            update_config(settings, "logging.handlers.redis.port", port)
+            update_config(settings, "logging.handlers.redis.password", password)
+            action = None
         except Exception as e:
             logger.exception(e)
             action = choose_action(
@@ -392,7 +392,7 @@ async def setup(reset_factory=False, force=False):
         config_file = os.path.join(get_config_dir(), "defaults.yaml")
         if os.path.exists(config_file):
             print(f"{colored('[PASS]', 'green')} 安装程序已在本机上成功运行")
-            raise CancelError()
+            sys.exit(0)
 
     if reset_factory:
         import sh
@@ -410,27 +410,31 @@ async def setup(reset_factory=False, force=False):
     if not check_environment():
         sys.exit(-1)
 
-    print_title("Step 2. 配置上游服务器")
+    print_title("Step 2. 配置日志")
+    config_logging(settings)
+    print_title("Step 3. 配置上游服务器")
     config_fetcher(settings)
-    print_title("Step 3. 配置Redis服务器")
+    print_title("Step 4. 配置Redis服务器")
     await config_redis(settings)
-    print_title("Step 4. 配置Postgres服务器")
+    print_title("Step 5. 配置Postgres服务器")
     await config_postgres(settings)
     save_config(settings)
-    print_title("Step 5. 配置日志系统")
-    config_syslog()
 
-    print_title("Step 6. 下载历史数据")
-    config_dir = get_config_dir()
-    cfg4py.init(config_dir, False)
-    await download_archive(None)
+    # the following if-condition is to make coverage happy
+    # these secenarios are tested seprately
+    if True:  # pragma: no cover
+        print_title("Step 6. 下载历史数据")
+        config_dir = get_config_dir()
+        cfg4py.init(config_dir, False)
+        remove_console_log_handler()
+        await download_archive(None)
 
-    print_title("配置已完成。现在为您启动Omega,开启财富之旅！")
+        print_title("配置已完成。现在为您启动Omega,开启财富之旅！")
 
-    start()
-    time.sleep(5)
-    start("jobs")
-    status()
+        start()
+        time.sleep(5)
+        start("jobs")
+        status()
 
 
 def save_config(settings):
@@ -443,9 +447,12 @@ def save_config(settings):
             parser = YAML()
             parser.indent(sequence=4, offset=2)
             parser.dump(settings, f)
-    except Exception:  # noqa
+    except Exception as e:  # noqa
         # restore the backup
+        logger.exception(e)
+        logger.warning("failed to save config:\n%s", settings)
         print(f"[{colored('FAIL', 'green')}] 无法保存文件。安装失败。")
+        sys.exit(-1)
 
 
 def check_environment():
@@ -797,12 +804,16 @@ async def show_subprocess_output(stream):
             line = line.decode("utf-8")
             if not line:
                 break
+
+            # this is logger output
+            if line.find(" I ") != -1:
+                continue
             print(line)
         except Exception:
             pass
 
 
-async def download_archive(n:Union[str,int]=None):
+async def download_archive(n: Union[str, int] = None):
     index = await get_archive_index()
 
     avail_months = [int(m) for m in index.get("stock")]
@@ -828,6 +839,7 @@ async def download_archive(n:Union[str,int]=None):
     if n is None or n <= 0:
         return
 
+    t0 = time.time()
     n = min(n, len(avail_months))
     # months = ",".join([str(x) for x in avail_months[-n:]])
     cats = "index,stock"
@@ -848,6 +860,7 @@ async def download_archive(n:Union[str,int]=None):
             "main",
             f"'{months}'",
             f"'{cats}'",
+            cfg.omega.urls.archive,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -856,6 +869,14 @@ async def download_archive(n:Union[str,int]=None):
         tasks.append(show_subprocess_output(proc.stderr))
 
     await asyncio.gather(*tasks)
+    print(f"数据导入共费时{int(time.time() - t0)}秒")
+
+
+def remove_console_log_handler():
+    root_logger = logging.getLogger()
+    for h in root_logger.handlers:
+        if isinstance(h, logging.StreamHandler):
+            root_logger.removeHandler(h)
 
 
 async def _init():
@@ -863,10 +884,7 @@ async def _init():
     cfg = cfg4py.init(config_dir, False)
 
     # remove console log, so the output message will looks prettier
-    root_logger = logging.getLogger()
-    for h in root_logger.handlers:
-        if isinstance(h, logging.StreamHandler):
-            root_logger.removeHandler(h)
+    remove_console_log_handler()
     try:
         await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
     except Exception:

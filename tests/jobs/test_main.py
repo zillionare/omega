@@ -1,17 +1,15 @@
 import asyncio
-import json
 import logging
 import os
 import shutil
-import subprocess
-import sys
 import unittest
 import aiohttp
 
 import cfg4py
+import omicron
 import rlog
 from omicron.core.types import FrameType
-from omega.jobs.main import app
+from omicron import cache
 
 from omega.config.schema import Config
 from omega.jobs.main import init, start_logging
@@ -68,17 +66,11 @@ class TestJobsMain(unittest.IsolatedAsyncioTestCase):
 
     async def test_init(self):
         init_test_env()
-        # we don't want to sync too many bars in ut
-        # origin = cfg.omega.sync.bars
+        await omicron.init()
+        await cache.sys.delete("jobs.bars_sync.stop")
         try:
-            # cfg.omega.sync.bars = [
-            #     {
-            #         "include": "000001.XSHE",
-            #         "frame": FrameType.MIN60,
-            #         "start": "2020-04-30",
-            #         "stop": "2020-05-07",
-            #     }
-            # ]
+            await init(None, None)
+            # won't trigger sync this time
             await init(None, None)
         finally:
             # cfg.omega.sync.bars = origin
@@ -102,7 +94,7 @@ class TestJobsMain(unittest.IsolatedAsyncioTestCase):
                 async with client.get(url, json=sync_params) as resp:
                     self.assertEqual(200, resp.status)
                     result = await resp.text()
-                    print(result)
+                    print(result)            
         finally:
             if job_server:
                 job_server.kill()

@@ -14,6 +14,7 @@ logging:
       formatter: default
       host: ${REDIS_HOST}
       port: ${REDIS_PORT}
+      password: ${REDIS_PASSWORD}
       channel: omega.log
   loggers:
     apscheduler:
@@ -59,10 +60,6 @@ omega:
         cat:
             - stock
       - frame: '1Q'
-        start: '2005-1-1'
-        cat:
-            - stock
-      - frame: '1Y'
         start: '2005-1-1'
         cat:
             - stock

@@ -23,17 +23,14 @@ class TestArchieveFetcher(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         init_test_env()
         self.cfg = cfg4py.get_instance()
-        self.omega = await start_omega()
-        self.archive = await start_archive_server()
 
+        self.archive_server = await start_archive_server()
         await omicron.init()
 
     async def asyncTearDown(self) -> None:
-        if self.omega:
-            self.omega.kill()
-
-        if self.archive:
-            self.archive.kill()
+        await omicron.shutdown()
+        if self.archive_server:
+            self.archive_server.kill()
 
     async def test_get_bars(self):
         sec = "000001.XSHE"

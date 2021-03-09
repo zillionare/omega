@@ -50,6 +50,7 @@ async def init(app, loop):  # noqa
 
     config_dir = get_config_dir()
     cfg4py.init(get_config_dir(), False)
+
     logger.info("init omega-jobs process with config at %s", config_dir)
 
     await omicron.init()
@@ -92,7 +93,7 @@ async def init(app, loop):  # noqa
 
 
 @app.route("/jobs/sync_bars")
-async def start_sync(request):
+async def start_sync(request): # pragma: no cover :they're in another process
     logger.info("received http command sync_bars")
     sync_params = request.json
 
@@ -100,13 +101,13 @@ async def start_sync(request):
     return response.text("sync task scheduled")
 
 
-@app.route("/jobs/status")
+@app.route("/jobs/status") # pragma: no cover
 async def get_status(request):
     return response.empty(status=200)
 
 
 @app.listener("after_server_stop")
-async def on_shutdown(app, loop):
+async def on_shutdown(app, loop): # pragma: no cover
     global receiver
     try:
         await receiver.stop()
@@ -118,7 +119,7 @@ async def on_shutdown(app, loop):
 
 def start(host: str = "0.0.0.0", port: int = 3180):  # pragma: no cover
     check_env()
-    logger.info("staring omega jobs...")
+    logger.info("staring omega jobs ...")
     app.register_listener(init, "before_server_start")
     app.run(host=host, port=port, register_sys_signals=True)
     logger.info("omega jobs exited.")

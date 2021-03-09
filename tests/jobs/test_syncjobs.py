@@ -42,14 +42,8 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         home = Path(cfg.omega.home).expanduser()
         os.makedirs(str(home / "data/chksum"), exist_ok=True)
 
-        self.omega = await start_omega()
-
     async def asyncTearDown(self) -> None:
         await omicron.shutdown()
-        if self.omega:
-            self.omega.kill()
-            # await omega exit
-            time.sleep(1)
         await emit.stop()
 
     async def create_quotes_fetcher(self):

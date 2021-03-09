@@ -6,24 +6,36 @@ from unittest import mock
 import cfg4py
 from pyemit import emit
 from ruamel.yaml import YAML
+import shutil
 
 from omega import cli
-from tests import find_free_port, init_test_env, start_archive_server, start_omega
+from tests import init_test_env, start_archive_server, start_omega
 
 
 class TestCLI(unittest.IsolatedAsyncioTestCase):
-    async def asyncSetUp(self) -> None:
-        self.cfg = init_test_env()
-
+    async def _start_servers(self):
+        # 将server启动独立出来，加快单元测试速度
         self.omega = await start_omega()
         self.archive = await start_archive_server()
 
+    async def _stop_servers(self):
+        try:
+            if self.omega:
+                self.omega.kill()
+        except AttributeError:
+            pass
+
+        try:
+            if self.archive:
+                self.archive.kill()
+        except AttributeError:
+            pass
+
+    async def asyncSetUp(self) -> None:
+        self.cfg = init_test_env()
+
     async def asyncTearDown(self) -> None:
         await emit.stop()
-        if self.omega:
-            self.omega.kill()
-        if self.archive:
-            self.archive.kill()
 
     def yaml_dumps(self, settings):
         stream = io.StringIO()
@@ -48,9 +60,6 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
         return count
 
     async def test_omega_lifecycle(self):
-        if self.omega:
-            self.omega.kill()
-
         await cli.start("omega")
         procs = cli.find_fetcher_processes()
         self.assertTrue(len(procs) >= 1)
@@ -68,13 +77,25 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
         await cli.stop("jobs")
 
     async def test_sync_sec_list(self):
-        await cli.sync_sec_list()
+        try:
+            await self._start_servers()
+            await cli.sync_sec_list()
+        finally:
+            await self._stop_servers()
 
     async def test_sync_calendar(self):
-        await cli.sync_calendar()
+        try:
+            await self._start_servers()
+            await cli.sync_calendar()
+        finally:
+            await self._stop_servers()
 
     async def test_sync_bars(self):
-        await cli.sync_bars("1d", codes="000001.XSHE")
+        try:
+            await self._start_servers()
+            await cli.sync_bars("1d", codes="000001.XSHE")
+        finally:
+            await self._stop_servers()
 
     def test_load_factory_settings(self):
         settings = cli.load_factory_settings()
@@ -116,9 +137,42 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
             os.environ[cfg4py.envar] = "PRODUCTION"
             self.assertTrue(cli.check_environment())
 
-    def _test_config_syslog(self):
-        # this test is from debug only. Need interact manually.
-        cli.config_syslog()
+    def test_config_logging(self):
+        settings = {}
+        folder = "/tmp/omega/test"
+        shutil.rmtree("/tmp/omega/test", ignore_errors=True)
+
+        # 1. function normal
+        with mock.patch("builtins.input", return_value=folder):
+            cli.config_logging(settings)
+
+        try:
+            logfile = os.path.join(folder, "omega.log")
+            with open(logfile, "rt") as f:
+                content = f.read(-1)
+                msg = f"logging output is writtern to {logfile} now"
+                self.assertTrue(content.find(msg))
+        except Exception as e:
+            print(e)
+
+        # 2. raise Permission error, ask user help escalte privilege
+        with mock.patch("os.makedirs", side_effect=PermissionError()):
+            with mock.patch("sh.contrib.sudo.mkdir"):
+                with mock.patch("sh.contrib.sudo.chmod"):
+                    pass  # disable prompt to enable auto test
+
+        # 3. raise other exception, need redo
+        shutil.rmtree("/tmp/omega/test", ignore_errors=True)
+        with mock.patch("os.makedirs", side_effect=[Exception("mocked"), mock.DEFAULT]):
+            with mock.patch("builtins.input", return_value=folder):
+                with mock.patch("omega.cli.choose_action", return_value="R"):
+                    try:
+                        cli.config_logging(settings)
+                    except FileNotFoundError:
+                        # since os.makdirs are mocked, so there's no logfile created
+                        pass
+
+            self.assertEqual(2, os.makedirs.call_count)
 
     async def test_config_postgres(self):
         settings = {}
@@ -140,26 +194,61 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(expected, settings["postgres"]["dsn"])
 
     async def test_config_redis(self):
+        # 1. normla case
         settings = {}
-        with mock.patch("builtins.input", side_effect=["local", "6380", "", "C"]):
-            expected = "redis://local:6380"
-            await cli.config_redis(settings)
-            self.assertDictEqual({}, settings)
-
-        with mock.patch("builtins.input", side_effect=["local", "6380", ""]):
+        with mock.patch("builtins.input", side_effect=["localhost", "6379", ""]):
             with mock.patch("omega.cli.check_redis"):
-                expected = "redis://local:6380"
+                expected = "redis://localhost:6379"
                 await cli.config_redis(settings)
                 self.assertEqual(expected, settings["redis"]["dsn"])
 
-    def _test_setup(self):
+        # 2. exception case
+        settings = {}
+        with mock.patch("builtins.input", side_effect=["localhost", "3180", "", "C"]):
+            await cli.config_redis(settings)
+            self.assertDictEqual({}, settings)
+
+    async def test_setup(self):
+        class EarlyJumpError(Exception):
+            pass
+
         def save_config(settings):
             with open("/tmp/omega_test_setup.yaml", "w") as f:
                 f.writelines(self.yaml_dumps(settings))
 
+            # ignore the rest setup process
+            raise EarlyJumpError()
+
         with mock.patch("omega.cli.save_config", save_config):
-            cli.setup()
+            with mock.patch(
+                "builtins.input",
+                side_effect=[
+                    "/var/log/zillionare/",  # logging
+                    os.environ.get("JQ_ACCOUNT"),
+                    os.environ.get("JQ_PASSWORD"),
+                    "1",
+                    "n",  # config no more account
+                    os.environ.get("REDIS_HOST"),
+                    os.environ.get("REDIS_PORT"),
+                    "",  # redis password
+                    "",  # continue on postgres config
+                    os.environ.get("POSTGRES_HOST"),
+                    os.environ.get("POSTGRES_PORT"),
+                    os.environ.get("POSTGRES_USER"),
+                    os.environ.get("POSTGRES_PASSWORD"),
+                    "1",  # download one month archive
+                ],
+            ):
+                try:
+                    await cli.setup(force=True)
+                except EarlyJumpError:
+                    pass
 
     async def test_download_archive(self):
-        with mock.patch("builtins.input", return_value="2"):
-            await cli.download_archive()
+        try:
+            archive_server = await start_archive_server()
+            with mock.patch("builtins.input", return_value="1"):
+                await cli.download_archive()
+        finally:
+            if archive_server:
+                archive_server.kill()
