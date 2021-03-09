@@ -695,7 +695,7 @@ async def restart(service: str = ""):
     await _init()
 
     if service == "jobs":
-        return _restart_jobs
+        return _restart_jobs()
 
     _stop_fetcher_processes()
     _start_fetcher_processes()
@@ -890,11 +890,11 @@ async def _init():
     except Exception:
         print(f"dsn is {cfg.redis.dsn}")
 
-    await omicron.init(AbstractQuotesFetcher)
-
     impl = cfg.quotes_fetchers[0]["impl"]
     params = cfg.quotes_fetchers[0]["workers"][0]
     await AbstractQuotesFetcher.create_instance(impl, **params)
+
+    await omicron.init(AbstractQuotesFetcher)
 
 
 def run(func):
