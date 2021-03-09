@@ -802,7 +802,7 @@ async def show_subprocess_output(stream):
             pass
 
 
-async def download_archive(ask=True):
+async def download_archive(n:Union[str,int]=None):
     index = await get_archive_index()
 
     avail_months = [int(m) for m in index.get("stock")]
@@ -813,7 +813,7 @@ async def download_archive(ask=True):
     else:
         prompt = f"现有截止到{avail_months[-1]}的{len(avail_months)}个月的数据可供下载。"
 
-    if ask:
+    if n is None:
         op_hint = "请输入要下载的数据的月数，0表示不下载:"
 
         def is_valid(x):
@@ -824,9 +824,8 @@ async def download_archive(ask=True):
 
         n = int(get_input(prompt, is_valid, None, op_hint=op_hint))
     else:
-        n = os.environ.get("ARCHIVE_BARS")
-        n = int(n) if n is not None else None
-    if n is None or n == 0:
+        n = int(n)
+    if n is None or n <= 0:
         return
 
     n = min(n, len(avail_months))
