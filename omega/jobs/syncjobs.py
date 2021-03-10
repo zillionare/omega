@@ -222,7 +222,7 @@ async def sync_bars(params: dict):
 
     if secs is not None:
         logger.info(
-            "sync bars with %s(%s-%s) for given %s secs",
+            "sync bars with %s(%s ~ %s) for given %s secs",
             frame_type,
             start,
             stop,

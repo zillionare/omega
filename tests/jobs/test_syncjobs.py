@@ -18,6 +18,7 @@ from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
 from omicron.models.securities import Securities
 from pyemit import emit
+from omega.fetcher import archive
 
 import omega.core.sanity
 import omega.jobs
@@ -25,7 +26,7 @@ import omega.jobs.syncjobs as syncjobs
 from omega.config.schema import Config
 from omega.core.events import Events, ValidationError
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
-from tests import init_test_env, start_omega
+from tests import init_test_env, start_archive_server, start_omega
 
 logger = logging.getLogger(__name__)
 cfg: Config = cfg4py.get_instance()
@@ -256,26 +257,33 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         }
 
         secs, frame_type, start, stop, _ = syncjobs.parse_sync_params(**sync_params)
-        # day 0 sync
+        # 1. day 0 sync
         # assume the cache is totally empty,
 
         code = secs[0]
         await cache.security.delete(f"{code}:{frame_type.value}")
         await self._sync_and_check(code, frame_type, start, stop)
 
-        # There're several records in the cache and all in sync scope. So after the
+        # 2. There're several records in the cache and all in sync scope. So after the
         # sync, the cache should have bars_to_fetch bars
         chaos_head = arrow.get("2020-05-11").date()
         chaos_tail = arrow.get("2020-05-20").date()
         await cache.set_bars_range(code, frame_type, chaos_head, chaos_tail)
         await self._sync_and_check(code, frame_type, start, stop)
 
-        # Day 1 sync
+        # 3. Day 1 sync
         # The cache already has bars_available records: [expected_head, ..., end]
         # After the sync, the cache should contains [expected_head, ..., end,
         # end + 1] bars in the cache
         stop = arrow.get("2020-05-22").date()
         await self._sync_and_check(code, frame_type, start, stop)
+
+        # 4. if sync_start >> tail? Now tail is 2020-05-08
+        start = arrow.get("2020-05-26").date()
+        stop = arrow.get("2020-05-28").date()
+        exp_head = arrow.get("2020-05-08").date()
+
+        await self._sync_and_check(code, frame_type, start, stop, exp_head)
 
     async def test_sync_bars_004(self):
         """sync_bars for FrameType.MIN60
@@ -343,6 +351,54 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         sync_params["stop"] = "2020-05-08 10:00"
         _, _, start, stop, *_ = syncjobs.parse_sync_params(**sync_params)
         await self._sync_and_check(code, frame_type, start, stop)
+
+    async def test_sync_bars_006(self):
+        """sync bars after archive data imported
+
+        trade_days:
+
+        20190102, 20190103, 20190104, 20190107, 20190108, 20190109,
+        20190110, 20190111, 20190114, 20190115, 20190116, 20190117,
+        """
+        try:
+            archive_server = await start_archive_server()
+            await cache.security.delete("000001.XSHE:1d")
+            
+            # start import archive and check result
+            await archive._main([201901], ["stock"])
+            sec = "000001.XSHE"
+            head, tail = await cache.get_bars_range(sec, FrameType.DAY)
+            self.assertEqual(datetime.date(2019, 1, 4), head)
+            self.assertEqual(datetime.date(2019, 1, 4), tail)
+
+            # sync start right after archive data
+            sync_params = {
+                "include": "000001.XSHE",
+                "frame": FrameType.DAY,
+                "start": "2019-01-05",
+                "stop": "2019-01-10"
+            }
+
+            _, frame_type, start, stop, delay = syncjobs.parse_sync_params(**sync_params)
+
+            exp_head = arrow.get('2019-01-04').date()
+            await self._sync_and_check(sec, frame_type, start, stop, exp_head)
+
+            # sync starts before archive data
+            sync_params["start"] =  "2019-01-02"
+            sync_params["stop"] = "2019-01-11"
+            _, _, start, stop, _ = syncjobs.parse_sync_params(**sync_params)
+            exp_head = arrow.get('2019-01-02').date()
+            await self._sync_and_check(sec, frame_type, start, stop, exp_head)
+
+            # sync starts after archive data with gap
+            start = arrow.get("2019-01-15").date()
+            stop = arrow.get("2019-01-17").date()
+            exp_head = arrow.get("2019-01-02").date()
+            await self._sync_and_check(sec, frame_type, start, stop, exp_head)
+        finally:
+            if archive_server:
+                archive_server.kill()
 
     async def test_sync_calendar(self):
         try:
