@@ -3,6 +3,7 @@ import glob
 import io
 import logging
 import os
+import random
 import shutil
 import tarfile
 import tempfile
@@ -183,7 +184,7 @@ async def _load_index(url: str):
 async def get_bars(server, months: List[int], cats: List[str]) -> Tuple[int, str]:
     if not server.endswith("/"):
         server += "/"
-    status, response = await _load_index(server + "index.yml")
+    status, response = await _load_index(server + f"index.yml?{random.random()}")
     if status != 200:
         yield status, response
         yield 500, "读取索引失败，无法下载历史数据"
@@ -222,7 +223,7 @@ async def get_index(server):
     if not server.endswith("/"):
         server += "/"
 
-    status, index = await _load_index(server + "/index.yml")
+    status, index = await _load_index(server + f"/index.yml?{random.random()}")
     if status != 200 or (index is None):
         return 500, None
 

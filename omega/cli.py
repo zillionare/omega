@@ -8,6 +8,7 @@ import asyncio
 import itertools
 import logging
 import os
+import random
 import re
 import signal
 import subprocess
@@ -767,7 +768,7 @@ async def http_get(url, content_type: str = "json"):
 
 
 async def get_archive_index():
-    url = cfg.omega.urls.archive + "/index.yml"
+    url = cfg.omega.urls.archive + f"/index.yml?{random.random()}"
     content = await http_get(url, "text")
     if content is None:
         print("当前没有历史数据可供下载")
