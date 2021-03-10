@@ -1,4 +1,4 @@
--- this script is for omega <= 0.6
+-- version 0.6:
 create table if not exists valuation
 (
     id                     serial not null
