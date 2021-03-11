@@ -178,7 +178,7 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
         settings = {}
         with mock.patch(
             "builtins.input",
-            side_effect=["R", "127.0.0.1", "6380", "account", "password"],
+            side_effect=["R", "127.0.0.1", "6380", "account", "password", "zillionare"],
         ):
             with mock.patch("omega.cli.check_postgres", side_effect=[True]):
                 await cli.config_postgres(settings)
@@ -187,11 +187,35 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
 
         with mock.patch(
             "builtins.input",
-            side_effect=["R", "127.0.0.1", "6380", "account", "password", "C"],
+            side_effect=[
+                "R",
+                "127.0.0.1",
+                "6380",
+                "account",
+                "password",
+                "zillionare",
+                "C",
+            ],
         ):
             await cli.config_postgres(settings)
             expected = "postgres://account:password@127.0.0.1:6380/zillionare"
             self.assertEqual(expected, settings["postgres"]["dsn"])
+
+        # check connection to postgres. Need provide right info in ut
+        with mock.patch(
+            "builtins.input",
+            side_effect=[
+                "R",
+                "localhost",
+                "5432",
+                "zillionare",
+                "123456",
+                "zillionare",
+            ],
+        ):
+            result = await cli.config_postgres(settings)
+            # should be no exceptions
+            self.assertTrue(result)
 
     async def test_config_redis(self):
         # 1. normla case
