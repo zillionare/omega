@@ -44,6 +44,8 @@ async def start_logging():
         receiver = RedisLogReceiver(dsn, channel, filename, backup_count, max_bytes)
         await receiver.start()
 
+        logger.info("%s is working now", cfg.logreceiver.klass)
+
 
 async def init(app, loop):  # noqa
     global scheduler
@@ -51,6 +53,7 @@ async def init(app, loop):  # noqa
     config_dir = get_config_dir()
     cfg4py.init(get_config_dir(), False)
 
+    await start_logging()
     logger.info("init omega-jobs process with config at %s", config_dir)
 
     await omicron.init()
@@ -109,6 +112,7 @@ async def get_status(request):
 @app.listener("after_server_stop")
 async def on_shutdown(app, loop):  # pragma: no cover
     global receiver
+    logger.info("omega jobs is shutting down...")
     try:
         await receiver.stop()
     except Exception:
@@ -119,7 +123,7 @@ async def on_shutdown(app, loop):  # pragma: no cover
 
 def start(host: str = "0.0.0.0", port: int = 3180):  # pragma: no cover
     check_env()
-    logger.info("staring omega jobs ...")
+    logger.info("starting omega jobs ...")
     app.register_listener(init, "before_server_start")
     app.run(host=host, port=port, register_sys_signals=True)
     logger.info("omega jobs exited.")
