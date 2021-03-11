@@ -51,27 +51,18 @@ omega:
     calendar: 02:00
     bars:
       - frame: '1W'
-        start: '2005-1-1'
+        start: '2020-12-1'
         cat:
             - stock
       - frame: '1M'
-        start: '2005-1-1'
-        cat:
-            - stock
-      - frame: '1Q'
-        start: '2005-1-1'
+        start: '2020-12-1'
         cat:
             - stock
       - frame: '1d'
-        start: '2018-1-1'
+        start: '2020-12-1'
         delay: 0 # delay * seconds after the frame is done
         cat:
           - stock # stock | index
-      - frame: '30m'
-        start: '2020-1-1'
-        delay: 60 # delay 1 minute
-        cat:
-          - stock
 
 quotes_fetchers:
   - impl: jqadaptor    # there must be a create_instance method in this module
@@ -80,4 +71,4 @@ quotes_fetchers:
         password: ${JQ_PASSWORD}
         port: 3181
         # note! for the first group, if you set n, then you'll get n + 1 workers
-        sessions: 2
+        sessions: 1
