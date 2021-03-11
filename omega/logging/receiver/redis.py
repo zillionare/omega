@@ -85,6 +85,9 @@ class RedisLogReceiver:
 
     def _write(self, msg: str):
         self._written_bytes += len(msg)
+        if (1 + self._written_bytes) % 4096 == 0:
+            self._fh.flush()
+
         if self._written_bytes > self._max_bytes:
             self.rotate()
 
