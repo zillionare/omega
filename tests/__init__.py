@@ -3,15 +3,14 @@ import json
 import logging
 import os
 import signal
+import socket
 import subprocess
 import sys
 import time
+from contextlib import closing
 
 import aiohttp
 import cfg4py
-
-import socket
-from contextlib import closing
 
 from omega.config import get_config_dir
 

@@ -18,13 +18,13 @@ from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
 from omicron.models.securities import Securities
 from pyemit import emit
-from omega.fetcher import archive
 
 import omega.core.sanity
 import omega.jobs
 import omega.jobs.syncjobs as syncjobs
 from omega.config.schema import Config
 from omega.core.events import Events, ValidationError
+from omega.fetcher import archive
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from tests import init_test_env, start_archive_server, start_omega
 
@@ -363,7 +363,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         try:
             archive_server = await start_archive_server()
             await cache.security.delete("000001.XSHE:1d")
-            
+
             # start import archive and check result
             await archive._main([201901], ["stock"])
             sec = "000001.XSHE"
@@ -376,19 +376,21 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                 "include": "000001.XSHE",
                 "frame": FrameType.DAY,
                 "start": "2019-01-05",
-                "stop": "2019-01-10"
+                "stop": "2019-01-10",
             }
 
-            _, frame_type, start, stop, delay = syncjobs.parse_sync_params(**sync_params)
+            _, frame_type, start, stop, delay = syncjobs.parse_sync_params(
+                **sync_params
+            )
 
-            exp_head = arrow.get('2019-01-04').date()
+            exp_head = arrow.get("2019-01-04").date()
             await self._sync_and_check(sec, frame_type, start, stop, exp_head)
 
             # sync starts before archive data
-            sync_params["start"] =  "2019-01-02"
+            sync_params["start"] = "2019-01-02"
             sync_params["stop"] = "2019-01-11"
             _, _, start, stop, _ = syncjobs.parse_sync_params(**sync_params)
-            exp_head = arrow.get('2019-01-02').date()
+            exp_head = arrow.get("2019-01-02").date()
             await self._sync_and_check(sec, frame_type, start, stop, exp_head)
 
             # sync starts after archive data with gap

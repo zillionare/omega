@@ -186,7 +186,7 @@ class AbstractQuotesFetcher(QuotesFetcher):
 
         if len(bars) == 0:
             return
-            
+
         # 根据指定的end，计算结束时的frame
         last_closed_frame = tf.floor(end, frame_type)
 

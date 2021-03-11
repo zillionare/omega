@@ -215,8 +215,7 @@ class TestAbstractQuotesFetcher(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(datetime.date(2021, 2, 5), bars["frame"][0])
 
     async def test_get_bars_016(self):
-        """test when bars is empty
-        """
+        """test when bars is empty"""
         sec = "605060.XSHG"
         frame_type = FrameType.MONTH
         end = datetime.date(2021, 2, 1)

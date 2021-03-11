@@ -3,13 +3,13 @@ import logging
 import os
 import shutil
 import unittest
-import aiohttp
 
+import aiohttp
 import cfg4py
 import omicron
 import rlog
-from omicron.core.types import FrameType
 from omicron import cache
+from omicron.core.types import FrameType
 
 from omega.config.schema import Config
 from omega.jobs.main import init, start_logging

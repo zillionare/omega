@@ -1,12 +1,12 @@
 import io
 import os
+import shutil
 import unittest
 from unittest import mock
 
 import cfg4py
 from pyemit import emit
 from ruamel.yaml import YAML
-import shutil
 
 from omega import cli
 from tests import init_test_env, start_archive_server, start_omega
@@ -236,6 +236,7 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
                     os.environ.get("POSTGRES_PORT"),
                     os.environ.get("POSTGRES_USER"),
                     os.environ.get("POSTGRES_PASSWORD"),
+                    os.environ.get("POSTGRES_DB"),
                     "1",  # download one month archive
                 ],
             ):
