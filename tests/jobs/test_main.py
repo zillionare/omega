@@ -14,6 +14,7 @@ from omicron.core.types import FrameType
 from omega.config.schema import Config
 from omega.jobs.main import init, start_logging
 from tests import find_free_port, init_test_env, start_job_server
+from unittest import mock
 
 cfg: Config = cfg4py.get_instance()
 
@@ -69,9 +70,22 @@ class TestJobsMain(unittest.IsolatedAsyncioTestCase):
         await omicron.init()
         await cache.sys.delete("jobs.bars_sync.stop")
         try:
-            await init(None, None)
-            # won't trigger sync this time
-            await init(None, None)
+            cfg.omega.sync.bars = [
+                {
+                    "frame": "1d",
+                    "start": "2020-01-02",
+                    "stop": "2020-01-03",
+                    "delay": 3,
+                    "cat": [],
+                    "include": "000001.XSHE",
+                    "exclude": "000001.XSHG",
+                }
+            ]
+            # disable init, just use cfg here
+            with mock.patch("cfg4py.init"):
+                await init(None, None)
+                # won't trigger sync this time
+                await init(None, None)
         finally:
             # cfg.omega.sync.bars = origin
             pass
