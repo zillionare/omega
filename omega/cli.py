@@ -141,7 +141,6 @@ async def check_postgres(dsn: str):
             script = "".join(f.readlines())
 
             await conn.execute(script)
-        print("数据库初始化完成。")
         return True
     except asyncpg.InvalidCatalogNameError:
         print("数据库<zillionare>不存在，请联系管理员创建后，再运行本程序")
@@ -189,7 +188,7 @@ async def config_postgres(settings):
             update_config(settings, "postgres.dsn", dsn)
             update_config(settings, "postgres.enabled", True)
             print(f"[{colored('PASS', 'green')}] 数据库连接成功，并成功初始化！")
-            return
+            return True
         else:
             hint = f"[{colored('FAIL', 'red')}] 忽略错误[C]，重新输入[R]，退出[Q]"
             action = choose_action(hint)
@@ -435,10 +434,8 @@ async def setup(reset_factory=False, force=False):
 
         print_title("配置已完成。现在为您启动Omega,开启财富之旅！")
 
-        start()
-        time.sleep(5)
-        start("jobs")
-        status()
+        await start()
+        await status()
 
 
 def save_config(settings):
@@ -538,10 +535,16 @@ async def start(service: str = ""):
     config_dir = get_config_dir()
     cfg4py.init(config_dir, False)
 
-    if service == "jobs":
+    if service == "":
+        _start_fetcher_processes()
+        await asyncio.sleep(5)
+        _start_jobs()
+    elif service == "jobs":
         return _start_jobs()
-
-    _start_fetcher_processes()
+    elif service == "fetcher":
+        return _start_fetcher_processes()
+    else:
+        print("不支持的服务")
 
 
 def _start_fetcher_processes():
@@ -614,7 +617,7 @@ def _start_jobs():
     while _find_jobs_process() is None and retry < 5:
         print("等待omega.jobs启动中")
         retry += 1
-        time.sleep(0.5)
+        time.sleep(1)
     if retry < 5:
         print("omega.jobs启动成功。")
         return
@@ -658,7 +661,7 @@ def _show_jobs_process():
 def _find_jobs_process():
     for p in psutil.process_iter():
         cmd = " ".join(p.cmdline())
-        if cmd.find("-m omega.jobs") != -1:
+        if cmd.find("-m omega.jobs.main") != -1:
             return p.pid
     return None
 
@@ -688,21 +691,29 @@ async def status():
 
 
 async def stop(service: str = ""):
-    if service == "jobs":
+    if service == "":
+        _stop_jobs()
+        _stop_fetcher_processes()
+    elif service == "jobs":
         return _stop_jobs()
-
-    _stop_fetcher_processes()
+    else:
+        _stop_fetcher_processes()
 
 
 async def restart(service: str = ""):
     print("正在重启动服务...")
     await _init()
 
-    if service == "jobs":
+    if service == "":
+        _stop_fetcher_processes()
+        _stop_jobs()
+        _start_fetcher_processes()
+        _start_jobs()
+    elif service == "jobs":
         return _restart_jobs()
-
-    _stop_fetcher_processes()
-    _start_fetcher_processes()
+    else:
+        _stop_fetcher_processes()
+        _start_fetcher_processes()
 
 
 async def sync_sec_list():
