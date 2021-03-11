@@ -136,7 +136,7 @@ async def check_postgres(dsn: str):
         conn = await asyncpg.connect(dsn=dsn)
 
         print("连接成功，正在初始化数据库...")
-        script_file = os.path.join(factory_config_dir(), "sql/v0.6.sql")
+        script_file = os.path.join(factory_config_dir(), "sql/init.sql")
         with open(script_file, "r") as f:
             script = "".join(f.readlines())
 
@@ -179,9 +179,12 @@ async def config_postgres(settings):
         )
         account = get_input("请输入账号,", None, os.environ.get("POSTGRES_USER"))
         password = get_input("请输入密码,", None, os.environ.get("POSTGRES_PASSWORD"))
+        dbname = get_input(
+            "请输入数据库名,", None, os.environ.get("POSTGRES_DB") or "zillionare"
+        )
 
         print("正在测试Postgres连接...")
-        dsn = f"postgres://{account}:{password}@{host}:{port}/zillionare"
+        dsn = f"postgres://{account}:{password}@{host}:{port}/{dbname}"
         if await check_postgres(dsn):
             update_config(settings, "postgres.dsn", dsn)
             update_config(settings, "postgres.enabled", True)
