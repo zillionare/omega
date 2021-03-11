@@ -60,16 +60,20 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
         return count
 
     async def test_omega_lifecycle(self):
-        await cli.start("omega")
+        await cli.start("fetcher")
         procs = cli.find_fetcher_processes()
         self.assertTrue(len(procs) >= 1)
 
-        await cli.restart("omega")
+        await cli.restart("fetcher")
         await cli.status()
 
-        await cli.stop("omega")
+        await cli.stop("fetcher")
         procs = cli.find_fetcher_processes()
         self.assertEqual(0, len(procs))
+
+        await cli.start()
+        await cli.restart()
+        await cli.stop()
 
     async def test_omega_jobs(self):
         await cli.start("jobs")
