@@ -1,5 +1,8 @@
 # Config file for automatic testing at travis-ci.com
-
+branches:
+  only:
+    - release
+    - master
 language: python
 python:
   - 3.8
