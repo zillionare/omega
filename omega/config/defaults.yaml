@@ -19,7 +19,7 @@ logging:
     apscheduler:
       level: INFO
     pyemit:
-      level: DEBUG
+      level: INFO
   root:
     handlers:
       - redis
