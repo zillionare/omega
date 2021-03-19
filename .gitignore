@@ -107,3 +107,4 @@ ENV/
 /.idea
 site
 omega/config/schema.py
+nohup.out
