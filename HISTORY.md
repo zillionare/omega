@@ -16,3 +16,10 @@
 * 重构了[omega.app.start][]接口，允许从父进程继承`cfg`设置
 * web interface增加[omega.app.get_version][]接口。此接口也可以用来判断Omega服务器是否在线
 * 本版本适配zillionare-omicron 0.3和zillionare-omega-adaptors-jq 0.2.4
+
+## 1.0 (2020-?)
+
+first stable release
+
+### 功能
+### bug fixes
