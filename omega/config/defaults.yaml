@@ -37,7 +37,7 @@ redis:
   dsn: redis://${REDIS_HOST}:${REDIS_PORT}
 postgres:
   dsn: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
-  enabled: false
+  enabled: ${POSTGRES_ENABLED}
 pickle:
   ver: 4
 omega:
