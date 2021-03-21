@@ -3,6 +3,7 @@ import logging
 import os
 import shutil
 import unittest
+from unittest import mock
 
 import aiohttp
 import cfg4py
@@ -14,7 +15,6 @@ from omicron.core.types import FrameType
 from omega.config.schema import Config
 from omega.jobs.main import init, start_logging
 from tests import find_free_port, init_test_env, start_job_server
-from unittest import mock
 
 cfg: Config = cfg4py.get_instance()
 
