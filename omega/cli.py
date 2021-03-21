@@ -871,7 +871,7 @@ async def download_archive(n: Union[str, int] = None):
 
     months_groups = bin_cut(avail_months[-n:], cpus)
     tasks = []
-    print(f"共启动{cpus}个进程，正在下载中...")
+    print(f"共启动{len(months_groups)}个进程，正在下载中...")
     for m in months_groups:
         if len(m) == 0:
             break
