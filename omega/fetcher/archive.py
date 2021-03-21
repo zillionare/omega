@@ -131,10 +131,13 @@ async def get_file(url: str, timeout: int = 600, handler: FileHandler = None):
                         year, month, cat = parse_url(url)
                         return url, f"404 服务器上没有{year}年{month}月的{cat}数据"
 
-        except aiohttp.ClientConnectionError as e:
+        except aiohttp.ServerTimeoutError as e:
             logger.warning("downloading %s failed for %sth time", url, retry)
             logger.exception(e)
-            raise e
+        except Exception as e:
+            logger.warning("downloading %s failed, url")
+            logger.exception(e)
+            break
 
         retry += 1
         logger.info("retry downloading file from %s", url)
