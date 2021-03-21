@@ -611,7 +611,15 @@ def _start_fetcher(
 
 
 def _start_jobs():
-    subprocess.Popen([sys.executable, "-m", "omega.jobs.main", "start"])
+    subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "omega.jobs.main",
+            "start",
+            f"--port={cfg.omega.jobs.port}",
+        ]
+    )
 
     retry = 0
     while _find_jobs_process() is None and retry < 5:
@@ -863,6 +871,7 @@ async def download_archive(n: Union[str, int] = None):
 
     months_groups = bin_cut(avail_months[-n:], cpus)
     tasks = []
+    print(f"共启动{cpus}个进程，正在下载中...")
     for m in months_groups:
         if len(m) == 0:
             break

@@ -42,6 +42,8 @@ pickle:
   ver: 4
 omega:
   home: ~/zillionare/omgea
+  jobs:
+    port: 3180
   urls:
     quotes_server: http://localhost:3181
     archive: http://stocks.jieyu.ai
