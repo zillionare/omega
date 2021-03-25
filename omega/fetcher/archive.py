@@ -112,7 +112,7 @@ def parse_url(url: str):
     return url.split("/")[-1].split(".")[0].split("-")
 
 
-async def get_file(url: str, timeout: int = 600, handler: FileHandler = None):
+async def get_file(url: str, timeout: int = 1200, handler: FileHandler = None):
     retry = 1
     timeout = aiohttp.ClientTimeout(total=timeout)
     while retry <= 3:
@@ -236,8 +236,11 @@ async def get_index(server):
 async def _main(months: list, cats: list):
     await omicron.init()
 
-    async for status, desc in get_bars(cfg.omega.urls.archive, months, cats):
-        print(status, desc)
+    try:
+        async for status, desc in get_bars(cfg.omega.urls.archive, months, cats):
+            print(status, desc)
+    finally:
+        await omicron.shutdown()
 
 
 def main(months: str, cats: str, archive_server: str = None):
