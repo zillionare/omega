@@ -645,3 +645,9 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             },
         }
         return end, expected
+
+    async def test_sync_security_list(self):
+        await cache.security.delete("securities")
+        await syncjobs.sync_security_list()
+        secs = await cache.get_securities()
+        self.assertTrue(len(secs) > 0)
