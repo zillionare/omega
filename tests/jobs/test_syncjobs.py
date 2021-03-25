@@ -366,6 +366,10 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
 
             # start import archive and check result
             await archive._main([201901], ["stock"])
+
+            # in archive._main, omicron.shutdown is called
+            await omicron.init()
+
             sec = "000001.XSHE"
             head, tail = await cache.get_bars_range(sec, FrameType.DAY)
             self.assertEqual(datetime.date(2019, 1, 4), head)
