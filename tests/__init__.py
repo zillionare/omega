@@ -6,7 +6,6 @@ import signal
 import socket
 import subprocess
 import sys
-import time
 from contextlib import closing
 
 import aiohttp
@@ -98,7 +97,7 @@ async def is_local_job_server_alive(port):
 
 async def start_job_server(port, timeout=30):
     process = subprocess.Popen(
-        [sys.executable, "-m", "omega.jobs.main", "start", f"--port={port}"],
+        [sys.executable, "-m", "omega.jobs", "start", f"--port={port}"],
         env=os.environ,
     )
 
@@ -107,7 +106,7 @@ async def start_job_server(port, timeout=30):
         if await is_local_job_server_alive(port):
             return process
 
-    raise TimeoutError("Archieved Bars server not started")
+    raise TimeoutError("jobs server not started")
 
 
 async def is_local_archive_server_alive(port):

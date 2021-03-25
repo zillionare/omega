@@ -114,7 +114,8 @@ async def on_shutdown(app, loop):  # pragma: no cover
     global receiver
     logger.info("omega jobs is shutting down...")
     try:
-        await receiver.stop()
+        if receiver:
+            await receiver.stop()
     except Exception:
         pass
 

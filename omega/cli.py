@@ -615,7 +615,7 @@ def _start_jobs():
         [
             sys.executable,
             "-m",
-            "omega.jobs.main",
+            "omega.jobs",
             "start",
             f"--port={cfg.omega.jobs.port}",
         ]
@@ -649,9 +649,9 @@ def _stop_jobs():
     pid = _find_jobs_process()
     retry = 0
     while pid is not None and retry < 5:
+        retry += 1
         try:
             os.kill(pid, signal.SIGTERM)
-            retry += 1
             time.sleep(0.5)
         except Exception:
             pass
@@ -669,7 +669,7 @@ def _show_jobs_process():
 def _find_jobs_process():
     for p in psutil.process_iter():
         cmd = " ".join(p.cmdline())
-        if cmd.find("-m omega.jobs.main") != -1:
+        if cmd.find("-m omega.jobs") != -1:
             return p.pid
     return None
 
@@ -865,7 +865,7 @@ async def download_archive(n: Union[str, int] = None):
     t0 = time.time()
     n = min(n, len(avail_months))
     # months = ",".join([str(x) for x in avail_months[-n:]])
-    cats = "index,stock"
+    cats = "stock"
 
     cpus = psutil.cpu_count()
 

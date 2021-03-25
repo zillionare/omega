@@ -13,7 +13,7 @@ from omicron import cache
 from omicron.core.types import FrameType
 
 from omega.config.schema import Config
-from omega.jobs.main import init, start_logging
+from omega.jobs.__main__ import init, start_logging
 from tests import find_free_port, init_test_env, start_job_server
 
 cfg: Config = cfg4py.get_instance()
