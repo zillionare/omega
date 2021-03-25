@@ -165,7 +165,7 @@ def parse_sync_params(
         if stop:
             stop = arrow.get(stop, tzinfo=cfg.tz)
             if stop.hour == 0:  # 未指定有效的时间帧，使用当日结束帧
-                stop = tf.last_frame(tf.day_shift(stop.date(), 0), frame_type)
+                stop = tf.last_min_frame(tf.day_shift(stop.date(), 0), frame_type)
             else:
                 stop = tf.floor(stop, frame_type)
         else:
@@ -173,7 +173,7 @@ def parse_sync_params(
         if start:
             start = arrow.get(start, tzinfo=cfg.tz)
             if start.hour == 0:  # 未指定有效的交易帧，使用当日的起始帧
-                start = tf.first_frame(tf.day_shift(start.date(), 0), frame_type)
+                start = tf.first_min_frame(tf.day_shift(start.date(), 0), frame_type)
             else:
                 start = tf.floor(start, frame_type)
         else:
@@ -386,7 +386,10 @@ async def sync_calendar():
 
 
 async def sync_security_list():
-    """更新证券列表"""
+    """更新证券列表
+
+    注意证券列表在AbstractQuotesServer取得时就已保存，此处只是触发
+    """
     secs = await aq.get_security_list()
     logger.info("%s secs are fetched and saved.", len(secs))
 
