@@ -76,9 +76,9 @@ async def init(app, loop):  # noqa
         minute=m,
     )
 
-    # sync bars at startup
     syncjobs.load_bars_sync_jobs(scheduler)
 
+    # sync bars at startup
     last_sync = await cache.sys.get("jobs.bars_sync.stop")
     if last_sync:
         last_sync = arrow.get(last_sync, tzinfo=cfg.tz).timestamp

@@ -125,11 +125,11 @@ class RedisLogReceiver:
                 max_bytes = float(size) * 1024 * 1024
             elif unit == "K":
                 max_bytes = float(size) * 1024
-            else: # pragma: no cover
+            else:  # pragma: no cover
                 raise ValueError(f"{max_bytes} is not parsable")
         elif isinstance(max_bytes, int):
             pass
-        else: # pragma: no cover
+        else:  # pragma: no cover
             raise ValueError(f"type of max_bytes({type(max_bytes)}) is not supported.")
 
         return max_bytes
