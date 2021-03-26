@@ -170,6 +170,10 @@ def parse_sync_params(
                 stop = tf.floor(stop, frame_type)
         else:
             stop = tf.floor(arrow.now(tz=cfg.tz).datetime, frame_type)
+
+        if stop > arrow.now(tz=cfg.tz):
+            raise ValueError(f"请勿将同步截止时间设置在未来: {stop}")
+
         if start:
             start = arrow.get(start, tzinfo=cfg.tz)
             if start.hour == 0:  # 未指定有效的交易帧，使用当日的起始帧
@@ -180,6 +184,9 @@ def parse_sync_params(
             start = tf.shift(stop, -999, frame_type)
     else:
         stop = (stop and arrow.get(stop).date()) or arrow.now().date()
+        if stop == arrow.now().date():
+            stop = arrow.now(tz=cfg.tz)
+
         stop = tf.floor(stop, frame_type)
         start = tf.floor((start and arrow.get(start).date()), frame_type) or tf.shift(
             stop, -1000, frame_type
@@ -198,7 +205,7 @@ def parse_sync_params(
 
 
 async def sync_bars(params: dict):
-    """[summary]
+    """sync bars on signal OMEGA_DO_SYNC received
 
     Args:
         params (dict): composed of the following:
@@ -233,12 +240,20 @@ async def sync_bars(params: dict):
             return secs.pop() if len(secs) else None
 
     else:
-        logger.info("sync bars with %s(%s-%s) in polling mode", frame_type, start, stop)
+        logger.info(
+            "sync bars with %s(%s ~ %s) in polling mode", frame_type, start, stop
+        )
 
         async def get_sec():
             return await cache.sys.lpop(key_scope)
 
     key_scope = f"jobs.bars_sync.scope.{frame_type.value}"
+
+    if start is None or frame_type is None:
+        raise ValueError("you must specify a start date/frame_type for sync")
+
+    if stop is None:
+        stop = tf.floor(arrow.now(tz=cfg.tz), frame_type)
 
     while code := await get_sec():
         try:
@@ -262,16 +277,26 @@ async def sync_bars_for_security(
     stop: Union[None, datetime.date, datetime.datetime],
 ):
     counters = 0
-    logger.info("syncing %s(%s), from %s to %s", code, frame_type.value, start, stop)
 
     # 取数据库中该frame_type下该code的k线起始点
     head, tail = await cache.get_bars_range(code, frame_type)
     if not all([head, tail]):
         await cache.clear_bars_range(code, frame_type)
         n_bars = tf.count_frames(start, stop, frame_type)
+
         bars = await aq.get_bars(code, stop, n_bars, frame_type)
-        counters = len(bars)
-        logger.info("finished sync %s(%s), %s bars synced", code, frame_type, counters)
+        if bars is not None and len(bars):
+            logger.debug(
+                "sync %s(%s), from %s to %s: actual got %s ~ %s (%s)",
+                code,
+                frame_type,
+                start,
+                head,
+                bars[0]["frame"],
+                bars[-1]["frame"],
+                len(bars),
+            )
+            counters = len(bars)
         return
 
     if start < head:
@@ -279,45 +304,49 @@ async def sync_bars_for_security(
         if n > 0:
             _end_at = tf.shift(head, -1, frame_type)
             bars = await aq.get_bars(code, _end_at, n, frame_type)
-            counters += len(bars)
-            logger.debug(
-                "sync %s level bars of %s to %s: expected: %s, actual %s",
-                frame_type,
-                code,
-                _end_at,
-                n,
-                len(bars),
-            )
-            if len(bars) and bars["frame"][-1] != _end_at:
-                logger.warning(
-                    "discrete frames found:%s, bars[-1](%s), " "head(%s)",
+            if bars is not None and len(bars):
+                counters += len(bars)
+                logger.debug(
+                    "sync %s(%s), from %s to %s: actual got %s ~ %s (%s)",
                     code,
-                    bars["frame"][-1],
+                    frame_type,
+                    start,
                     head,
+                    bars[0]["frame"],
+                    bars[-1]["frame"],
+                    len(bars),
                 )
+                if bars["frame"][-1] != _end_at:
+                    logger.warning(
+                        "discrete frames found:%s, bars[-1](%s), " "head(%s)",
+                        code,
+                        bars["frame"][-1],
+                        head,
+                    )
 
     if stop > tail:
         n = tf.count_frames(tail, stop, frame_type) - 1
         if n > 0:
             bars = await aq.get_bars(code, stop, n, frame_type)
-            logger.debug(
-                "sync %s level bars of %s to %s: expected: %s, actual %s",
-                frame_type,
-                code,
-                stop,
-                n,
-                len(bars),
-            )
-            counters += len(bars)
-            if bars["frame"][0] != tf.shift(tail, 1, frame_type):
-                logger.warning(
-                    "discrete frames found: %s, tail(%s), bars[0](" "%s)",
+            if bars is not None and len(bars):
+                logger.debug(
+                    "sync %s(%s), from %s to %s: actual got %s ~ %s (%s)",
                     code,
+                    frame_type,
                     tail,
-                    bars["frame"][0],
+                    stop,
+                    bars[0]["frame"],
+                    bars[-1]["frame"],
+                    len(bars),
                 )
-
-    logger.info("finished sync %s(%s), %s bars synced", code, frame_type, counters)
+                counters += len(bars)
+                if bars["frame"][0] != tf.shift(tail, 1, frame_type):
+                    logger.warning(
+                        "discrete frames found: %s, tail(%s), bars[0](" "%s)",
+                        code,
+                        tail,
+                        bars["frame"][0],
+                    )
 
 
 async def trigger_single_worker_sync(_type: str, params: dict = None):

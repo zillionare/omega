@@ -96,18 +96,32 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             sync_request.append(params)
 
         emit.register(Events.OMEGA_DO_SYNC, on_sync_bars)
-        with mock.patch("arrow.now", return_value=arrow.get("2020-1-6")):
+        with mock.patch("arrow.now", return_value=arrow.get("2020-1-6 10:00")):
             await syncjobs.trigger_bars_sync(sync_params, force=True)
 
         await asyncio.sleep(0.2)
         self.assertDictEqual(
             {
                 "start": arrow.get("2019-12-31").date(),
-                "stop": arrow.get("2020-1-6").date(),
+                "stop": arrow.get("2020-1-3").date(),
                 "frame_type": FrameType.DAY,
             },
             sync_request[0],
         )
+
+        sync_request = []
+        with mock.patch("arrow.now", return_value=arrow.get("2020-1-6 15:00")):
+            await syncjobs.trigger_bars_sync(sync_params, force=True)
+
+            await asyncio.sleep(0.2)
+            self.assertDictEqual(
+                {
+                    "start": arrow.get("2019-12-31").date(),
+                    "stop": arrow.get("2020-1-6").date(),
+                    "frame_type": FrameType.DAY,
+                },
+                sync_request[0],
+            )
 
     async def test_parse_sync_params(self):
         """
@@ -123,13 +137,26 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             "include": "000001.XSHE 000004.XSHE",
             "exclude": "000001.XSHE 000001.XSHG",
         }
-        # 1.
-        codes, ft, start, stop, delay = syncjobs.parse_sync_params(**sync_params)
-        self.assertTrue("000001.XSHE" in codes)
-        self.assertEqual(FrameType.DAY, ft)
-        self.assertEqual(start, datetime.date(2019, 12, 31))
-        self.assertEqual(stop, tf.day_shift(arrow.now().date(), 0))
-        self.assertEqual(3, delay)
+        # 0. stop is None and current time is in opening
+        with mock.patch(
+            "arrow.now", return_value=arrow.get("2021-03-01 10:45", tzinfo=cfg.tz)
+        ):
+            codes, ft, start, stop, delay = syncjobs.parse_sync_params(**sync_params)
+            self.assertTrue("000001.XSHE" in codes)
+            self.assertEqual(FrameType.DAY, ft)
+            self.assertEqual(start, datetime.date(2019, 12, 31))
+            self.assertEqual(stop, datetime.date(2021, 2, 26))
+            self.assertEqual(3, delay)
+
+        # 1. stop is None, and current time is after closed
+        with mock.patch(
+            "arrow.now", return_value=arrow.get("2021-3-1 16:00", tzinfo=cfg.tz)
+        ):
+            codes, ft, start, stop, delay = syncjobs.parse_sync_params(**sync_params)
+            self.assertEqual(FrameType.DAY, ft)
+            self.assertEqual(start, datetime.date(2019, 12, 31))
+            self.assertEqual(stop, datetime.date(2021, 3, 1))
+            self.assertEqual(3, delay)
 
         # 2. MIN5 frame, start is type of `date` could start align to first_frame?
         sync_params["frame"] = "5m"
@@ -158,27 +185,34 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(expected_stop, stop)
             self.assertEqual(1000, tf.count_frames(start, expected_stop, ft))
 
+    async def _cache_get_bars_all(self, code, frame_type):
+        head, tail = await cache.get_bars_range(code, frame_type)
+
+        n_bars = tf.count_frames(head, tail, frame_type)
+        return await cache.get_bars(code, tail, n_bars, frame_type)
+
     async def _sync_and_check(
         self, code, frame_type, start, stop, exp_head=None, exp_tail=None
     ):
+        stop = stop or arrow.now(cfg.tz).datetime
+
         exp_head = exp_head or start
         exp_tail = exp_tail or stop
 
         await syncjobs.sync_bars(
             {"frame_type": frame_type, "start": start, "stop": stop, "secs": [code]}
         )
-        head, tail = await cache.get_bars_range(code, frame_type)
 
-        n_bars = tf.count_frames(exp_head, exp_tail, frame_type)
-        bars = await cache.get_bars(code, exp_tail, n_bars, frame_type)
+        bars = await self._cache_get_bars_all(code, frame_type)
 
         # 本单元测试的k线数据应该没有空洞。如果程序在首尾衔接处出现了问题，就会出现空洞，
         # 导致期望获得的数据与实际数据数量不相等。
+        exp_bars_len = tf.count_frames(exp_head, exp_tail, frame_type)
         bars = list(filter(lambda x: not np.isnan(x["close"]), bars))
 
-        self.assertEqual(n_bars, len(bars))
-        self.assertEqual(exp_head, head)
-        self.assertEqual(exp_tail, tail)
+        self.assertEqual(exp_bars_len, len(bars))
+        self.assertEqual(exp_head, bars[0]["frame"])
+        self.assertEqual(exp_tail, bars[-1]["frame"])
 
     async def test_sync_bars_001(self):
         """sync_bars for FrameType.MONTH
@@ -248,6 +282,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         20200430, 20200506, 20200507, 20200508, 20200511, 20200512,
         20200513, 20200514, 20200515, 20200518, 20200519, 20200520,
         20200521, 20200522, 20200525, 20200526, 20200527, 20200528,
+        20200529, 20200601, 20200602, 20200603
         """
         sync_params = {
             "include": "000001.XSHE",
@@ -284,6 +319,16 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         exp_head = arrow.get("2020-05-08").date()
 
         await self._sync_and_check(code, frame_type, start, stop, exp_head)
+
+        # 5. sync to today, before close
+        with mock.patch("arrow.now", return_value=arrow.get("2020-05-29 10:00")):
+            sync_params["stop"] = None
+            secs, frame_type, start, stop, _ = syncjobs.parse_sync_params(**sync_params)
+            await self._sync_and_check(code, frame_type, start, stop)
+
+        with mock.patch("arrow.now", return_value=arrow.get("2020-5-29 16:00")):
+            sync_params["stop"] = None
+            secs, frame_type, start, stop, _ = syncjobs.parse_sync_params(**sync_params)
 
     async def test_sync_bars_004(self):
         """sync_bars for FrameType.MIN60
