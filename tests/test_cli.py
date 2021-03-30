@@ -156,7 +156,7 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
         except Exception as e:
             print(e)
 
-        # # fixme: disable temporarily, patch('sh.contrib.sudo.mkdir') causes issue 
+        # # fixme: disable temporarily, patch('sh.contrib.sudo.mkdir') causes issue
         # # 2. no permission to mkdir.
         # with mock.patch("os.makedirs", side_effect=PermissionError()):
         #     with mock.patch("sh.contrib.sudo.mkdir"):

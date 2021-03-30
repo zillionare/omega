@@ -259,4 +259,3 @@ class TestAbstractQuotesFetcher(unittest.IsolatedAsyncioTestCase):
         n = tf.count_frames(start, stop, frame_type)
         bars = await aq.get_bars(code, stop, n, frame_type)
         print(bars)
-
