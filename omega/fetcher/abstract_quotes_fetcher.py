@@ -87,7 +87,7 @@ class AbstractQuotesFetcher(QuotesFetcher):
         include_unclosed=True,
     ) -> np.ndarray:
         return await cls.get_instance().get_bars_batch(
-            secs, end, n_bars, frame_type, include_unclosed
+            secs, end, n_bars, frame_type.value, include_unclosed
         )
 
     @classmethod
@@ -181,7 +181,7 @@ class AbstractQuotesFetcher(QuotesFetcher):
                 return None
 
         bars = await cls.get_instance().get_bars(
-            sec, end, n_bars, frame_type, include_unclosed
+            sec, end, n_bars, frame_type.value, include_unclosed
         )
 
         if len(bars) == 0:
