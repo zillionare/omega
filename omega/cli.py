@@ -817,7 +817,7 @@ def bin_cut(arr: list, n: int):
     for i in range(n):
         result.append(arr[i * sz : (i + 1) * sz])
 
-    return result
+    return [e for e in result if len(e)]
 
 
 async def show_subprocess_output(stream):

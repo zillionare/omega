@@ -279,3 +279,14 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
         finally:
             if archive_server:
                 archive_server.kill()
+
+    async def test_bin_cut(self):
+        arr = [1,2,3,4,5]
+
+        expected = [[1, 2, 3, 4, 5],
+                    [1, 2, 3], [4, 5],
+                    [1, 2], [3, 4], [5],
+                    [1], [2], [3], [4], [5],
+                    [1], [2], [3], [4], [5]]
+        for i, bins in enumerate([1, 2, 3, 5, 10]):
+            self.assertListEqual(expected[i], cli.bin_cut(arr, bins))
