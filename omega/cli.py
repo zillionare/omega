@@ -678,6 +678,7 @@ def _stop_fetcher_processes():
     retry = 0
     while retry < 5:
         procs = find_fetcher_processes()
+        retry += 1
         if len(procs) == 0:
             return
 
