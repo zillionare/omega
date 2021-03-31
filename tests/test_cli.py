@@ -288,7 +288,6 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
                     print("stopping omega servers")
                     await cli.stop()
 
-
     async def test_download_archive(self):
         try:
             archive_server = await start_archive_server()

@@ -939,6 +939,7 @@ def run_with_init(func):
 
     return wrapper
 
+
 def run(func):
     def wrapper(*args, **kwargs):
         asyncio.run(func(*args, **kwargs))
