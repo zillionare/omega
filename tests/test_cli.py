@@ -16,6 +16,12 @@ from tests import init_test_env, start_archive_server, start_omega
 
 
 class TestCLI(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self) -> None:
+        self.cfg = init_test_env()
+
+    async def asyncTearDown(self) -> None:
+        await emit.stop()
+
     async def _start_servers(self):
         # 将server启动独立出来，加快单元测试速度
         self.omega = await start_omega()
@@ -33,12 +39,6 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
                 self.archive.kill()
         except AttributeError:
             pass
-
-    async def asyncSetUp(self) -> None:
-        self.cfg = init_test_env()
-
-    async def asyncTearDown(self) -> None:
-        await emit.stop()
 
     def yaml_dumps(self, settings):
         stream = io.StringIO()
@@ -285,6 +285,7 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
                     os.rename(bak, origin)
 
                     # setup has started servers
+                    print("stopping omega servers")
                     await cli.stop()
 
 

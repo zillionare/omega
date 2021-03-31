@@ -579,6 +579,8 @@ def _start_fetcher_processes():
 
 
 def show_fetcher_processes():
+    print(f"正在运行中的omega-fetchers进程：\n{'=' * 40}")
+
     procs = find_fetcher_processes()
 
     if len(procs):
@@ -627,10 +629,11 @@ def _start_jobs():
         time.sleep(1)
     if retry < 5:
         print("omega.jobs启动成功。")
-        return
     else:
         print("omega.jobs启动失败。")
         return
+
+    _show_jobs_process()
 
 
 def _restart_jobs():
@@ -658,6 +661,7 @@ def _stop_jobs():
 
 
 def _show_jobs_process():
+    print(f"正在运行中的jobs进程:\n{'=' * 40}")
     pid = _find_jobs_process()
     if pid:
         print(pid)
@@ -668,7 +672,7 @@ def _show_jobs_process():
 def _find_jobs_process():
     for p in psutil.process_iter():
         cmd = " ".join(p.cmdline())
-        if cmd.find("-m omega.jobs") != -1:
+        if cmd.find("omega.jobs") != -1:
             return p.pid
     return None
 
@@ -691,10 +695,8 @@ def _stop_fetcher_processes():
 
 
 async def status():
-    print(f"正在运行中的omega-fetchers进程：\n{'=' * 40}")
     show_fetcher_processes()
     print("\n")
-    print(f"正在运行中的jobs进程:\n{'=' * 40}")
     _show_jobs_process()
 
 
