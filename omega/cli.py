@@ -921,7 +921,7 @@ async def _init():
     await omicron.init(AbstractQuotesFetcher)
 
 
-def run(func):
+def run_with_init(func):
     def wrapper(*args, **kwargs):
         async def init_and_run(*args, **kwargs):
             try:
@@ -937,9 +937,11 @@ def run(func):
 
     return wrapper
 
+def run(func):
+    def wrapper(*args, **kwargs):
+        asyncio.run(func(*args, **kwargs))
 
-def _setup(*args, **kwargs):
-    asyncio.run(setup(*args, **kwargs))
+    return wrapper
 
 
 def main():
@@ -950,14 +952,14 @@ def main():
     fire.Fire(
         {
             "start": run(start),
-            "setup": _setup,
+            "setup": run(setup),
             "stop": run(stop),
             "status": run(status),
             "restart": run(restart),
-            "sync_sec_list": run(sync_sec_list),
-            "sync_calendar": run(sync_calendar),
-            "sync_bars": run(sync_bars),
-            "download": run(download_archive),
+            "sync_sec_list": run_with_init(sync_sec_list),
+            "sync_calendar": run_with_init(sync_calendar),
+            "sync_bars": run_with_init(sync_bars),
+            "download": run_with_init(download_archive),
         }
     )
 
