@@ -1,4 +1,7 @@
 import io
+
+import aioredis
+from omega.config import get_config_dir
 import os
 import shutil
 import unittest
@@ -235,15 +238,21 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
             self.assertDictEqual({}, settings)
 
     async def test_setup(self):
-        class EarlyJumpError(Exception):
-            pass
+        # clear cache to simulate first setup
+        redis = await aioredis.create_redis("redis://localhost:6379")
+        await redis.flushall()
+        redis.close()
+        await redis.wait_closed()
+
+        # backup configuration files
+        origin = os.path.join(get_config_dir(), "defaults.yaml")
+        bak = os.path.join(get_config_dir(), "defaults.bak")
 
         def save_config(settings):
-            with open("/tmp/omega_test_setup.yaml", "w") as f:
+            os.rename(origin, bak)
+            with open(origin, "w") as f:
+                settings["omega"]["urls"]["archive"] = self.cfg.omega.urls.archive
                 f.writelines(self.yaml_dumps(settings))
-
-            # ignore the rest setup process
-            raise EarlyJumpError()
 
         with mock.patch("omega.cli.save_config", save_config):
             with mock.patch(
@@ -267,9 +276,17 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
                 ],
             ):
                 try:
+                    self.archive = await start_archive_server()
                     await cli.setup(force=True)
-                except EarlyJumpError:
-                    pass
+                finally:
+                    if self.archive:
+                        self.archive.kill()
+                    os.remove(origin)
+                    os.rename(bak, origin)
+
+                    # setup has started servers
+                    await cli.stop()
+
 
     async def test_download_archive(self):
         try:
@@ -281,12 +298,14 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
                 archive_server.kill()
 
     async def test_bin_cut(self):
-        arr = [1,2,3,4,5]
+        arr = [1, 2, 3, 4, 5]
 
-        expected = [[1, 2, 3, 4, 5],
-                    [1, 2, 3], [4, 5],
-                    [1, 2], [3, 4], [5],
-                    [1], [2], [3], [4], [5],
-                    [1], [2], [3], [4], [5]]
+        expected = [
+            [[1, 2, 3, 4, 5]],
+            [[1, 2, 3], [4, 5]],
+            [[1, 2], [3, 4], [5]],
+            [[1], [2], [3], [4], [5]],
+            [[1], [2], [3], [4], [5]],
+        ]
         for i, bins in enumerate([1, 2, 3, 5, 10]):
             self.assertListEqual(expected[i], cli.bin_cut(arr, bins))

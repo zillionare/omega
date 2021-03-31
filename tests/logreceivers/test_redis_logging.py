@@ -6,7 +6,7 @@ import unittest
 
 import rlog
 
-from omega.logging.receiver.redis import RedisLogReceiver
+from omega.logreceivers.redis import RedisLogReceiver
 from tests import init_test_env
 
 

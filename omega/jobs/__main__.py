@@ -21,7 +21,7 @@ from sanic import Sanic, response
 import omega.jobs.syncjobs as syncjobs
 from omega.config import check_env, get_config_dir
 from omega.config.schema import Config
-from omega.logging.receiver.redis import RedisLogReceiver
+from omega.logreceivers.redis import RedisLogReceiver
 
 app = Sanic("Omega-jobs")
 logger = logging.getLogger(__name__)
