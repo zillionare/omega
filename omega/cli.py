@@ -423,19 +423,18 @@ async def setup(reset_factory=False, force=False):
     await config_postgres(settings)
     save_config(settings)
 
-    # the following if-condition is to make coverage happy
-    # these secenarios are tested seprately
-    if True:  # pragma: no cover
-        print_title("Step 6. 下载历史数据")
-        config_dir = get_config_dir()
-        cfg4py.init(config_dir, False)
-        remove_console_log_handler()
-        await download_archive(None)
+    print_title("Step 6. 下载历史数据")
+    config_dir = get_config_dir()
+    cfg4py.init(config_dir, False)
+    remove_console_log_handler()
 
-        print_title("配置已完成。现在为您启动Omega,开启财富之旅！")
+    await start("fetcher")
+    await download_archive(None)
 
-        await start()
-        await status()
+    print_title("配置已完成。现在为您启动Omega,开启财富之旅！")
+
+    await start("jobs")
+    await status()
 
 
 def save_config(settings):
