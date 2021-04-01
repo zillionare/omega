@@ -23,7 +23,6 @@ logging:
   root:
     handlers:
       - redis
-      - console
     level: INFO
 tz: Asia/Shanghai
 logreceiver:
@@ -63,8 +62,7 @@ omega:
       - frame: '1d'
         start: '2020-12-1'
         delay: 0 # delay * seconds after the frame is done
-        cat:
-          - stock # stock | index
+        include: 000001.XSHE
 
 quotes_fetchers:
   - impl: jqadaptor    # there must be a create_instance method in this module
