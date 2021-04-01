@@ -64,14 +64,18 @@ async def init(app, loop):  # noqa
     # sync securities daily
     h, m = map(int, cfg.omega.sync.security_list.split(":"))
     scheduler.add_job(
-        functools.partial(syncjobs.trigger_single_worker_sync, "calendar"),
+        syncjobs.trigger_single_worker_sync,
         "cron",
         hour=h,
         minute=m,
+        args=("calendar", ),
+        name="sync_calendar"
     )
     scheduler.add_job(
-        functools.partial(syncjobs.trigger_single_worker_sync, "security_list"),
+        syncjobs.trigger_single_worker_sync,
         "cron",
+        args=("security_list", ),
+        name = "sync_security_list",
         hour=h,
         minute=m,
     )
