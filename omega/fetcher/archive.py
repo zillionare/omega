@@ -135,7 +135,7 @@ async def get_file(url: str, timeout: int = 1200, handler: FileHandler = None):
             logger.warning("downloading %s failed for %sth time", url, retry)
             logger.exception(e)
         except Exception as e:
-            logger.warning("downloading %s failed, url")
+            logger.warning("downloading %s failed", url)
             logger.exception(e)
             break
 
