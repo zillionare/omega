@@ -93,33 +93,14 @@ class TestArchieveFetcher(unittest.IsolatedAsyncioTestCase):
     @mock.patch("aiohttp.ClientSession.get")
     async def test_get_file_connection_error(self, mock_get):
         mock_get.return_value.__aenter__.return_value.raiseError.side_effect = (
-            aiohttp.ClientConnectionError()
+            aiohttp.ServerTimeoutError()
         )
 
         archive_log = logging.getLogger("omega.fetcher.archive")
-        with mock.patch.object(archive_log, "info") as mock_info:
-            url, resp = await archive.get_file("http://mock/2019-11-stock.tgz")
+        with mock.patch.object(archive_log, "info"):
+            url, _ = await archive.get_file("http://mock/2019-11-stock.tgz")
             self.assertEqual("http://mock/2019-11-stock.tgz", url)
-            self.assertRaises(aiohttp.ClientConnectionError)
-            mock_info.assert_has_calls(
-                [
-                    call("downloading file from %s", "http://mock/2019-11-stock.tgz"),
-                    call(
-                        "retry downloading file from %s",
-                        "http://mock/2019-11-stock.tgz",
-                    ),
-                    call("downloading file from %s", "http://mock/2019-11-stock.tgz"),
-                    call(
-                        "retry downloading file from %s",
-                        "http://mock/2019-11-stock.tgz",
-                    ),
-                    call("downloading file from %s", "http://mock/2019-11-stock.tgz"),
-                    call(
-                        "retry downloading file from %s",
-                        "http://mock/2019-11-stock.tgz",
-                    ),
-                ]
-            )
+            self.assertRaises(aiohttp.ServerTimeoutError)
 
     async def test_archive_bars_handler_process(self):
         handler = ArchivedBarsHandler("http://mock/2019-01-stock.tgz")

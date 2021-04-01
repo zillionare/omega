@@ -39,7 +39,7 @@ class ArchivedBarsHandler(FileHandler):
     async def process(self, file_content):
         extract_to = tempfile.mkdtemp(prefix="omega-archive-")
         try:
-            year, month, cat = parse_url(self.url)
+            _, (year, month, cat) = parse_url(self.url)
 
             fileobj = io.BytesIO(file_content)
             tar = tarfile.open(fileobj=fileobj, mode="r")
@@ -109,40 +109,46 @@ class ArchivedBarsHandler(FileHandler):
 
 
 def parse_url(url: str):
-    return url.split("/")[-1].split(".")[0].split("-")
+    if url.find("index.yml") != -1:
+        return True, (url, None, None)
+
+    return False, url.split("/")[-1].split(".")[0].split("-")
 
 
 async def get_file(url: str, timeout: int = 1200, handler: FileHandler = None):
-    retry = 1
     timeout = aiohttp.ClientTimeout(total=timeout)
-    while retry <= 3:
-        logger.info("downloading file from %s", url)
-        try:
-            async with aiohttp.ClientSession(timeout=timeout) as client:
-                async with client.get(url) as response:
-                    if response.status == 200:
-                        logger.info("file %s downloaded", url)
-                        content = await response.read()
-                        if handler is None:
-                            return url, content
-                        else:
-                            return await handler.process(content)
-                    elif response.status == 404:
-                        year, month, cat = parse_url(url)
+    logger.info("downloading file from %s", url)
+    is_index, (year, month, cat) = parse_url(url)
+
+    try:
+        async with aiohttp.ClientSession(timeout=timeout) as client:
+            async with client.get(url) as response:
+                if response.status == 200:
+                    logger.info("file %s downloaded", url)
+                    content = await response.read()
+                    if handler is None:
+                        return url, content
+                    else:
+                        return await handler.process(content)
+                elif response.status == 404:
+                    if is_index:
+                        return url, f"404 未找到索引文件"
+                    else:
                         return url, f"404 服务器上没有{year}年{month}月的{cat}数据"
-
-        except aiohttp.ServerTimeoutError as e:
-            logger.warning("downloading %s failed for %sth time", url, retry)
-            logger.exception(e)
-        except Exception as e:
-            logger.warning("downloading %s failed", url)
-            logger.exception(e)
-            break
-
-        retry += 1
-        logger.info("retry downloading file from %s", url)
-
-    return url, None
+    except aiohttp.ServerTimeoutError as e:
+        logger.warning("downloading %s failed", url)
+        logger.exception(e)
+        if is_index:
+            return url, f"500 下载索引文件超时"
+        else:
+            return url, f"500 {year}/{month}的{cat}数据下载超时"
+    except Exception as e:
+        logger.warning("downloading %s failed", url)
+        logger.exception(e)
+        if is_index:
+            return url, f"500 下载索引文件失败"
+        else:
+            return url, f"500 {year}/{month}的{cat}数据下载失败"
 
 
 def parse_index(text):
