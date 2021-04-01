@@ -639,6 +639,9 @@ def _stop_jobs():
         except Exception:
             pass
         pid = _find_jobs_process()
+    
+    if retry >= 5:
+        print("未能停止omega.jobs")
 
 
 def _show_jobs_process():
@@ -673,6 +676,9 @@ def _stop_fetcher_processes():
                 except Exception:
                     pass
         time.sleep(1)
+
+    if retry >= 5:
+        print("未能终止fetcher进程")
 
 
 async def status():
