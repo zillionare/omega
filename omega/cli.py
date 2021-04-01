@@ -456,17 +456,6 @@ def save_config(settings):
 
 
 def check_environment():
-    role = os.environ.get(cfg4py.envar)
-    if role not in ["PRODUCTION", "DEV", "TEST"]:
-        print("在运行之前，请为服务器选择一个合适的角色：")
-        print("\t 生产环境 - PRODUCTION")
-        print("\t 测试用机 - TEST")
-        print("\t 开发环境 - DEV")
-        print(f"请将 {cfg4py.envar}= [PRODUCTION|TEST|DEV] (任选一）写入环境变量，再次运行本程序")
-        return False
-
-    print(f"[{colored('PASS', 'green')}] 当前服务器角色设置为 {colored(role,'green')}")
-
     if not is_in_venv():
         msg = """
             检测到当前未处于任何虚拟环境中。\\n运行Zillionare的正确方式是为其创建单独的虚拟运行环境。\\n
@@ -522,14 +511,6 @@ async def start(service: str = ""):
 
     """
     print(f"正在启动zillionare-omega {colored(service, 'green')}...")
-
-    server_roles = ["PRODUCTION", "TEST", "DEV"]
-    if os.environ.get(cfg4py.envar) not in ["PRODUCTION", "TEST", "DEV"]:
-        print(
-            f"请设置环境变量{colored(cfg4py.envar, 'red')}为["
-            f"{colored(server_roles, 'red')}]之一。"
-        )
-        sys.exit(-1)
 
     config_dir = get_config_dir()
     cfg4py.init(config_dir, False)
