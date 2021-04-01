@@ -792,13 +792,10 @@ def bin_cut(arr: list, n: int):
     Returns:
         [type]: [description]
     """
-    result = []
+    result = [[] for i in range(n)]
 
-    sz = len(arr) // n
-    if sz * n != len(arr):
-        sz += 1
-    for i in range(n):
-        result.append(arr[i * sz : (i + 1) * sz])
+    for i, e in enumerate(arr):
+        result[i%n].append(e)   
 
     return [e for e in result if len(e)]
 
