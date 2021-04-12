@@ -33,7 +33,7 @@ class RedisLogReceiver:
         )
 
         # the file handler to save log messages
-        self._fh = open(filename, mode="a", encoding="utf-8")
+        self._fh = open(filename, mode="a", encoding="utf-8", buffering=1)
 
         # bytes written. to decide when to rotate files
         self._written_bytes = os.path.getsize(filename)
@@ -77,7 +77,7 @@ class RedisLogReceiver:
             err_msg = str(e)
 
         filename = os.path.join(self._dir, self._filename)
-        self._fh = open(filename, mode="a", encoding="utf-8")
+        self._fh = open(filename, mode="a", encoding="utf-8", buffering=1)
         self._written_bytes = 0
 
         if err_msg:
