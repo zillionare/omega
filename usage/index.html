@@ -1,0 +1,701 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+      <link rel="shortcut icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.1.2, mkdocs-material-6.2.8">
+    
+    
+      
+        <title>使用手册 - Omega帮助文档</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.cb6bc1d0.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.39b8e14a.min.css">
+        
+      
+    
+    
+    
+      
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,400i,700%7CRoboto+Mono&display=fallback">
+        <style>body,input{font-family:"Roboto",-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif}code,kbd,pre{font-family:"Roboto Mono",SFMono-Regular,Consolas,Menlo,monospace}</style>
+      
+    
+    
+    
+    
+      
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="" data-md-color-primary="none" data-md-color-accent="none">
+      
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#1-配置文件" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header-nav md-grid" aria-label="Header">
+    <a href=".." title="Omega帮助文档" class="md-header-nav__button md-logo" aria-label="Omega帮助文档">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 003-3 3 3 0 00-3-3 3 3 0 00-3 3 3 3 0 003 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54z"/></svg>
+
+    </a>
+    <label class="md-header-nav__button md-icon" for="__drawer">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2z"/></svg>
+    </label>
+    <div class="md-header-nav__title" data-md-component="header-title">
+      <div class="md-header-nav__ellipsis">
+        <div class="md-header-nav__topic">
+          <span class="md-ellipsis">
+            Omega帮助文档
+          </span>
+        </div>
+        <div class="md-header-nav__topic">
+          <span class="md-ellipsis">
+            
+              使用手册
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      <label class="md-header-nav__button md-icon" for="__search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0116 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 019.5 16 6.5 6.5 0 013 9.5 6.5 6.5 0 019.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5z"/></svg>
+      </label>
+      
+<div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" data-md-state="active" required>
+      <label class="md-search__icon md-icon" for="__search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0116 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 019.5 16 6.5 6.5 0 013 9.5 6.5 6.5 0 019.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
+      </label>
+      <button type="reset" class="md-search__icon md-icon" aria-label="Clear" data-md-component="search-reset" tabindex="-1">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>
+      </button>
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+  </nav>
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Omega帮助文档" class="md-nav__button md-logo" aria-label="Omega帮助文档">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 003-3 3 3 0 00-3-3 3 3 0 00-3 3 3 3 0 003 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54z"/></svg>
+
+    </a>
+    Omega帮助文档
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        简介
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deployment/" class="md-nav__link">
+        安装
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+    
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          使用手册
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        使用手册
+      </a>
+      
+        
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-配置文件" class="md-nav__link">
+    1. 配置文件
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-数据同步" class="md-nav__link">
+    2. 数据同步
+  </a>
+  
+    <nav class="md-nav" aria-label="2. 数据同步">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-数据同步发生的时间" class="md-nav__link">
+    2.1. 数据同步发生的时间
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-如何同步k线数据" class="md-nav__link">
+    2.2. 如何同步K线数据
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-管理omega" class="md-nav__link">
+    3. 管理omega
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-使用行情数据" class="md-nav__link">
+    4. 使用行情数据
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://zillionare.readthedocs.io/zh_CN/latest/contributing.html" class="md-nav__link">
+        社区
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../history/" class="md-nav__link">
+        版本历史
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        API文档
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-配置文件" class="md-nav__link">
+    1. 配置文件
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-数据同步" class="md-nav__link">
+    2. 数据同步
+  </a>
+  
+    <nav class="md-nav" aria-label="2. 数据同步">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-数据同步发生的时间" class="md-nav__link">
+    2.1. 数据同步发生的时间
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-如何同步k线数据" class="md-nav__link">
+    2.2. 如何同步K线数据
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-管理omega" class="md-nav__link">
+    3. 管理omega
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-使用行情数据" class="md-nav__link">
+    4. 使用行情数据
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          <div class="md-content">
+            <article class="md-content__inner md-typeset">
+              
+                
+                
+                  <h1>使用手册</h1>
+                
+                <h2 id="1-配置文件">1. 配置文件<a class="headerlink" href="#1-配置文件" title="Permanent link">&para;</a></h2>
+<p>对普通用户而言，Omega会从~/zillionare/omega/config下加载配置。</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>如果您是Omega的开发者，应该将环境变量<code>__cfg4py_server_role__</code>设置为DEV，这样Omega会
+从源代码所在文件夹下面的omega/config下读取配置。</p>
+<p>如果您是Omega的测试者，建议您将环境变量<code>__cfg4py_server_role__</code>设置为TEST，这样Omega
+会从~/.zillionare/omega/config下加载配置。</p>
+<p>上述设置并非必须，如果您不懂得这种设置的意义，您完全可以使用默认的位置，即~/zillionare/omega/config</p>
+</div>
+<p>配置文件使用YAML文件格式，并支持环境变量。比如，如果您通过环境变量<code>POSTGRES_USER</code>来设置了数据库
+账号，则可以在配置文件中这样使用它：</p>
+<table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span></pre></div></td><td class="code"><div class="highlight"><pre><span></span><code><span class="nt">postgres</span><span class="p">:</span>
+    <span class="nt">dsn</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost/zillionare</span>
+</code></pre></div>
+</td></tr></table>
+<p>上述环境变量的扩展是通过<a href="https://pypi.org/project/cfg4py/">cfg4py</a>来支持的。</p>
+<h2 id="2-数据同步">2. 数据同步<a class="headerlink" href="#2-数据同步" title="Permanent link">&para;</a></h2>
+<p>数据同步是Omega最核心的工作之一。Omega专门配置了一个Jobs进程来管理数据同步及其它工作。Jobs通过
+读取配置文件来确定应该如何进行同步，并向Omega Fetcher进程发出数据同步请求。</p>
+<p>对于日历、证券列表等少量数据的同步，这些请求通常只会发给一个Omega Fetcher进程，而对K线这样的大
+批量数据，这些请求则会发给所有在线的Omega Fetcher进程，因此，使用Omega可以得到极为优秀的数据同
+步性能。</p>
+<h3 id="21-数据同步发生的时间">2.1. 数据同步发生的时间<a class="headerlink" href="#21-数据同步发生的时间" title="Permanent link">&para;</a></h3>
+<p>对日历和证券列表等数据，Omega每天进行一次，具体同步时间默认为午夜2点，您可以在配置文件中进行修改:</p>
+<p><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span>
+<span class="normal">3</span>
+<span class="normal">4</span></pre></div></td><td class="code"><div class="highlight"><pre><span></span><code><span class="nt">omega</span><span class="p">:</span>  <span class="c1"># omega服务自身相关的配置</span>
+    <span class="nt">sync</span><span class="p">:</span> <span class="c1"># 同步相关的配置都在sync节下</span>
+        <span class="nt">security_list</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">02:00</span>
+        <span class="nt">calendar</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">02:00</span>
+</code></pre></div>
+</td></tr></table>
+建议在每个交易日盘前进行同步。如无特别需求，请保持默认值就好。</p>
+<p>K线数据会在每个Frame结束时间进行同步。比如，对60分钟k线，会分别在10:30, 11:30, 14:00和15：00
+各进行一次同步；对日线数据，会在15：00时进行同步，这样确保您始终可以得到最新的数据。</p>
+<p>您的上游数据服务提供者可能没来得及在每个Frame结束时，就刚好把所有的数据准备好。因此，您可以通过
+设置delay来稍稍延迟同步时间。如果您没有设置delay，而上游数据服务提供者又不能在Frame刚好结束时
+提供数据的话，数据同步仍然会触发，只不过您只能得到上一帧的数据。您可以根据您应用的实时性要求和上
+游数据提供者的服务能力来设置这个延时，系统默认是5秒钟。</p>
+<p>关于<code>delay</code>的设置，我们在下一节中介绍。</p>
+<h3 id="22-如何同步k线数据">2.2. 如何同步K线数据<a class="headerlink" href="#22-如何同步k线数据" title="Permanent link">&para;</a></h3>
+<p>Omega控制K线数据同步的配置格式如下（注意其中包括了上一节已经提到的<code>delay</code>参数）：</p>
+<table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 1</span>
+<span class="normal"> 2</span>
+<span class="normal"> 3</span>
+<span class="normal"> 4</span>
+<span class="normal"> 5</span>
+<span class="normal"> 6</span>
+<span class="normal"> 7</span>
+<span class="normal"> 8</span>
+<span class="normal"> 9</span>
+<span class="normal">10</span>
+<span class="normal">11</span>
+<span class="normal">12</span>
+<span class="normal">13</span>
+<span class="normal">14</span>
+<span class="normal">15</span></pre></div></td><td class="code"><div class="highlight"><pre><span></span><code><span class="nt">omega</span><span class="p">:</span>
+  <span class="nt">sync</span><span class="p">:</span> <span class="c1"># 同步相关的配置都在sync节下</span>
+    <span class="nt">bars</span><span class="p">:</span> <span class="c1"># K线数据同步配置都在bars节下</span>
+      <span class="p p-Indicator">-</span> <span class="nt">frame</span><span class="p">:</span> <span class="s">&#39;1d&#39;</span> <span class="c1"># k线帧类型</span>
+        <span class="nt">start</span><span class="p">:</span> <span class="s">&#39;2005-1-1&#39;</span> <span class="c1"># 可以不指定，系统会从当前日期倒推到1000个数据记录前的时间</span>
+        <span class="nt">stop</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">2020-12-30</span> <span class="c1"># 可以不指定，以便同步到最新的日期</span>
+        <span class="nt">include</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">000001.XSHG 399001.XSHE</span>
+        <span class="nt">exclude</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">000001.XSHE 600001.XSHG</span>
+        <span class="nt">delay</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">5</span>
+        <span class="nt">cat</span><span class="p">:</span>    <span class="c1"># 证券分类，如股票(stock), 指数(index)等</span>
+            <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">stock</span>
+      <span class="p p-Indicator">-</span> <span class="nt">frame</span><span class="p">:</span> <span class="s">&#39;1m&#39;</span>
+        <span class="nt">start</span><span class="p">:</span> <span class="s">&#39;2005-1-1&#39;</span>
+        <span class="nt">cat</span><span class="p">:</span>
+            <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">stock</span>
+</code></pre></div>
+</td></tr></table>
+<p>上述配置格式提供了要同步的证券标的、K线的帧类型(比如，是30分钟线还是日线)，起始时间和延迟等关键
+信息。其中证券标的又是由<code>cat</code>、<code>exclude</code>和<code>include</code>共同决定的。</p>
+<p>上述配置中，每种K线都有自己的设置，它们构成了一个数组。</p>
+<p><code>frame</code>键表明k线的帧类型。Omega支持的帧类型如下（注意区分大小写）：</p>
+<table>
+<thead>
+<tr>
+<th>K线类型</th>
+<th>标识</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>年线</td>
+<td>1Y</td>
+<td>每年一条记录，当年停牌的除外，下同</td>
+</tr>
+<tr>
+<td>季线</td>
+<td>1Q</td>
+<td>每年产生4条记录</td>
+</tr>
+<tr>
+<td>月线</td>
+<td>1M</td>
+<td>每月产生1条记录</td>
+</tr>
+<tr>
+<td>周线</td>
+<td>1W</td>
+<td>每周产生1条记录</td>
+</tr>
+<tr>
+<td>日线</td>
+<td>1d</td>
+<td>每天产生1条记录，全年约250条记录</td>
+</tr>
+<tr>
+<td>60分钟线</td>
+<td>60m</td>
+<td>每天产生4条记录</td>
+</tr>
+<tr>
+<td>30分钟线</td>
+<td>30m</td>
+<td>每天产生8条记录</td>
+</tr>
+<tr>
+<td>15分钟线</td>
+<td>15m</td>
+<td>每天产生16条记录</td>
+</tr>
+<tr>
+<td>5分钟线</td>
+<td>5m</td>
+<td>每天产生48条记录</td>
+</tr>
+<tr>
+<td>1分钟线</td>
+<td>1m</td>
+<td>每天产生240条记录</td>
+</tr>
+</tbody>
+</table>
+<p><code>start</code>指定该种k线获取数据的起点时间。如果不指定，则系统会从当前日期倒推1000个数据记录。您无
+须指定精确的时间，比如对30分钟线指定精确到2020年1月3日10:00开始，或者担心2020年1月4日是否刚好是
+周线的结束日。对于同步数据来说，多取一个帧的数据并不会增加什么负担，所以系统会取到一个最合适的起
+始时间，刚好保证您要求的数据都能被同步。</p>
+<p><code>stop</code>指定该种k线获取数据的终点。通常您无须进行设置，系统应该自动为您同步到最新时间。但
+如果您设置了，则系统将<strong>不会为您获取在<code>stop</code>之后的任何数据</strong>。实际效果是，在首次同步完成后，禁
+止了今后的数据同步。</p>
+<p>待同步证券的标的由<code>cat</code>、<code>include</code>和<code>exclude</code>共同决定。系统先根据<code>cat</code>选出一些标的，
+然后排除在<code>exclude</code>中的标的，再加入<code>include</code>中的标的。</p>
+<p>如果<code>cat</code>为空，则根据上述规则，将只有<code>include</code>中的标的被加入。如果一支标的在<code>exclude</code>和
+<code>include</code>中同时存在，则<code>include</code>拥有更高的优选级。</p>
+<p>根据上述规则，如果您有以下同步需求：同步除了银行股以外的所有股票的日线数据，并且包括上证指数和深
+成指，则可以使用以下的配置：
+<table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span>
+<span class="normal">3</span>
+<span class="normal">4</span>
+<span class="normal">5</span>
+<span class="normal">6</span>
+<span class="normal">7</span>
+<span class="normal">8</span></pre></div></td><td class="code"><div class="highlight"><pre><span></span><code><span class="nt">omega</span><span class="p">:</span>
+  <span class="nt">sync</span><span class="p">:</span>
+    <span class="nt">bars</span><span class="p">:</span>
+      <span class="p p-Indicator">-</span> <span class="nt">frame</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">1d</span>   <span class="c1"># 要求同步日线数据</span>
+        <span class="nt">include</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">000001.XSHG 399001.XSHE</span> <span class="c1"># 使用空格分隔</span>
+        <span class="nt">exclude</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">600001.XSHG 000001.XSHE ...</span>
+        <span class="nt">cat</span><span class="p">:</span>
+            <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">stock</span> <span class="c1"># 仅包含股票</span>
+</code></pre></div>
+</td></tr></table></p>
+<h2 id="3-管理omega">3. 管理omega<a class="headerlink" href="#3-管理omega" title="Permanent link">&para;</a></h2>
+<ol>
+<li>要启动Omega的行情服务，请在命令行下输入:</li>
+</ol>
+<table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div class="highlight"><pre><span></span><code>    omega start
+</code></pre></div>
+</td></tr></table>
+<ol>
+<li>行情同步等任务是由jobs进程管理的，所以您还需要启动jobs进程</li>
+</ol>
+<table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div class="highlight"><pre><span></span><code>    omega start <span class="nb">jobs</span>
+</code></pre></div>
+</td></tr></table>
+<ol>
+<li>要查看当前有哪些fetcher和jobs进程在运行，使用下面的命令：</li>
+</ol>
+<table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div class="highlight"><pre><span></span><code>    omega status
+</code></pre></div>
+</td></tr></table>
+<ol>
+<li>此外，Omega还提供了stop和restart命令:</li>
+</ol>
+<table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span>
+<span class="normal">3</span>
+<span class="normal">4</span></pre></div></td><td class="code"><div class="highlight"><pre><span></span><code>    omega stop <span class="nb">jobs</span>
+    omega stop
+    omega restart <span class="nb">jobs</span>
+    omega restart
+</code></pre></div>
+</td></tr></table>
+<h2 id="4-使用行情数据">4. 使用行情数据<a class="headerlink" href="#4-使用行情数据" title="Permanent link">&para;</a></h2>
+<p>虽然Omega提供了HTTP接口，但因为性能优化的原因，其通过HTTP接口提供的数据，都是二进制的。</p>
+<p>使用行情数据的正确方式是通过Omicron SDK来访问数据。请跳转至 <a href="https://zillionare-omicron.readthedocs.io">Omicron帮助文档</a> 继续阅读。</p>
+                
+              
+              
+                
+
+
+              
+            </article>
+          </div>
+        </div>
+      </main>
+      
+        
+<footer class="md-footer">
+  
+    <div class="md-footer-nav">
+      <nav class="md-footer-nav__inner md-grid" aria-label="Footer">
+        
+          <a href="../deployment/" class="md-footer-nav__link md-footer-nav__link--prev" rel="prev">
+            <div class="md-footer-nav__button md-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
+            </div>
+            <div class="md-footer-nav__title">
+              <div class="md-ellipsis">
+                <span class="md-footer-nav__direction">
+                  Previous
+                </span>
+                安装
+              </div>
+            </div>
+          </a>
+        
+        
+          <a href="../history/" class="md-footer-nav__link md-footer-nav__link--next" rel="next">
+            <div class="md-footer-nav__title">
+              <div class="md-ellipsis">
+                <span class="md-footer-nav__direction">
+                  Next
+                </span>
+                版本历史
+              </div>
+            </div>
+            <div class="md-footer-nav__button md-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11H4z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    </div>
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-footer-copyright">
+        
+        Made with
+        <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+          Material for MkDocs
+        </a>
+      </div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    
+      <script src="../assets/javascripts/vendor.18f0862e.min.js"></script>
+      <script src="../assets/javascripts/bundle.994580cf.min.js"></script><script id="__lang" type="application/json">{"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing"}</script>
+      
+      <script>
+        app = initialize({
+          base: "..",
+          features: [],
+          search: Object.assign({
+            worker: "../assets/javascripts/worker/search.9c0e82ba.min.js"
+          }, typeof search !== "undefined" && search)
+        })
+      </script>
+      
+    
+  </body>
+</html>
