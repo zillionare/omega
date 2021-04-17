@@ -639,7 +639,7 @@ def _stop_jobs():
         except Exception:
             pass
         pid = _find_jobs_process()
-    
+
     if retry >= 5:
         print("未能停止omega.jobs")
 
@@ -801,7 +801,7 @@ def bin_cut(arr: list, n: int):
     result = [[] for i in range(n)]
 
     for i, e in enumerate(arr):
-        result[i%n].append(e)   
+        result[i % n].append(e)
 
     return [e for e in result if len(e)]
 

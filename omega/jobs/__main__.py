@@ -68,14 +68,14 @@ async def init(app, loop):  # noqa
         "cron",
         hour=h,
         minute=m,
-        args=("calendar", ),
-        name="sync_calendar"
+        args=("calendar",),
+        name="sync_calendar",
     )
     scheduler.add_job(
         syncjobs.trigger_single_worker_sync,
         "cron",
-        args=("security_list", ),
-        name = "sync_security_list",
+        args=("security_list",),
+        name="sync_security_list",
         hour=h,
         minute=m,
     )

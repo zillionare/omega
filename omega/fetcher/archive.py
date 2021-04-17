@@ -132,21 +132,21 @@ async def get_file(url: str, timeout: int = 1200, handler: FileHandler = None):
                         return await handler.process(content)
                 elif response.status == 404:
                     if is_index:
-                        return url, f"404 未找到索引文件"
+                        return url, "404 未找到索引文件"
                     else:
                         return url, f"404 服务器上没有{year}年{month}月的{cat}数据"
     except aiohttp.ServerTimeoutError as e:
         logger.warning("downloading %s failed", url)
         logger.exception(e)
         if is_index:
-            return url, f"500 下载索引文件超时"
+            return url, "500 下载索引文件超时"
         else:
             return url, f"500 {year}/{month}的{cat}数据下载超时"
     except Exception as e:
         logger.warning("downloading %s failed", url)
         logger.exception(e)
         if is_index:
-            return url, f"500 下载索引文件失败"
+            return url, "500 下载索引文件失败"
         else:
             return url, f"500 {year}/{month}的{cat}数据下载失败"
 

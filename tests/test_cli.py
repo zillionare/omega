@@ -1,17 +1,16 @@
 import io
-
-import aioredis
-from omega.config import get_config_dir
 import os
 import shutil
 import unittest
 from unittest import mock
 
+import aioredis
 import cfg4py
 from pyemit import emit
 from ruamel.yaml import YAML
 
 from omega import cli
+from omega.config import get_config_dir
 from tests import init_test_env, start_archive_server, start_omega
 
 
