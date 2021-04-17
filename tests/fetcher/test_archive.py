@@ -92,15 +92,11 @@ class TestArchieveFetcher(unittest.IsolatedAsyncioTestCase):
 
     @mock.patch("aiohttp.ClientSession.get")
     async def test_get_file_connection_error(self, mock_get):
-        mock_get.return_value.__aenter__.return_value.raiseError.side_effect = (
-            aiohttp.ServerTimeoutError()
-        )
+        mock_get.side_effect = aiohttp.ServerTimeoutError()
 
-        archive_log = logging.getLogger("omega.fetcher.archive")
-        with mock.patch.object(archive_log, "info"):
-            url, _ = await archive.get_file("http://mock/2019-11-stock.tgz")
-            self.assertEqual("http://mock/2019-11-stock.tgz", url)
-            self.assertRaises(aiohttp.ServerTimeoutError)
+        url, _ = await archive.get_file("http://mock/2019-11-stock.tgz")
+        self.assertEqual("http://mock/2019-11-stock.tgz", url)
+        self.assertRaises(aiohttp.ServerTimeoutError)
 
     async def test_archive_bars_handler_process(self):
         handler = ArchivedBarsHandler("http://mock/2019-01-stock.tgz")
