@@ -1,31 +1,13 @@
 
 ![](http://images.jieyu.ai/images/hot/zillionbanner.jpg)
 
-<p align="center">
-<a href="https://pypi.python.org/pypi/zillionare-omega">
-    <img src="http://img.shields.io/pypi/v/zillionare-omega?color=brightgreen" >
-</a>
-
-<a href="https://travis-ci.com/zillionare/omega">
-<img src="https://api.travis-ci.com/zillionare/omega.svg?branch=release">
-</a>
-
-<a href="https://omega.readthedocs.io/en/latest/?badge=latest">
-<img src="https://readthedocs.org/projects/omega/badge/?version=latest">
-</a>
-
-<a href="https://pepy.tech/project/zillionare-omega">
-<img src="https://pepy.tech/badge/zillionare-omega">
-</a>
-
-<a href="https://github.com/psf/black">
-<img src="https://img.shields.io/badge/code%20style-black-000000.svg">
-</a>
-
-<a href="https://opensource.org/licenses/MIT">
-<img src="https://img.shields.io/badge/License-MIT-yellow.svg">
-</a>
-</p>
+[![Version](http://img.shields.io/pypi/v/zillionare-omega?color=brightgreen)](https://pypi.python.org/pypi/zillionare-omega)
+[![CI Status](https://github.com/zillionare/omega/actions/workflows/main.yml/badge.svg?branch=release)](https://github.com/zillionare/omega)
+[![Code Coverage](https://img.shields.io/codecov/c/github/zillionare/omega)](https://app.codecov.io/gh/zillionare/omega)
+[![ReadtheDos](https://readthedocs.org/projects/omega/badge/?version=latest)](https://omega.readthedocs.io/en/latest/?badge=latest)
+[![Dowloads](https://pepy.tech/badge/zillionare-omega)](https://pepy.tech/project/zillionare-omega)
+[![License](https://img.shields.io/badge/License-MIT.svg)](https://opensource.org/licenses/MIT)
+[![Style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 
 高速分布式本地行情服务器
