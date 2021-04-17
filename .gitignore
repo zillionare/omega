@@ -103,7 +103,6 @@ ENV/
 
 # IDE settings
 .vscode/
-.github/
 /.idea
 site
 omega/config/schema.py
