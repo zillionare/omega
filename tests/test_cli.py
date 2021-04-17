@@ -6,11 +6,10 @@ from unittest import mock
 
 import aioredis
 import cfg4py
-from pyemit import emit
-from ruamel.yaml import YAML
-
 from omega import cli
 from omega.config import get_config_dir
+from pyemit import emit
+from ruamel.yaml import YAML
 from tests import init_test_env, start_archive_server, start_omega
 
 
@@ -232,7 +231,7 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
 
         # 2. exception case
         settings = {}
-        with mock.patch("builtins.input", side_effect=["localhost", "3180", "", "C"]):
+        with mock.patch("builtins.input", side_effect=["localserver", "3180", "", "C"]):
             await cli.config_redis(settings)
             self.assertDictEqual({}, settings)
 
