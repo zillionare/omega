@@ -212,7 +212,7 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
                 "localhost",
                 "5432",
                 "zillionare",
-                "123456",
+                "zillionare",
                 "zillionare",
             ],
         ):
