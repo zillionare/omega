@@ -10,7 +10,6 @@ from contextlib import closing
 
 import aiohttp
 import cfg4py
-
 from omega.config import get_config_dir
 
 cfg = cfg4py.get_instance()
@@ -70,12 +69,25 @@ async def start_omega(timeout=60):
             f"--port={port}",
         ],
         env=os.environ,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
     for i in range(timeout, 0, -1):
         await asyncio.sleep(1)
+        if process.poll() is not None:
+            # already exit, due to finish or fail
+            out, err = process.communicate()
+            logger.info("subprocess %s: %s", process.pid, out.decode("utf-8"))
+            raise subprocess.SubprocessError(err.decode("utf-8"))
+
         if await is_local_omega_alive():
             # return the process id, the caller should shutdown it later
-            logger.info("omega sever started: %s", process.pid)
+            logger.info(
+                "omega server(%s) is listen on %s",
+                process.pid,
+                cfg.omega.urls.quotes_server,
+            )
+
             return process
 
     os.kill(process.pid, signal.SIGINT)
