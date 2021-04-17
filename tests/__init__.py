@@ -1,3 +1,4 @@
+import aioredis
 import asyncio
 import json
 import logging
@@ -9,6 +10,7 @@ import sys
 from contextlib import closing
 
 import aiohttp
+import arrow
 import cfg4py
 from omega.config import get_config_dir
 
@@ -26,6 +28,7 @@ def init_test_env():
     cfg4py.init(get_config_dir(), False)
     # enable postgres for unittest
     cfg.postgres.enabled = True
+
     return cfg
 
 

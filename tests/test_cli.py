@@ -5,6 +5,7 @@ import unittest
 from unittest import mock
 
 import aioredis
+import arrow
 import cfg4py
 from omega import cli
 from omega.config import get_config_dir
@@ -16,6 +17,11 @@ from tests import init_test_env, start_archive_server, start_omega
 class TestCLI(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         self.cfg = init_test_env()
+
+        # disable catch up sync, since test_cli, jobs will be launched many times and cache might by empty
+        redis = await aioredis.create_redis(self.cfg.redis.dsn)
+        last_sync = arrow.now(self.cfg.tz).format("YYYY-MM-DD HH:mm:SS")
+        await redis.set("jobs.bars_sync.stop", last_sync)
 
     async def asyncTearDown(self) -> None:
         await emit.stop()
@@ -188,6 +194,7 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
                 expected = "postgres://account:password@127.0.0.1:6380/zillionare"
                 self.assertEqual(expected, settings["postgres"]["dsn"])
 
+        # test continure with wrong config
         with mock.patch(
             "builtins.input",
             side_effect=[
@@ -205,16 +212,15 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(expected, settings["postgres"]["dsn"])
 
         # check connection to postgres. Need provide right info in ut
+        host = os.environ.get("POSTGRES_HOST")
+        port = os.environ.get("POSTGRES_PORT")
+        db = os.environ.get("POSTGRES_DB")
+        user = os.environ.get("POSTGRES_USER")
+        password = os.environ.get("POSTGRES_PASSWORD")
+
         with mock.patch(
             "builtins.input",
-            side_effect=[
-                "R",
-                "localhost",
-                "5432",
-                "zillionare",
-                "zillionare",
-                "zillionare",
-            ],
+            side_effect=["R", host, port, user, password, db],
         ):
             result = await cli.config_postgres(settings)
             # should be no exceptions
