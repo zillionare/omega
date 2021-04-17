@@ -22,10 +22,6 @@ def init_test_env():
     logging.captureWarnings(True)
 
     os.environ[cfg4py.envar] = "DEV"
-    os.environ["REDIS_HOST"] = "localhost"
-    os.environ["REDIS_PORT"] = "6379"
-    os.environ["POSTGRES_USER"] = "zillionare"
-    os.environ["POSTGRES_PASSWORD"] = "123456"
 
     cfg4py.init(get_config_dir(), False)
     # enable postgres for unittest
