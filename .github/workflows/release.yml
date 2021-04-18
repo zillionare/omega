@@ -39,6 +39,8 @@ jobs:
           prWoLabels: true
           unreleased: true
           addSections: '{"documentation":{"prefix":"**Documentation:**","labels":["documentation"]}}'
+          sinceTag: 0.6.1-alpha.0
+          output: CHANGELOG.md
 
       - name: commit change log
         uses: stefanzweifel/git-auto-commit-action@v4
