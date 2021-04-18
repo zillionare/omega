@@ -3048,7 +3048,7 @@ here for easy understand by end user. It actually implies "FrameType".</p>
 <td><code>str</code></td>
 <td>
 <p>which securities should be included, seperated by
-comma, for example, "000001.XSHE,000004.XSHE". Defaults to empty string.</p>
+space, for example, "000001.XSHE 000004.XSHE". Defaults to empty string.</p>
 </td>
 <td><code>''</code></td>
 </tr>
@@ -3057,7 +3057,7 @@ comma, for example, "000001.XSHE,000004.XSHE". Defaults to empty string.</p>
 <td><code>str</code></td>
 <td>
 <p>which securities should be excluded, seperated by
-comma. Defaults to empty string.</p>
+a space. Defaults to empty string.</p>
 </td>
 <td><code>''</code></td>
 </tr>
@@ -3111,9 +3111,9 @@ comma. Defaults to empty string.</p>
 <span class="sd">        stop (Union[str, Frame], optional): [description]. Defaults to None.</span>
 <span class="sd">        delay (int, optional): [description]. Defaults to 5.</span>
 <span class="sd">        include (str, optional): which securities should be included, seperated by</span>
-<span class="sd">            comma, for example, "000001.XSHE,000004.XSHE". Defaults to empty string.</span>
+<span class="sd">            space, for example, "000001.XSHE 000004.XSHE". Defaults to empty string.</span>
 <span class="sd">        exclude (str, optional):  which securities should be excluded, seperated by</span>
-<span class="sd">            comma. Defaults to empty string.</span>
+<span class="sd">            a space. Defaults to empty string.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        - codes (List[str]): 待同步证券列表</span>
