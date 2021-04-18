@@ -148,9 +148,9 @@ def parse_sync_params(
         stop (Union[str, Frame], optional): [description]. Defaults to None.
         delay (int, optional): [description]. Defaults to 5.
         include (str, optional): which securities should be included, seperated by
-            comma, for example, "000001.XSHE,000004.XSHE". Defaults to empty string.
+            space, for example, "000001.XSHE 000004.XSHE". Defaults to empty string.
         exclude (str, optional):  which securities should be excluded, seperated by
-            comma. Defaults to empty string.
+            a space. Defaults to empty string.
 
     Returns:
         - codes (List[str]): 待同步证券列表
