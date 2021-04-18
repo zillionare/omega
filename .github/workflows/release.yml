@@ -69,6 +69,7 @@ jobs:
       - name: show temporary files
         run: >-
           ls -l
+          ls /de
 
       - name: create github release
         id: create_release
@@ -76,7 +77,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          body_path: /github/workspace/CHANGELOG.md
+          body_path: ./CHANGELOG.md
           files: dist/*.whl
           draft: true
           prerelease: false
