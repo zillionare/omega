@@ -42,12 +42,6 @@ jobs:
           sinceTag: 0.6.1-alpha.0
           output: CHANGELOG.md
 
-      - name: commit change log
-        uses: stefanzweifel/git-auto-commit-action@v4
-        with:
-          commit_message: Update Changelog for PR
-          file_pattern: CHANGELOG.md
-
       - uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-versions }}
@@ -82,7 +76,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          body_path: ./CHANGELOG.md
+          body_path: /github/workspace/CHANGELOG.md
           files: dist/*.whl
           draft: true
           prerelease: false
