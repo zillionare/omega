@@ -69,7 +69,7 @@ jobs:
       - name: show temporary files
         run: >-
           ls -l
-          ls /de
+          ls /
 
       - name: create github release
         id: create_release
