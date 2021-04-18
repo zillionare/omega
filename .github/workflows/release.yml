@@ -69,7 +69,6 @@ jobs:
       - name: show temporary files
         run: |
           ls -l
-          ls -R /home
 
       - name: create github release
         id: create_release
@@ -79,7 +78,7 @@ jobs:
         with:
           body_path: ./CHANGELOG.md
           files: dist/*.whl
-          draft: true
+          draft: false
           prerelease: false
 
       - name:
