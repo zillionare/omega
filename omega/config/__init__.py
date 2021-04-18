@@ -29,13 +29,3 @@ def get_config_dir():
 
     sys.path.insert(0, _dir)
     return _dir
-
-
-def check_env():
-    server_roles = ["PRODUCTION", "TEST", "DEV"]
-    if os.environ.get(cfg4py.envar) not in ["PRODUCTION", "TEST", "DEV"]:
-        print(
-            f"请设置环境变量{colored(cfg4py.envar, 'red')}为["
-            f"{colored(server_roles, 'red')}]之一。"
-        )
-        sys.exit(-1)

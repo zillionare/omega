@@ -19,7 +19,7 @@ from pyemit import emit
 from sanic import Sanic, response
 
 import omega.jobs.syncjobs as syncjobs
-from omega.config import check_env, get_config_dir
+from omega.config import get_config_dir
 from omega.config.schema import Config
 from omega.logreceivers.redis import RedisLogReceiver
 
@@ -127,7 +127,6 @@ async def on_shutdown(app, loop):  # pragma: no cover
 
 
 def start(host: str = "0.0.0.0", port: int = 3180):  # pragma: no cover
-    check_env()
     logger.info("starting omega jobs ...")
     app.register_listener(init, "before_server_start")
     app.run(host=host, port=port, register_sys_signals=True)
