@@ -70,6 +70,10 @@ jobs:
         run: >-
           poetry build
 
+      - name: show temporary files
+        run: >-
+          ls -l
+
       - name: create github release
         id: create_release
         uses: softprops/action-gh-release@v1
