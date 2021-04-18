@@ -67,7 +67,7 @@ jobs:
           poetry build
 
       - name: show temporary files
-        run: |
+        run: >-
           ls -l
 
       - name: create github release
