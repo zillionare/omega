@@ -87,11 +87,18 @@ async def init(app, loop):  # noqa
     if last_sync:
         last_sync = arrow.get(last_sync, tzinfo=cfg.tz).timestamp
     if not last_sync or time.time() - last_sync >= 24 * 3600:
-        logger.info("start catch-up quotes sync")
+        next_run_time = arrow.now(cfg.tz).shift(minutes=5).datetime
+        logger.info("start catch-up quotes sync at %s", next_run_time)
+
         for frame_type in itertools.chain(tf.day_level_frames, tf.minute_level_frames):
             params = syncjobs.load_sync_params(frame_type)
             if params:
-                asyncio.create_task(syncjobs.trigger_bars_sync(params, force=True))
+                scheduler.add_job(
+                    syncjobs.trigger_bars_sync,
+                    args=(params, True),
+                    name=f"catch-up sync for {frame_type}",
+                    next_run_time=next_run_time,
+                )
     else:
         logger.info("%s: less than 24 hours since last sync", last_sync)
 

@@ -79,7 +79,7 @@ jobs:
           body_path: ./CHANGELOG.md
           files: dist/*.whl
           draft: false
-          prerelease: false
+          prerelease: true
 
       - name:
         uses: pypa/gh-action-pypi-publish@release/v1

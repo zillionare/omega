@@ -516,9 +516,8 @@ async def start(service: str = ""):
     cfg4py.init(config_dir, False)
 
     if service == "":
-        _start_fetcher_processes()
-        await asyncio.sleep(5)
         _start_jobs()
+        _start_fetcher_processes()
     elif service == "jobs":
         return _start_jobs()
     elif service == "fetcher":
@@ -702,10 +701,10 @@ async def restart(service: str = ""):
     await _init()
 
     if service == "":
-        _stop_fetcher_processes()
         _stop_jobs()
-        _start_fetcher_processes()
+        _stop_fetcher_processes()
         _start_jobs()
+        _start_fetcher_processes()
     elif service == "jobs":
         return _restart_jobs()
     else:
