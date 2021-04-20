@@ -35,7 +35,7 @@ include = [
     "tests/*"
 ]
 
-version = "1.0.0-alpha.8"
+version = "1.0.0-alpha.9"
 
 [tool.poetry.dependencies]
 python=">=3.8,<3.9"
