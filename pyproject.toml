@@ -39,7 +39,7 @@ version = "1.0.0-alpha.9"
 
 [tool.poetry.dependencies]
 python=">=3.8,<3.9"
-zillionare_omega_adaptors_jq="1.0.2"
+zillionare_omega_adaptors_jq="1.0.3"
 # should be > 1.0.0.a4, but repo of aliyun got sync delay issue
 zillionare_omicron=">=1.0.0.a4,<=1.0.0"
 aiohttp = "3.7.4"
