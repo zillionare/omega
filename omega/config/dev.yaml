@@ -1,0 +1,9 @@
+omega:
+  sync:
+    bars:
+      - frame: '1d'
+        start: '2020-12-1'
+        delay: 0 # delay * seconds after the frame is done
+        include: 000001.XSHE
+      - frame: '30m'
+        include: 000001.XSHG 000001.XSHE

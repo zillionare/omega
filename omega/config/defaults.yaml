@@ -54,15 +54,21 @@ omega:
       - frame: '1W'
         start: '2020-12-1'
         cat:
-            - stock
+          - stock
       - frame: '1M'
         start: '2020-12-1'
         cat:
-            - stock
+          - stock
       - frame: '1d'
         start: '2020-12-1'
-        delay: 0 # delay * seconds after the frame is done
-        include: 000001.XSHE
+        delay: 5 # delay * seconds after the frame is done
+        cat:
+          - stock
+      - frame: '30m'
+        start: '2021-3-31'
+        delay: 5
+        cat:
+          - stock
 
 quotes_fetchers:
   - impl: jqadaptor    # there must be a create_instance method in this module
