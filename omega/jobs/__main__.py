@@ -84,8 +84,14 @@ async def init(app, loop):  # noqa
 
     # sync bars at startup
     last_sync = await cache.sys.get("jobs.bars_sync.stop")
+
     if last_sync:
-        last_sync = arrow.get(last_sync, tzinfo=cfg.tz).timestamp
+        try:
+            last_sync = arrow.get(last_sync, tzinfo=cfg.tz).timestamp
+        except ValueError:
+            logger.warning("failed to parse last_sync: %s", last_sync)
+            last_sync = None
+
     if not last_sync or time.time() - last_sync >= 24 * 3600:
         next_run_time = arrow.now(cfg.tz).shift(minutes=5).datetime
         logger.info("start catch-up quotes sync at %s", next_run_time)
