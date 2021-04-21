@@ -16,6 +16,7 @@ jobs:
   # This workflow contains a single job called "build"
   test:
     env:
+      TZ: Asia/Shanghai
       REDIS_HOST: localhost
       REDIS_PORT: 6379
       POSTGRES_DB: zillionare
