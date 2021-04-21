@@ -516,17 +516,17 @@ async def start(service: str = ""):
     cfg4py.init(config_dir, False)
 
     if service == "":
-        _start_jobs()
-        _start_fetcher_processes()
+        await _start_jobs()
+        await _start_fetcher_processes()
     elif service == "jobs":
-        return _start_jobs()
+        return await _start_jobs()
     elif service == "fetcher":
-        return _start_fetcher_processes()
+        return await _start_fetcher_processes()
     else:
         print("不支持的服务")
 
 
-def _start_fetcher_processes():
+async def _start_fetcher_processes():
     procs = find_fetcher_processes()
 
     # fetcher processes are started by groups
@@ -552,9 +552,9 @@ def _start_fetcher_processes():
                         pass
 
                 _start_fetcher(impl, account, password, port, sessions)
-                time.sleep(1)
+                await asyncio.sleep(1)
 
-    time.sleep(3)
+    await asyncio.sleep(3)
     show_fetcher_processes()
 
 
@@ -591,7 +591,7 @@ def _start_fetcher(
     )
 
 
-def _start_jobs():
+async def _start_jobs():
     subprocess.Popen(
         [
             sys.executable,
@@ -606,7 +606,7 @@ def _start_jobs():
     while _find_jobs_process() is None and retry < 5:
         print("等待omega.jobs启动中")
         retry += 1
-        time.sleep(1)
+        await asyncio.sleep(1)
     if retry < 5:
         print("omega.jobs启动成功。")
     else:
@@ -627,14 +627,14 @@ def _restart_jobs():
         _start_jobs()
 
 
-def _stop_jobs():
+async def _stop_jobs():
     pid = _find_jobs_process()
     retry = 0
     while pid is not None and retry < 5:
         retry += 1
         try:
             os.kill(pid, signal.SIGTERM)
-            time.sleep(0.5)
+            await asyncio.sleep(0.5)
         except Exception:
             pass
         pid = _find_jobs_process()
@@ -660,7 +660,7 @@ def _find_jobs_process():
     return None
 
 
-def _stop_fetcher_processes():
+async def _stop_fetcher_processes():
     retry = 0
     while retry < 5:
         procs = find_fetcher_processes()
@@ -674,7 +674,7 @@ def _stop_fetcher_processes():
                     os.kill(pid, signal.SIGTERM)
                 except Exception:
                     pass
-        time.sleep(1)
+        await asyncio.sleep(1)
 
     if retry >= 5:
         print("未能终止fetcher进程")
@@ -688,12 +688,12 @@ async def status():
 
 async def stop(service: str = ""):
     if service == "":
-        _stop_jobs()
-        _stop_fetcher_processes()
+        await _stop_jobs()
+        await _stop_fetcher_processes()
     elif service == "jobs":
-        return _stop_jobs()
+        return await _stop_jobs()
     else:
-        _stop_fetcher_processes()
+        await _stop_fetcher_processes()
 
 
 async def restart(service: str = ""):
@@ -701,15 +701,15 @@ async def restart(service: str = ""):
     await _init()
 
     if service == "":
-        _stop_jobs()
-        _stop_fetcher_processes()
-        _start_jobs()
-        _start_fetcher_processes()
+        await _stop_jobs()
+        await _stop_fetcher_processes()
+        await _start_jobs()
+        await _start_fetcher_processes()
     elif service == "jobs":
-        return _restart_jobs()
+        return await _restart_jobs()
     else:
-        _stop_fetcher_processes()
-        _start_fetcher_processes()
+        await _stop_fetcher_processes()
+        await _start_fetcher_processes()
 
 
 async def sync_sec_list():
