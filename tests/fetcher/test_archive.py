@@ -2,19 +2,17 @@ import datetime
 import logging
 import unittest
 from unittest import mock
-from unittest.mock import call
 
 import aiohttp
 import cfg4py
 import omicron
-import pandas as pd
 from omicron.core.types import FrameType
 from omicron.dal import cache
 from ruamel.yaml.error import YAMLError
 
 from omega.fetcher import archive
 from omega.fetcher.archive import ArchivedBarsHandler
-from tests import init_test_env, start_archive_server, start_omega
+from tests import init_test_env, start_archive_server
 
 logger = logging.getLogger(__name__)
 
@@ -38,32 +36,28 @@ class TestArchieveFetcher(unittest.IsolatedAsyncioTestCase):
 
         responses = set()
         async for status, desc in archive.get_bars(
-            self.cfg.omega.urls.archive, [201901], ["stock"]
+            self.cfg.omega.urls.archive, [202103], ["stock"]
         ):
             responses.add(f"{status} {desc}")
         self.assertSetEqual(
             set(
                 [
                     "200 读取索引成功",
-                    "200 成功导入2019年01月的stock数据",
+                    "200 成功导入2021年03月的stock数据",
                     "200 DONE",
                 ]
             ),
             responses,
         )
 
-        head, tail = await cache.get_bars_range(sec, FrameType.DAY)
-        self.assertEqual(datetime.date(2019, 1, 4), head)
-        self.assertEqual(datetime.date(2019, 1, 4), tail)
+        bars = await cache.get_bars(sec, datetime.date(2021, 3, 31), 1, FrameType.DAY)
 
-        bars = await cache.get_bars(sec, datetime.date(2019, 1, 4), 1, FrameType.DAY)
-
-        self.assertEqual(datetime.date(2019, 1, 4), bars[0]["frame"])
+        self.assertEqual(datetime.date(2021, 3, 31), bars[0]["frame"])
 
     async def test_get_index(self):
         status, index = await archive.get_index(self.cfg.omega.urls.archive)
         self.assertEqual(200, status)
-        self.assertListEqual([201901, 201902], index.get("stock"))
+        self.assertListEqual([202103, 202102, 202101], index.get("stock"))
 
         func = "omega.fetcher.archive.get_file"
         for side_effect in [aiohttp.ServerTimeoutError(), YAMLError(), Exception()]:
@@ -74,14 +68,37 @@ class TestArchieveFetcher(unittest.IsolatedAsyncioTestCase):
 
     @mock.patch("builtins.print")
     async def test_main(self, mock_print):
-        await archive._main([201901], ["stock"])
-        mock_print.assert_has_calls(
-            [
-                mock.call(200, "读取索引成功"),
-                mock.call(200, "成功导入2019年01月的stock数据"),
-                mock.call(200, "DONE"),
-            ]
+        # either head or tail is None
+        await cache.security.hdel("000001.XSHE:1d", "head")
+        await cache.security.hmset("000001.XSHE:1d", "tail", 2020)
+
+        # arc_tail (202103311500) < head (2021 0401 1500)
+        await cache.security.hmset(
+            "000001.XSHE:30m", "head", 202104011500, "tail", 202104031500
         )
+
+        # arc_head (20210104) > tail (20191231)
+        await cache.security.hmset("600000.XSHG:1d", "head", 20191230, "tail", 20191231)
+
+        # overlapped
+        await cache.security.hmset(
+            "600001.XSHG:30m", "head", 202101051400, "tail", 202103021130
+        )
+
+        await archive.clear_range()
+        await archive._main([202103, 202101, 202102], ["stock"])
+        # _main will close omicron
+        await omicron.init()
+        await archive.adjust_range()
+
+        head, tail = await cache.security.hmget("000001.XSHE:1d", "head", "tail")
+        print(head, tail)
+        head, tail = await cache.security.hmget("000001.XSHE:30m", "head", "tail")
+        print(head, tail)
+        head, tail = await cache.security.hmget("600001.XSHG:1d", "head", "tail")
+        print(head, tail)
+        head, tail = await cache.security.hmget("600001.XSHE:30m", "head", "tail")
+        print(head, tail)
 
     @mock.patch("aiohttp.ClientSession.get")
     async def test_get_file_404(self, mock_get):
@@ -99,9 +116,9 @@ class TestArchieveFetcher(unittest.IsolatedAsyncioTestCase):
         self.assertRaises(aiohttp.ServerTimeoutError)
 
     async def test_archive_bars_handler_process(self):
-        handler = ArchivedBarsHandler("http://mock/2019-01-stock.tgz")
+        handler = ArchivedBarsHandler("http://mock/2021-03-stock.tgz")
         content = None
-        with open("tests/data/2019-01-stock.tgz", "rb") as f:
+        with open("tests/data/2021-03-stock.tgz", "rb") as f:
             content = f.read(-1)
         # 0. normal case
         url, result = await handler.process(content)
@@ -114,3 +131,56 @@ class TestArchieveFetcher(unittest.IsolatedAsyncioTestCase):
         with mock.patch("shutil.rmtree", side_effect=Exception()):
             url, result = await handler.process(content)
             self.assertTrue(result.startswith("200 成功导入"))
+
+    async def test_adjust_ranges(self):
+        await archive.clear_range()
+
+        frames = [20200101, 20200102, 20200103, 20200104]
+        await cache.sys.lpush("archive.ranges.000001.XSHE:1d", *frames)
+        # either head or tail is None
+        await cache.security.hdel("000001.XSHE:1d", "head")
+        await cache.security.hmset("000001.XSHE:1d", "tail", 20200104)
+
+        frames = [202101011030, 202101011100, 202101011330, 202101011400]
+        await cache.sys.lpush("archive.ranges.000001.XSHE:30m", *frames)
+
+        frames = [20200101, 20200102, 20200103, 20200104]
+        await cache.sys.lpush("archive.ranges.600001.XSHG:1d", *frames)
+
+        frames = [202101011030, 202101011100, 202101011330, 202101011400]
+        await cache.sys.lpush("archive.ranges.600001.XSHG:30m", *frames)
+
+        # arc_tail (2021 0101 1400) < head (2021 0102 1100)
+        await cache.security.hmset(
+            "000001.XSHE:30m", "head", 202101021030, "tail", 202101021100
+        )
+
+        # arch_head (2020 0101) > tail (2019 1231)
+        await cache.security.hmset("600001.XSHG:1d", "head", 20191230, "tail", 20191231)
+
+        # others: overlapped
+        await cache.security.hmset(
+            "600001.XSHG:30m", "head", 202101011100, "tail", 202101011500
+        )
+
+        await archive.adjust_range(batch=2)
+
+        head, tail = await cache.security.hmget("000001.XSHE:1d", "head", "tail")
+        head, tail = int(head), int(tail)
+        self.assertEqual(20200101, head)
+        self.assertEqual(20200104, tail)
+
+        head, tail = await cache.security.hmget("000001.XSHE:30m", "head", "tail")
+        head, tail = int(head), int(tail)
+        self.assertEqual(202101011030, head)
+        self.assertEqual(202101011400, tail)
+
+        head, tail = await cache.security.hmget("600001.XSHG:1d", "head", "tail")
+        head, tail = int(head), int(tail)
+        self.assertEqual(20200101, head)
+        self.assertEqual(20200104, tail)
+
+        head, tail = await cache.security.hmget("600001.XSHG:30m", "head", "tail")
+        head, tail = int(head), int(tail)
+        self.assertEqual(202101011030, head)
+        self.assertEqual(202101011500, tail)

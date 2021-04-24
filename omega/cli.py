@@ -654,9 +654,12 @@ def _show_jobs_process():
 
 def _find_jobs_process():
     for p in psutil.process_iter():
-        cmd = " ".join(p.cmdline())
-        if cmd.find("omega.jobs") != -1:
-            return p.pid
+        try:
+            cmd = " ".join(p.cmdline())
+            if cmd.find("omega.jobs") != -1:
+                return p.pid
+        except (PermissionError, ProcessLookupError):
+            pass
     return None
 
 
@@ -822,6 +825,8 @@ async def show_subprocess_output(stream):
 
 
 async def download_archive(n: Union[str, int] = None):
+    await omicron.init()
+    await archive.clear_range()
     index = await get_archive_index()
 
     avail_months = [int(m) for m in index.get("stock")]
@@ -878,6 +883,7 @@ async def download_archive(n: Union[str, int] = None):
         tasks.append(show_subprocess_output(proc.stderr))
 
     await asyncio.gather(*tasks)
+    await archive.adjust_range()
     print(f"数据导入共费时{int(time.time() - t0)}秒")
 
 

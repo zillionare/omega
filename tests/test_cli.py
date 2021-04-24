@@ -8,6 +8,7 @@ import aioredis
 import arrow
 import cfg4py
 from omega import cli
+import omega
 from omega.config import get_config_dir
 from pyemit import emit
 from ruamel.yaml import YAML
@@ -281,10 +282,14 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
             ):
                 try:
                     self.archive = await start_archive_server()
+                    self.omega = await start_omega()
                     await cli.setup(force=True)
                 finally:
                     if self.archive:
                         self.archive.kill()
+
+                    if self.omega:
+                        self.omega.kill()
                     os.remove(origin)
                     os.rename(bak, origin)
 
@@ -294,12 +299,15 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
 
     async def test_download_archive(self):
         try:
-            archive_server = await start_archive_server()
+            self.archive_server = await start_archive_server()
+            self.omega = await start_omega()
             with mock.patch("builtins.input", return_value="1"):
                 await cli.download_archive()
         finally:
-            if archive_server:
-                archive_server.kill()
+            if self.archive_server:
+                self.archive_server.kill()
+            if self.omega:
+                omega.kill()
 
     async def test_bin_cut(self):
         arr = [1, 2, 3, 4, 5]
