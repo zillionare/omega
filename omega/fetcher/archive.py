@@ -273,7 +273,6 @@ async def _main(months: list, cats: list):
     try:
         async for status, desc in get_bars(cfg.omega.urls.archive, months, cats):
             print(status, desc)
-
     finally:
         await omicron.shutdown()
 
