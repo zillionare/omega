@@ -408,42 +408,42 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             await cache.security.delete("000001.XSHE:1d")
 
             # start import archive and check result
-            await archive._main([201901], ["stock"])
+            await archive._main([202101], ["stock"])
 
             # in archive._main, omicron.shutdown is called
             await omicron.init()
 
             sec = "000001.XSHE"
             head, tail = await cache.get_bars_range(sec, FrameType.DAY)
-            self.assertEqual(datetime.date(2019, 1, 4), head)
-            self.assertEqual(datetime.date(2019, 1, 4), tail)
+            self.assertEqual(datetime.date(2021, 1, 4), head)
+            self.assertEqual(datetime.date(2021, 1, 29), tail)
 
             # sync start right after archive data
             sync_params = {
                 "include": "000001.XSHE",
                 "frame": FrameType.DAY,
-                "start": "2019-01-05",
-                "stop": "2019-01-10",
+                "start": "2021-02-02",
+                "stop": "2021-02-03",
             }
 
             _, frame_type, start, stop, delay = syncjobs.parse_sync_params(
                 **sync_params
             )
 
-            exp_head = arrow.get("2019-01-04").date()
+            exp_head = arrow.get("2021-01-04").date()
             await self._sync_and_check(sec, frame_type, start, stop, exp_head)
 
             # sync starts before archive data
-            sync_params["start"] = "2019-01-02"
-            sync_params["stop"] = "2019-01-11"
+            sync_params["start"] = "2020-12-31"
+            sync_params["stop"] = "2021-02-05"
             _, _, start, stop, _ = syncjobs.parse_sync_params(**sync_params)
-            exp_head = arrow.get("2019-01-02").date()
+            exp_head = arrow.get("2020-12-31").date()
             await self._sync_and_check(sec, frame_type, start, stop, exp_head)
 
             # sync starts after archive data with gap
-            start = arrow.get("2019-01-15").date()
-            stop = arrow.get("2019-01-17").date()
-            exp_head = arrow.get("2019-01-02").date()
+            start = arrow.get("2021-02-08").date()
+            stop = arrow.get("2021-02-09").date()
+            exp_head = arrow.get("2020-12-31").date()
             await self._sync_and_check(sec, frame_type, start, stop, exp_head)
         finally:
             if archive_server:

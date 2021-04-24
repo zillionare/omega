@@ -69,19 +69,11 @@ class ArchivedBarsHandler(FileHandler):
             df = pd.read_parquet(file)
             code = os.path.split(file)[-1]
             pipeline = cache.security.pipeline()
-
-            ranges = {}
+            range_pl = cache.sys.pipeline()
 
             # retrieve rng from cache
             for frame_type in set(df["frame_type"]):
                 key = f"{code}:{FrameType.from_int(frame_type).value}"
-
-                head = await cache.security.hget(key, "head")
-                tail = await cache.security.hget(key, "tail")
-                ranges[key] = {
-                    "head": int(head) if head else None,
-                    "tail": int(tail) if tail else None,
-                }
 
             for frame, (o, h, l, c, v, a, fq, frame_type) in df.iterrows():
                 key = f"{code}:{FrameType.from_int(frame_type).value}"
@@ -89,20 +81,10 @@ class ArchivedBarsHandler(FileHandler):
                 pipeline.hset(
                     key, frame, f"{o:.2f} {h:.2f} {l:.2f} {c:.2f} {v} {a:.2f} {fq:.2f}"
                 )
-                ranges[key]["head"] = (
-                    min(ranges[key]["head"], frame) if ranges[key]["head"] else frame
-                )
-                ranges[key]["tail"] = (
-                    max(ranges[key]["tail"], frame) if ranges[key]["tail"] else frame
-                )
-
-            for frame_type in set(df["frame_type"]):
-                key = f"{code}:{FrameType.from_int(frame_type).value}"
-                # workaround for previous collected data
-                pipeline.hset(key, "head", int(ranges[key]["head"]))
-                pipeline.hset(key, "tail", int(ranges[key]["tail"]))
+                range_pl.lpush(f"archive.ranges.{key}", frame)
 
             await pipeline.execute()
+            await range_pl.execute()
         except Exception as e:
             logger.info("导入%s失败", file)
             logger.exception(e)
@@ -239,12 +221,60 @@ async def get_index(server):
     return 200, {cat: list(index[cat].keys()) for cat in index.keys()}
 
 
+async def clear_range():
+    """clear cached secs's range before/after import archive bars"""
+    key = "archive.ranges.*"
+    keys = await cache.sys.keys(key)
+
+    if keys:
+        await cache.sys.delete(*keys)
+
+
+async def adjust_range(batch: int = 500):
+    """adjust secs's range after archive bars imported"""
+    cur = b"0"
+    key = "archive.ranges.*"
+    while cur:
+        cur, keys = await cache.sys.scan(cur, match=key, count=batch)
+        if not keys:
+            continue
+
+        pl = cache.security.pipeline()
+        for item in keys:
+            values = [int(v) for v in await cache.sys.lrange(item, 0, -1)]
+            values.sort()
+
+            arc_head, arc_tail = values[0], values[-1]
+
+            code_frame_key = item.replace("archive.ranges.", "")
+            head, tail = await cache.security.hmget(code_frame_key, "head", "tail")
+
+            head = int(head) if head is not None else None
+            tail = int(tail) if tail is not None else None
+
+            # head, tail, arc_head, arc_tail should be all frame-aligned
+            if head is None or tail is None:
+                head, tail = arc_head, arc_tail
+            elif arc_tail < head or arc_head > tail:
+                head, tail = arc_head, arc_tail
+            else:
+                head = min(arc_head, head)
+                tail = max(arc_tail, tail)
+            pl.hset(code_frame_key, "head", head)
+            pl.hset(code_frame_key, "tail", tail)
+
+        await pl.execute()
+
+
 async def _main(months: list, cats: list):
     await omicron.init()
 
     try:
+        await clear_range()
         async for status, desc in get_bars(cfg.omega.urls.archive, months, cats):
             print(status, desc)
+
+        await adjust_range()
     finally:
         await omicron.shutdown()
 
