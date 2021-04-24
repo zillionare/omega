@@ -307,7 +307,7 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
             if self.archive_server:
                 self.archive_server.kill()
             if self.omega:
-                omega.kill()
+                self.omega.kill()
 
     async def test_bin_cut(self):
         arr = [1, 2, 3, 4, 5]
