@@ -21,5 +21,8 @@
 
 first stable release
 
-### 功能
-### bug fixes
+* 可导入从2015年以来的A股30分钟及以上股票数据。
+* 高速行情同步。支持多账号、多session、多进程。
+* 向外提供服务时，支持load-balance（需要配置http网关，如nginx)。
+* 自动实时行情同步。
+* 仅支持JoinQuant作为上游数据源
