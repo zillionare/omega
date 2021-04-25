@@ -2,7 +2,7 @@
 ![](http://images.jieyu.ai/images/hot/zillionbanner.jpg)
 
 [![Version](http://img.shields.io/pypi/v/zillionare-omega?color=brightgreen)](https://pypi.python.org/pypi/zillionare-omega)
-[![CI Status](https://github.com/zillionare/omega/actions/workflows/main.yml/badge.svg?branch=release)](https://github.com/zillionare/omega)
+[![CI Status](https://github.com/zillionare/omega/actions/workflows/release.yml/badge.svg?branch=release)](https://github.com/zillionare/omega)
 [![Code Coverage](https://img.shields.io/codecov/c/github/zillionare/omega)](https://app.codecov.io/gh/zillionare/omega)
 [![ReadtheDos](https://readthedocs.org/projects/omega/badge/?version=latest)](https://omega.readthedocs.io/en/latest/?badge=latest)
 [![Dowloads](https://pepy.tech/badge/zillionare-omega)](https://pepy.tech/project/zillionare-omega)
