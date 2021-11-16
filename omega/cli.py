@@ -862,7 +862,6 @@ async def show_subprocess_output(stream):
 
 
 async def download_archive(n: Union[str, int] = None):
-    await omicron.init()
     await archive.clear_range()
     index = await get_archive_index()
 
@@ -947,7 +946,10 @@ async def _init():
     #await AbstractQuotesFetcher.create_instance(impl, **params)
 
     #await omicron.init(AbstractQuotesFetcher)
-    await omicron.init()
+    try:
+        await omicron.init()
+    except Exception:
+        pass
 
 
 def run_with_init(func):
