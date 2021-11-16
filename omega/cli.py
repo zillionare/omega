@@ -907,9 +907,10 @@ async def _init():
 
     impl = cfg.quotes_fetchers[0]["impl"]
     params = cfg.quotes_fetchers[0]["workers"][0]
-    await AbstractQuotesFetcher.create_instance(impl, **params)
+    #await AbstractQuotesFetcher.create_instance(impl, **params)
 
-    await omicron.init(AbstractQuotesFetcher)
+    #await omicron.init(AbstractQuotesFetcher)
+    await omicron.init()
 
 
 def run_with_init(func):
