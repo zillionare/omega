@@ -862,6 +862,12 @@ async def show_subprocess_output(stream):
 
 
 async def download_archive(n: Union[str, int] = None):
+    impl = cfg.quotes_fetchers[0]["impl"]
+    params = cfg.quotes_fetchers[0]["workers"][0]
+    await AbstractQuotesFetcher.create_instance(impl, **params)
+
+    await omicron.init(AbstractQuotesFetcher)
+
     await archive.clear_range()
     index = await get_archive_index()
 
@@ -941,11 +947,6 @@ async def _init():
     except Exception:
         print(f"dsn is {cfg.redis.dsn}")
 
-    impl = cfg.quotes_fetchers[0]["impl"]
-    params = cfg.quotes_fetchers[0]["workers"][0]
-    #await AbstractQuotesFetcher.create_instance(impl, **params)
-
-    #await omicron.init(AbstractQuotesFetcher)
     try:
         await omicron.init()
     except Exception:
