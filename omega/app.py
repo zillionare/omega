@@ -69,7 +69,7 @@ class Omega(object):
     async def heart_beat(self):
         pid = os.getpid()
         key = f"process.fetchers.{pid}"
-        logger.info("send heartbeat from omega fetcher: %s", pid)
+        logger.debug("send heartbeat from omega fetcher: %s", pid)
         await omicron.cache.sys.hmset_dict(key, {
             "impl": self.fetcher_impl,
             "gid": self.gid,
