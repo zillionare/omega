@@ -544,34 +544,38 @@ async def _start_fetcher_processes():
 
     # fetcher processes are started by groups
     cfg = cfg4py.get_instance()
-    for fetcher in cfg.quotes_fetchers:
-        impl = fetcher.get("impl")
-        workers = fetcher.get("workers")
+    try:
+        for fetcher in cfg.quotes_fetchers:
+            impl = fetcher.get("impl")
+            workers = fetcher.get("workers")
 
-        avail_ports = fetcher.get("ports")
-        avail_ports = set(avail_ports) - set(used_ports)
+            avail_ports = fetcher.get("ports")
+            avail_ports = set(avail_ports) - set(used_ports)
 
-        for group in workers:
-            sessions = group.get("sessions", 1)
+            for group in workers:
+                sessions = group.get("sessions", 1)
 
-            account = group.get("account")
-            password = group.get("password")
+                account = group.get("account")
+                password = group.get("password")
 
-            started_sessions = group_procs.get(f"{impl}:{account}", [])
-            gap = sessions - len(started_sessions)
-            if gap > 0:
-                sub = len(started_sessions)
-                total = sessions
-                print(f"账号{account}已运行{sub}/{total} fetcher进程，启动中...")
-            while gap > 0:
-                if len(avail_ports):
-                    port = avail_ports.pop()
-                else:
-                    raise ValidationErr("No available port")
+                started_sessions = group_procs.get(f"{impl}:{account}", [])
+                gap = sessions - len(started_sessions)
+                if gap > 0:
+                    sub = len(started_sessions)
+                    total = sessions
+                    print(f"账号{account}已运行{sub}/{total} fetcher进程，启动中...")
+                while gap > 0:
+                    if len(avail_ports):
+                        port = avail_ports.pop()
+                    else:
+                        print("No available port")
+                        raise ValidationErr("No available port")
 
-                _start_fetcher(impl, account, password, port)
-                await asyncio.sleep(1)
-                gap -= 1
+                    _start_fetcher(impl, account, password, port)
+                    await asyncio.sleep(1)
+                    gap -= 1
+    except ValidationErr:
+        pass
 
     await asyncio.sleep(3)
     await show_fetcher_processes()
