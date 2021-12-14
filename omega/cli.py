@@ -26,12 +26,12 @@ import fire
 import omicron
 import psutil
 import sh
+from omicron import cache
 from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
 from pyemit import emit
 from ruamel.yaml import YAML
 from termcolor import colored
-from omicron import cache
 
 import omega
 from omega.config import get_config_dir
@@ -491,7 +491,7 @@ async def find_fetcher_processes():
 
         heartbeat = float(info["heartbeat"])
 
-        group =f"{info['impl']}:{info['gid']}"
+        group = f"{info['impl']}:{info['gid']}"
         pid = int(info["pid"])
         port = int(info["port"])
         alive = time.time() - heartbeat < 10
@@ -499,6 +499,7 @@ async def find_fetcher_processes():
         results.append((pid, port, alive, group))
 
     return results
+
 
 async def start(service: str = ""):
     """启动omega主进程或者任务管理进程
@@ -540,7 +541,6 @@ async def _start_fetcher_processes():
             pids = group_procs.get(group_key, [])
             pids.append(pid)
             group_procs[group_key] = pids
-
 
     # fetcher processes are started by groups
     cfg = cfg4py.get_instance()
@@ -596,9 +596,8 @@ async def show_fetcher_processes():
         alive = "LIVE" if alive else "*DEAD*"
         print(f"{impl:10}|{' ':2}{account:15}|  {pid} | {port} | {alive}")
 
-def _start_fetcher(
-    impl: str, account: str, password: str, port: int
-):
+
+def _start_fetcher(impl: str, account: str, password: str, port: int):
     subprocess.Popen(
         [
             sys.executable,
@@ -608,7 +607,7 @@ def _start_fetcher(
             f"--impl={impl}",
             f"--account={account}",
             f"--password={password}",
-            f"--port={port}"
+            f"--port={port}",
         ],
         stdout=subprocess.DEVNULL,
     )
@@ -659,6 +658,7 @@ async def _restart_jobs():
         await _stop_jobs()
         await _start_jobs()
 
+
 async def _stop_jobs():
     pid, _ = await _find_jobs_process()
     retry = 0
@@ -690,14 +690,14 @@ async def _show_jobs_process():
 
 
 async def _find_jobs_process():
-    """查找并返回正在运行的jobs进程的pid
-    """
+    """查找并返回正在运行的jobs进程的pid"""
     info = await cache.sys.hgetall("process.jobs")
     if not info:
         return None, False
 
     heartbeat = float(info["heartbeat"])
     return int(info["pid"]), time.time() - heartbeat < 10
+
 
 async def _stop_fetcher_processes():
     retry = 0

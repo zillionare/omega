@@ -7,13 +7,14 @@ Contributors:
 """
 import logging
 import os
-from time import timezone
 import time
+from time import timezone
 from typing import List
 
 import cfg4py
 import fire
 import omicron
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from pyemit import emit
 from sanic import Blueprint, Sanic
 from sanic.websocket import WebSocketProtocol
@@ -24,8 +25,6 @@ from omega.core.events import Events
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omega.interfaces import jobs, quotes, sys
 from omega.jobs import syncjobs
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-
 
 cfg: Config = cfg4py.get_instance()
 
@@ -61,7 +60,7 @@ class Omega(object):
         emit.register(Events.OMEGA_DO_SYNC, syncjobs.sync_bars)
         await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
         await self.heart_beat()
-        self.scheduler.add_job(self.heart_beat, trigger='interval', seconds=3)
+        self.scheduler.add_job(self.heart_beat, trigger="interval", seconds=3)
         self.scheduler.start()
 
         logger.info("<<< init %s process done", self.__class__.__name__)
@@ -70,13 +69,17 @@ class Omega(object):
         pid = os.getpid()
         key = f"process.fetchers.{pid}"
         logger.debug("send heartbeat from omega fetcher: %s", pid)
-        await omicron.cache.sys.hmset_dict(key, {
-            "impl": self.fetcher_impl,
-            "gid": self.gid,
-            "port": self.port,
-            "pid": pid,
-            "heartbeat": time.time()
-        })
+        await omicron.cache.sys.hmset_dict(
+            key,
+            {
+                "impl": self.fetcher_impl,
+                "gid": self.gid,
+                "port": self.port,
+                "pid": pid,
+                "heartbeat": time.time(),
+            },
+        )
+
 
 def get_fetcher_info(fetchers: List, impl: str):
     for fetcher_info in fetchers:

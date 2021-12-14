@@ -47,15 +47,14 @@ async def start_logging():
 
         logger.info("%s is working now", cfg.logreceiver.klass)
 
+
 async def heartbeat():
     global scheduler
 
     pid = os.getpid()
-    key = f"process.jobs"
-    await omicron.cache.sys.hmset_dict(key, {
-        "pid": pid,
-        "heartbeat": time.time()
-    })
+    key = "process.jobs"
+    await omicron.cache.sys.hmset_dict(key, {"pid": pid, "heartbeat": time.time()})
+
 
 async def init(app, loop):  # noqa
     global scheduler
@@ -71,7 +70,7 @@ async def init(app, loop):  # noqa
 
     scheduler = AsyncIOScheduler(timezone=cfg.tz)
     await heartbeat()
-    scheduler.add_job(heartbeat, 'interval', seconds=5)
+    scheduler.add_job(heartbeat, "interval", seconds=5)
 
     # sync securities daily
     h, m = map(int, cfg.omega.sync.security_list.split(":"))
