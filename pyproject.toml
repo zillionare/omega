@@ -39,6 +39,7 @@ version = "1.1.0"
 [tool.poetry.dependencies]
 python=">=3.9,<3.10"
 zillionare_omega_adaptors_jq="1.0.3"
+zillionare_omicron = "1.1.2"
 aiohttp = "3.7.4"
 pyemit = "0.4.5"
 arrow = "^1.2"
