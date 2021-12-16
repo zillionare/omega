@@ -5,6 +5,7 @@ import asyncio
 import functools
 import itertools
 import logging
+import os
 import time
 from typing import Optional
 
@@ -47,6 +48,14 @@ async def start_logging():
         logger.info("%s is working now", cfg.logreceiver.klass)
 
 
+async def heartbeat():
+    global scheduler
+
+    pid = os.getpid()
+    key = "process.jobs"
+    await omicron.cache.sys.hmset_dict(key, {"pid": pid, "heartbeat": time.time()})
+
+
 async def init(app, loop):  # noqa
     global scheduler
 
@@ -60,6 +69,8 @@ async def init(app, loop):  # noqa
     await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
 
     scheduler = AsyncIOScheduler(timezone=cfg.tz)
+    await heartbeat()
+    scheduler.add_job(heartbeat, "interval", seconds=5)
 
     # sync securities daily
     h, m = map(int, cfg.omega.sync.security_list.split(":"))

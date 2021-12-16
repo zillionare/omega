@@ -16,6 +16,7 @@ import sys
 import time
 from pathlib import Path
 from typing import Any, Callable, List, Union
+from xml.dom import ValidationErr
 
 import aiohttp
 import aioredis
@@ -25,6 +26,7 @@ import fire
 import omicron
 import psutil
 import sh
+from omicron import cache
 from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
 from pyemit import emit
@@ -395,7 +397,7 @@ async def setup(reset_factory=False, force=False):
         config_file = os.path.join(get_config_dir(), "defaults.yaml")
         if os.path.exists(config_file):
             print(f"{colored('[PASS]', 'green')} 安装程序已在本机上成功运行")
-            sys.exit(0)
+            return
 
     if reset_factory:
         import sh
@@ -411,7 +413,7 @@ async def setup(reset_factory=False, force=False):
     settings = load_factory_settings()
 
     if not check_environment():
-        sys.exit(-1)
+        return
 
     print_title("Step 2. 配置日志")
     config_logging(settings)
@@ -477,28 +479,26 @@ def check_environment():
     return True
 
 
-def find_fetcher_processes():
-    """查找所有的omega(fetcher)进程
+async def find_fetcher_processes():
+    """从redis中查找已启动的fetcher进程
 
-    Omega进程在ps -aux中显示应该包含 omega.app --impl=&ltfetcher&gt --port=&ltport&gt信息
+    返回 f"{impl}:{gid}" -> (pid, port, alive)
     """
-    result = {}
-    for p in psutil.process_iter():
-        cmd = " ".join(p.cmdline())
-        if "omega.app start" in cmd and "--impl" in cmd and "--port" in cmd:
+    results = []
+    keys = await cache.sys.keys("process.fetchers.*")
+    for key in keys:
+        info = await cache.sys.hgetall(key)
 
-            m = re.search(r"--impl=([^\s]+)", cmd)
-            impl = m.group(1) if m else ""
+        heartbeat = float(info["heartbeat"])
 
-            m = re.search(r"--port=(\d+)", cmd)
-            port = m.group(1) if m else ""
+        group = f"{info['impl']}:{info['gid']}"
+        pid = int(info["pid"])
+        port = int(info["port"])
+        alive = time.time() - heartbeat < 10
 
-            group = f"{impl}:{port}"
-            pids = result.get(group, [])
-            pids.append(p.pid)
-            result[group] = pids
+        results.append((pid, port, alive, group))
 
-    return result
+    return results
 
 
 async def start(service: str = ""):
@@ -527,54 +527,77 @@ async def start(service: str = ""):
 
 
 async def _start_fetcher_processes():
-    procs = find_fetcher_processes()
+    results = await find_fetcher_processes()
+
+    # clean dead process
+    used_ports = set()
+    group_procs = {}
+    for pid, port, alive, group_key in results:
+        if not alive and psutil.pid_exists(pid):
+            os.kill(pid, signal.SIGTERM)
+        else:
+            used_ports.add(port)
+
+            pids = group_procs.get(group_key, [])
+            pids.append(pid)
+            group_procs[group_key] = pids
 
     # fetcher processes are started by groups
     cfg = cfg4py.get_instance()
-    for fetcher in cfg.quotes_fetchers:
-        impl = fetcher.get("impl")
-        workers = fetcher.get("workers")
+    try:
+        for fetcher in cfg.quotes_fetchers:
+            impl = fetcher.get("impl")
+            workers = fetcher.get("workers")
 
-        ports = [3181 + i for i in range(len(workers))]
-        for group in workers:
-            sessions = group.get("sessions", 1)
-            port = group.get("port") or ports.pop()
-            account = group.get("account")
-            password = group.get("password")
-            started_sessions = procs.get(f"{impl}:{port}", [])
-            if sessions - len(started_sessions) > 0:
-                print(f"启动的{impl}实例少于配置要求（或尚未启动），正在启动中。。。")
-                # sanic manages sessions, so we have to restart it as a whole
-                for pid in started_sessions:
-                    try:
-                        os.kill(pid, signal.SIGTERM)
-                    except Exception:
-                        pass
+            avail_ports = fetcher.get("ports")
+            avail_ports = set(avail_ports) - set(used_ports)
 
-                _start_fetcher(impl, account, password, port, sessions)
-                await asyncio.sleep(1)
+            for group in workers:
+                sessions = group.get("sessions", 1)
+
+                account = group.get("account")
+                password = group.get("password")
+
+                started_sessions = group_procs.get(f"{impl}:{account}", [])
+                gap = sessions - len(started_sessions)
+                if gap > 0:
+                    sub = len(started_sessions)
+                    total = sessions
+                    print(f"账号{account}已运行{sub}/{total} fetcher进程，启动中...")
+                while gap > 0:
+                    if len(avail_ports):
+                        port = avail_ports.pop()
+                    else:
+                        print("No available port")
+                        raise ValidationErr("No available port")
+
+                    _start_fetcher(impl, account, password, port)
+                    await asyncio.sleep(1)
+                    gap -= 1
+    except ValidationErr:
+        pass
 
     await asyncio.sleep(3)
-    show_fetcher_processes()
+    await show_fetcher_processes()
 
 
-def show_fetcher_processes():
-    print(f"正在运行中的omega-fetchers进程：\n{'=' * 40}")
+async def show_fetcher_processes():
+    print(f"\nomega-fetchers进程：\n{'=' * 40}")
 
-    procs = find_fetcher_processes()
+    results = await find_fetcher_processes()
 
-    if len(procs):
-        print("   impl   |     port   |  pids")
-        for group, pids in procs.items():
-            impl, port = group.split(":")
-            print(f"{impl:10}|{' ':5}{port:2}{' ':3}|  {pids}")
-    else:
+    if not results:
         print("None")
+        return
+
+    print("   impl   |     account     |   pid  | port | status")
+    for pid, port, alive, group in results:
+        impl, account = group.split(":")
+        alive = "LIVE" if alive else "*DEAD*"
+        print(f"{impl:10}|{' ':2}{account:15}|  {pid} | {port} | {alive}")
 
 
-def _start_fetcher(
-    impl: str, account: str, password: str, port: int, sessions: int = 1
-):
+def _start_fetcher(impl: str, account: str, password: str, port: int):
     subprocess.Popen(
         [
             sys.executable,
@@ -585,108 +608,126 @@ def _start_fetcher(
             f"--account={account}",
             f"--password={password}",
             f"--port={port}",
-            f"--sessions={sessions}",
         ],
         stdout=subprocess.DEVNULL,
     )
 
 
 async def _start_jobs():
-    subprocess.Popen(
-        [
-            sys.executable,
-            "-m",
-            "omega.jobs",
-            "start",
-            f"--port={cfg.omega.jobs.port}",
-        ]
-    )
-
     retry = 0
-    while _find_jobs_process() is None and retry < 5:
+    pid, alive = await _find_jobs_process()
+    if pid and alive:
+        print(f"zillionare-jobs进程已经启动，pid={pid}")
+        return
+    if not alive and pid:
+        if psutil.pid_exists(pid):
+            os.kill(pid, signal.SIGTERM)
+            pid = None
+
+    while pid is None and retry < 5:
+        subprocess.Popen(
+            [
+                sys.executable,
+                "-m",
+                "omega.jobs",
+                "start",
+                f"--port={cfg.omega.jobs.port}",
+            ]
+        )
         print("等待omega.jobs启动中")
         retry += 1
         await asyncio.sleep(1)
+        pid, alive = await _find_jobs_process()
+
     if retry < 5:
         print("omega.jobs启动成功。")
     else:
         print("omega.jobs启动失败。")
         return
 
-    _show_jobs_process()
+    await _show_jobs_process()
 
 
-def _restart_jobs():
-    pid = _find_jobs_process()
+async def _restart_jobs():
+    pid, _ = await _find_jobs_process()
     if pid is None:
         print("omega.jobs未运行。正在启动中...")
-        _start_jobs()
+        await _start_jobs()
     else:
         # 如果omega.jobs已经运行
-        _stop_jobs()
-        _start_jobs()
+        await _stop_jobs()
+        await _start_jobs()
 
 
 async def _stop_jobs():
-    pid = _find_jobs_process()
+    pid, _ = await _find_jobs_process()
     retry = 0
-    while pid is not None and retry < 5:
+    while pid and retry < 5:
         retry += 1
         try:
-            os.kill(pid, signal.SIGTERM)
-            await asyncio.sleep(0.5)
+            if psutil.pid_exists(pid):
+                os.kill(pid, signal.SIGTERM)
+                await asyncio.sleep(0.5)
+            if not psutil.pid_exists(pid):
+                await cache.sys.delete("process.jobs")
         except Exception:
             pass
-        pid = _find_jobs_process()
+        pid, _ = await _find_jobs_process()
 
     if retry >= 5:
         print("未能停止omega.jobs")
-
-
-def _show_jobs_process():
-    print(f"正在运行中的jobs进程:\n{'=' * 40}")
-    pid = _find_jobs_process()
-    if pid:
-        print(pid)
     else:
-        print("None")
+        print("omega.jobs已经终止运行。")
 
 
-def _find_jobs_process():
-    for p in psutil.process_iter():
-        try:
-            cmd = " ".join(p.cmdline())
-            if cmd.find("omega.jobs") != -1:
-                return p.pid
-        except (PermissionError, ProcessLookupError):
-            pass
-    return None
+async def _show_jobs_process():
+    print(f"jobs进程:\n{'=' * 40}")
+    print("  pid  |  status |")
+    pid, alive = await _find_jobs_process()
+    if pid:
+        alive = "LIVE" if alive else "*DEAD*"
+        print(f"{pid:6} |   {alive}  |")
+
+
+async def _find_jobs_process():
+    """查找并返回正在运行的jobs进程的pid"""
+    info = await cache.sys.hgetall("process.jobs")
+    if not info:
+        return None, False
+
+    heartbeat = float(info["heartbeat"])
+    return int(info["pid"]), time.time() - heartbeat < 10
 
 
 async def _stop_fetcher_processes():
     retry = 0
     while retry < 5:
-        procs = find_fetcher_processes()
+        procs = await find_fetcher_processes()
         retry += 1
         if len(procs) == 0:
             return
 
-        for group, pids in procs.items():
-            for pid in pids:
-                try:
+        for pid, *_ in procs:
+            try:
+                if psutil.pid_exists(pid):
                     os.kill(pid, signal.SIGTERM)
-                except Exception:
-                    pass
+                    await asyncio.sleep(0.5)
+                if not psutil.pid_exists(pid):
+                    await cache.sys.delete(f"process.fetchers.{pid}")
+            except Exception:
+                pass
         await asyncio.sleep(1)
 
     if retry >= 5:
         print("未能终止fetcher进程")
+    else:
+        print("omega.fetchers进程已经终止运行")
 
 
 async def status():
-    show_fetcher_processes()
+    await show_fetcher_processes()
     print("\n")
-    _show_jobs_process()
+    await _show_jobs_process()
 
 
 async def stop(service: str = ""):
@@ -825,7 +866,12 @@ async def show_subprocess_output(stream):
 
 
 async def download_archive(n: Union[str, int] = None):
-    await omicron.init()
+    impl = cfg.quotes_fetchers[0]["impl"]
+    params = cfg.quotes_fetchers[0]["workers"][0]
+    await AbstractQuotesFetcher.create_instance(impl, **params)
+
+    await omicron.init(AbstractQuotesFetcher)
+
     await archive.clear_range()
     index = await get_archive_index()
 
@@ -905,11 +951,10 @@ async def _init():
     except Exception:
         print(f"dsn is {cfg.redis.dsn}")
 
-    impl = cfg.quotes_fetchers[0]["impl"]
-    params = cfg.quotes_fetchers[0]["workers"][0]
-    await AbstractQuotesFetcher.create_instance(impl, **params)
-
-    await omicron.init(AbstractQuotesFetcher)
+    try:
+        await omicron.init()
+    except Exception:
+        pass
 
 
 def run_with_init(func):
@@ -924,7 +969,10 @@ def run_with_init(func):
             finally:
                 await omicron.cache.close()
 
-        asyncio.run(init_and_run(*args, **kwargs))
+        try:
+            asyncio.run(init_and_run(*args, **kwargs))
+        except Exception as e:
+            logger.exception(e)
 
     return wrapper
 
@@ -943,11 +991,11 @@ def main():
 
     fire.Fire(
         {
-            "start": run(start),
-            "setup": run(setup),
-            "stop": run(stop),
-            "status": run(status),
-            "restart": run(restart),
+            "start": run_with_init(start),
+            "setup": run_with_init(setup),
+            "stop": run_with_init(stop),
+            "status": run_with_init(status),
+            "restart": run_with_init(restart),
             "sync_sec_list": run_with_init(sync_sec_list),
             "sync_calendar": run_with_init(sync_calendar),
             "sync_bars": run_with_init(sync_bars),
