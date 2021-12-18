@@ -475,7 +475,10 @@ def check_environment():
 
     # create /var/log/zillionare for logging
     if not os.path.exists("/var/log/zillionare"):
-        sh.contrib.sudo.mkdir("/var/log/zillionare", "-m", "777")
+        try:
+            os.makedirs("/var/log/zillionare", exist_ok=True)
+        except PermissionError:
+            sh.contrib.sudo.mkdir("/var/log/zillionare", "-m", "777")
     return True
 
 
@@ -550,7 +553,8 @@ async def _start_fetcher_processes():
             workers = fetcher.get("workers")
 
             avail_ports = fetcher.get("ports")
-            avail_ports = set(avail_ports) - set(used_ports)
+            if avail_ports:
+                avail_ports = set(avail_ports) - set(used_ports)
 
             for group in workers:
                 sessions = group.get("sessions", 1)

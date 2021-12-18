@@ -98,7 +98,7 @@ async def init(app, loop):  # noqa
 
     if last_sync:
         try:
-            last_sync = arrow.get(last_sync, tzinfo=cfg.tz).timestamp
+            last_sync = arrow.get(last_sync, tzinfo=cfg.tz).timestamp()
         except ValueError:
             logger.warning("failed to parse last_sync: %s", last_sync)
             last_sync = None
