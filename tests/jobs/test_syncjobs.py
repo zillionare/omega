@@ -590,6 +590,41 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         finally:
             cfg.omega.sync.bars = origin
 
+    async def test_closing_quotation_sync_bars(self):
+        all_params = [{
+            "frame": "15m",
+            "start": "2020-01-02",
+            "delay": 3,
+            "cat": [],
+            "include": "000001.XSHE",
+        }, ]
+
+        sync_request = {}
+
+        async def on_sync_bars(params: dict):
+            sync_request["start"] = params["start"].date()
+            sync_request["stop"] = params["stop"].date()
+            sync_request["frame_type"] = params["frame_type"]
+
+        async def __hset():
+            return 1
+
+        emit.register(Events.OMEGA_DO_SYNC, on_sync_bars)
+
+        with mock.patch("arrow.now", return_value=arrow.get("2020-01-06 15:05")):
+            with mock.patch("omicron.cache.security.hset", return_value=__hset()):
+                await syncjobs.closing_quotation_sync_bars(all_params)
+
+        await asyncio.sleep(0.5)
+        self.assertDictEqual(
+            {
+                "start": arrow.get("2020-01-03 09:45:00").date(),
+                "stop": arrow.get("2020-01-06 15:00:00").date(),
+                "frame_type": FrameType.MIN15,
+            },
+            sync_request,
+        )
+
     async def _test_200_validation(self):
         # fixme: recover later. All validation/checksum related cases need to be redesigned.
         await self.prepare_checksum_data()
@@ -696,3 +731,6 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         await syncjobs.sync_security_list()
         secs = await cache.get_securities()
         self.assertTrue(len(secs) > 0)
+
+    async def test_reset_tail(self):
+        await syncjobs.reset_tail()
