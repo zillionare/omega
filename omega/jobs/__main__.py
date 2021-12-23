@@ -31,11 +31,15 @@ receiver: RedisLogReceiver = None
 
 
 async def start_logging():
+    print("22222",cfg.logreceiver.filename) 
+
     global receiver
     if getattr(cfg, "logreceiver") is None:
         return
 
     if cfg.logreceiver.klass == "omega.logging.receiver.redis.RedisLogReceiver":
+        print("3333",cfg.logreceiver.filename) 
+
         dsn = cfg.logreceiver.dsn
         channel = cfg.logreceiver.channel
         filename = cfg.logreceiver.filename
