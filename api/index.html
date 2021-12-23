@@ -6,7 +6,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1" name="viewport"/>
 <link href="../assets/images/favicon.png" rel="shortcut icon"/>
-<meta content="mkdocs-1.1.2, mkdocs-material-6.2.8" name="generator"/>
+<meta content="mkdocs-1.2.3, mkdocs-material-6.2.8" name="generator"/>
 <title>API文档 - Omega帮助文档</title>
 <link href="../assets/stylesheets/main.cb6bc1d0.min.css" rel="stylesheet"/>
 <link href="../assets/stylesheets/palette.39b8e14a.min.css" rel="stylesheet"/>
@@ -109,7 +109,7 @@
       </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="https://zillionare.readthedocs.io/zh_CN/latest/contributing.html">
+<a class="md-nav__link" href="https://www.jieyu.ai">
         社区
       </a>
 </li>
@@ -390,6 +390,11 @@
 <nav aria-label="syncjobs" class="md-nav">
 <ul class="md-nav__list">
 <li class="md-nav__item">
+<a class="md-nav__link" href="#omega.jobs.syncjobs.closing_quotation_sync_bars">
+    closing_quotation_sync_bars()
+  </a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#omega.jobs.syncjobs.load_sync_params">
     load_sync_params()
   </a>
@@ -397,6 +402,11 @@
 <li class="md-nav__item">
 <a class="md-nav__link" href="#omega.jobs.syncjobs.parse_sync_params">
     parse_sync_params()
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omega.jobs.syncjobs.reset_tail">
+    reset_tail()
   </a>
 </li>
 <li class="md-nav__item">
@@ -704,6 +714,11 @@
 <nav aria-label="syncjobs" class="md-nav">
 <ul class="md-nav__list">
 <li class="md-nav__item">
+<a class="md-nav__link" href="#omega.jobs.syncjobs.closing_quotation_sync_bars">
+    closing_quotation_sync_bars()
+  </a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#omega.jobs.syncjobs.load_sync_params">
     load_sync_params()
   </a>
@@ -711,6 +726,11 @@
 <li class="md-nav__item">
 <a class="md-nav__link" href="#omega.jobs.syncjobs.parse_sync_params">
     parse_sync_params()
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omega.jobs.syncjobs.reset_tail">
+    reset_tail()
   </a>
 </li>
 <li class="md-nav__item">
@@ -771,11 +791,10 @@ Contributors:</p>
 start<span class="p">(</span><span class="n">impl</span><span class="p">,</span> <span class="n">cfg</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">fetcher_params</span><span class="p">)</span> </code>
 <a class="headerlink" href="#omega.app.start" title="Permanent link">¶</a></h4>
 <div class="doc doc-contents">
-<p>启动一组Omega进程</p>
-<p>使用本函数来启动一组Omega进程。这一组进程使用同样的quotes fetcher,但可能有1到多个session
-(限制由quotes fetcher给出)。它们共享同一个port。Sanic在内部实现了load-balance机制。</p>
+<p>启动一个Omega fetcher进程</p>
+<p>使用本函数来启动一个Omega fetcher进程。该进程可能与其它进程一样，使用相同的impl和账号，因此构成一组进程。</p>
 <p>通过多次调用本方法，传入不同的quotes fetcher impl参数，即可启动多组Omega服务。</p>
-<p>如果指定了<code>fetcher_params</code>，则<code>start</code>将使用impl, fetcher_params来启动单组Omega服务，使
+<p>如果指定了<code>fetcher_params</code>，则<code>start</code>将使用impl, fetcher_params来启动单个Omega服务，使
 用impl指定的fetcher。否则，将使用<code>cfg.quotes_fetcher</code>中提供的信息来创建Omega.</p>
 <p>如果<code>cfg</code>不为None，则应该指定为合法的json string，其内容将覆盖本地cfg。这个设置目前的主要
 要作用是方便单元测试。</p>
@@ -820,14 +839,13 @@ start<span class="p">(</span><span class="n">impl</span><span class="p">,</span>
 <summary>Source code in <code>omega/app.py</code></summary>
 <div class="highlight">
 <pre><span></span><code><span class="k">def</span> <span class="nf">start</span><span class="p">(</span><span class="n">impl</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">cfg</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">fetcher_params</span><span class="p">):</span>
-    <span class="sd">"""启动一组Omega进程</span>
+    <span class="sd">"""启动一个Omega fetcher进程</span>
 
-<span class="sd">    使用本函数来启动一组Omega进程。这一组进程使用同样的quotes fetcher,但可能有1到多个session</span>
-<span class="sd">    (限制由quotes fetcher给出)。它们共享同一个port。Sanic在内部实现了load-balance机制。</span>
+<span class="sd">    使用本函数来启动一个Omega fetcher进程。该进程可能与其它进程一样，使用相同的impl和账号，因此构成一组进程。</span>
 
 <span class="sd">    通过多次调用本方法，传入不同的quotes fetcher impl参数，即可启动多组Omega服务。</span>
 
-<span class="sd">    如果指定了`fetcher_params`，则`start`将使用impl, fetcher_params来启动单组Omega服务，使</span>
+<span class="sd">    如果指定了`fetcher_params`，则`start`将使用impl, fetcher_params来启动单个Omega服务，使</span>
 <span class="sd">    用impl指定的fetcher。否则，将使用`cfg.quotes_fetcher`中提供的信息来创建Omega.</span>
 
 <span class="sd">    如果`cfg`不为None，则应该指定为合法的json string，其内容将覆盖本地cfg。这个设置目前的主要</span>
@@ -839,20 +857,20 @@ start<span class="p">(</span><span class="n">impl</span><span class="p">,</span>
 <span class="sd">        cfg: the cfg in json string</span>
 <span class="sd">        fetcher_params: contains info required by creating quotes fetcher</span>
 <span class="sd">    """</span>
-    <span class="n">sessions</span> <span class="o">=</span> <span class="n">fetcher_params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"sessions"</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
     <span class="n">port</span> <span class="o">=</span> <span class="n">fetcher_params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"port"</span><span class="p">,</span> <span class="mi">3181</span><span class="p">)</span>
     <span class="n">omega</span> <span class="o">=</span> <span class="n">Omega</span><span class="p">(</span><span class="n">impl</span><span class="p">,</span> <span class="n">cfg</span><span class="p">,</span> <span class="o">**</span><span class="n">fetcher_params</span><span class="p">)</span>
 
     <span class="n">app</span><span class="o">.</span><span class="n">register_listener</span><span class="p">(</span><span class="n">omega</span><span class="o">.</span><span class="n">init</span><span class="p">,</span> <span class="s2">"before_server_start"</span><span class="p">)</span>
 
-    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"starting sanic group listen on </span><span class="si">%s</span><span class="s2"> with </span><span class="si">%s</span><span class="s2"> workers"</span><span class="p">,</span> <span class="n">port</span><span class="p">,</span> <span class="n">sessions</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"starting sanic group listen on </span><span class="si">%s</span><span class="s2"> with </span><span class="si">%s</span><span class="s2"> workers"</span><span class="p">,</span> <span class="n">port</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
     <span class="n">app</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
         <span class="n">host</span><span class="o">=</span><span class="s2">"0.0.0.0"</span><span class="p">,</span>
         <span class="n">port</span><span class="o">=</span><span class="n">port</span><span class="p">,</span>
-        <span class="n">workers</span><span class="o">=</span><span class="n">sessions</span><span class="p">,</span>
+        <span class="n">workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
         <span class="n">register_sys_signals</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
         <span class="n">protocol</span><span class="o">=</span><span class="n">WebSocketProtocol</span><span class="p">,</span>
     <span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"sanic stopped."</span><span class="p">)</span>
 </code></pre>
 </div>
 </details>
@@ -1050,35 +1068,36 @@ config_postgres<span class="p">(</span><span class="n">settings</span><span clas
 <h4 class="doc doc-heading" id="omega.cli.find_fetcher_processes">
 <code class="highlight language-python">
 find_fetcher_processes<span class="p">()</span> </code>
+<span class="doc doc-properties">
+<small class="doc doc-property doc-property-async"><code>async</code></small>
+</span>
 <a class="headerlink" href="#omega.cli.find_fetcher_processes" title="Permanent link">¶</a></h4>
 <div class="doc doc-contents">
-<p>查找所有的omega(fetcher)进程</p>
-<p>Omega进程在ps -aux中显示应该包含 omega.app --impl=&amp;ltfetcher&amp;gt --port=&amp;ltport&amp;gt信息</p>
+<p>从redis中查找已启动的fetcher进程</p>
+<p>返回 f"{impl}:{gid}" -&gt; (pid, port, alive)</p>
 <details class="quote">
 <summary>Source code in <code>omega/cli.py</code></summary>
 <div class="highlight">
-<pre><span></span><code><span class="k">def</span> <span class="nf">find_fetcher_processes</span><span class="p">():</span>
-    <span class="sd">"""查找所有的omega(fetcher)进程</span>
+<pre><span></span><code><span class="k">async</span> <span class="k">def</span> <span class="nf">find_fetcher_processes</span><span class="p">():</span>
+    <span class="sd">"""从redis中查找已启动的fetcher进程</span>
 
-<span class="sd">    Omega进程在ps -aux中显示应该包含 omega.app --impl=&amp;ltfetcher&amp;gt --port=&amp;ltport&amp;gt信息</span>
+<span class="sd">    返回 f"{impl}:{gid}" -&gt; (pid, port, alive)</span>
 <span class="sd">    """</span>
-    <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
-    <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">psutil</span><span class="o">.</span><span class="n">process_iter</span><span class="p">():</span>
-        <span class="n">cmd</span> <span class="o">=</span> <span class="s2">" "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">cmdline</span><span class="p">())</span>
-        <span class="k">if</span> <span class="s2">"omega.app start"</span> <span class="ow">in</span> <span class="n">cmd</span> <span class="ow">and</span> <span class="s2">"--impl"</span> <span class="ow">in</span> <span class="n">cmd</span> <span class="ow">and</span> <span class="s2">"--port"</span> <span class="ow">in</span> <span class="n">cmd</span><span class="p">:</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">keys</span> <span class="o">=</span> <span class="k">await</span> <span class="n">cache</span><span class="o">.</span><span class="n">sys</span><span class="o">.</span><span class="n">keys</span><span class="p">(</span><span class="s2">"process.fetchers.*"</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">keys</span><span class="p">:</span>
+        <span class="n">info</span> <span class="o">=</span> <span class="k">await</span> <span class="n">cache</span><span class="o">.</span><span class="n">sys</span><span class="o">.</span><span class="n">hgetall</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
 
-            <span class="n">m</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s2">"--impl=([^\s]+)"</span><span class="p">,</span> <span class="n">cmd</span><span class="p">)</span>
-            <span class="n">impl</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="k">if</span> <span class="n">m</span> <span class="k">else</span> <span class="s2">""</span>
+        <span class="n">heartbeat</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">info</span><span class="p">[</span><span class="s2">"heartbeat"</span><span class="p">])</span>
 
-            <span class="n">m</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s2">"--port=(\d+)"</span><span class="p">,</span> <span class="n">cmd</span><span class="p">)</span>
-            <span class="n">port</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="k">if</span> <span class="n">m</span> <span class="k">else</span> <span class="s2">""</span>
+        <span class="n">group</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">info</span><span class="p">[</span><span class="s1">'impl'</span><span class="p">]</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">info</span><span class="p">[</span><span class="s1">'gid'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span>
+        <span class="n">pid</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">info</span><span class="p">[</span><span class="s2">"pid"</span><span class="p">])</span>
+        <span class="n">port</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">info</span><span class="p">[</span><span class="s2">"port"</span><span class="p">])</span>
+        <span class="n">alive</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">heartbeat</span> <span class="o">&lt;</span> <span class="mi">10</span>
 
-            <span class="n">group</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">impl</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">port</span><span class="si">}</span><span class="s2">"</span>
-            <span class="n">pids</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">group</span><span class="p">,</span> <span class="p">[])</span>
-            <span class="n">pids</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">pid</span><span class="p">)</span>
-            <span class="n">result</span><span class="p">[</span><span class="n">group</span><span class="p">]</span> <span class="o">=</span> <span class="n">pids</span>
+        <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">pid</span><span class="p">,</span> <span class="n">port</span><span class="p">,</span> <span class="n">alive</span><span class="p">,</span> <span class="n">group</span><span class="p">))</span>
 
-    <span class="k">return</span> <span class="n">result</span>
+    <span class="k">return</span> <span class="n">results</span>
 </code></pre>
 </div>
 </details>
@@ -1208,7 +1227,7 @@ setup<span class="p">(</span><span class="n">reset_factory</span><span class="o"
         <span class="n">config_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">get_config_dir</span><span class="p">(),</span> <span class="s2">"defaults.yaml"</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">config_file</span><span class="p">):</span>
             <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">colored</span><span class="p">(</span><span class="s1">'[PASS]'</span><span class="p">,</span> <span class="s1">'green'</span><span class="p">)</span><span class="si">}</span><span class="s2"> 安装程序已在本机上成功运行"</span><span class="p">)</span>
-            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+            <span class="k">return</span>
 
     <span class="k">if</span> <span class="n">reset_factory</span><span class="p">:</span>
         <span class="kn">import</span> <span class="nn">sh</span>
@@ -1224,7 +1243,7 @@ setup<span class="p">(</span><span class="n">reset_factory</span><span class="o"
     <span class="n">settings</span> <span class="o">=</span> <span class="n">load_factory_settings</span><span class="p">()</span>
 
     <span class="k">if</span> <span class="ow">not</span> <span class="n">check_environment</span><span class="p">():</span>
-        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span>
 
     <span class="n">print_title</span><span class="p">(</span><span class="s2">"Step 2. 配置日志"</span><span class="p">)</span>
     <span class="n">config_logging</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span>
@@ -2370,7 +2389,7 @@ get_security_list<span class="p">()</span> </code>
 </thead>
 <tbody>
 <tr>
-<td><code>Union[NoneType, numpy.ndarray]</code></td>
+<td><code>Optional[numpy.ndarray]</code></td>
 <td>
 <p>Union[None, np.ndarray]: [description]</p>
 </td>
@@ -3010,6 +3029,71 @@ get_valuation<span class="p">(</span><span class="bp">self</span><span class="p"
 <div class="doc doc-contents">
 <div class="doc doc-children">
 <div class="doc doc-object doc-function">
+<h5 class="doc doc-heading" id="omega.jobs.syncjobs.closing_quotation_sync_bars">
+<code class="highlight language-python">
+closing_quotation_sync_bars<span class="p">(</span><span class="n">all_params</span><span class="p">)</span> </code>
+<span class="doc doc-properties">
+<small class="doc doc-property doc-property-async"><code>async</code></small>
+</span>
+<a class="headerlink" href="#omega.jobs.syncjobs.closing_quotation_sync_bars" title="Permanent link">¶</a></h5>
+<div class="doc doc-contents">
+<p>收盘之后从新同步今天的分钟线数据和日周月</p>
+<p><strong>Returns:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>{
+            "frame"</code></td>
+<td>
+<p>"1m",
+            "start": "2020-01-02",
+            "stop": "2020-01-02",
+            "delay": 3,
+            "cat": [],
+            "include": "000001.XSHE",
+            "exclude": "000001.XSHG",
+        },</p>
+</td>
+</tr>
+</tbody>
+</table>
+<details class="quote">
+<summary>Source code in <code>omega/jobs/syncjobs.py</code></summary>
+<div class="highlight">
+<pre><span></span><code><span class="k">async</span> <span class="k">def</span> <span class="nf">closing_quotation_sync_bars</span><span class="p">(</span><span class="n">all_params</span><span class="p">):</span>
+    <span class="sd">"""</span>
+<span class="sd">    收盘之后从新同步今天的分钟线数据和日周月</span>
+<span class="sd">    Returns:</span>
+<span class="sd">        {</span>
+<span class="sd">                    "frame": "1m",</span>
+<span class="sd">                    "start": "2020-01-02",</span>
+<span class="sd">                    "stop": "2020-01-02",</span>
+<span class="sd">                    "delay": 3,</span>
+<span class="sd">                    "cat": [],</span>
+<span class="sd">                    "include": "000001.XSHE",</span>
+<span class="sd">                    "exclude": "000001.XSHG",</span>
+<span class="sd">                },</span>
+<span class="sd">    """</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"正在同步今天的分钟线数据和日周月"</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">params</span> <span class="ow">in</span> <span class="n">all_params</span><span class="p">:</span>
+        <span class="n">codes</span><span class="p">,</span> <span class="n">frame_type</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">stop</span><span class="p">,</span> <span class="n">delay</span> <span class="o">=</span> <span class="n">parse_sync_params</span><span class="p">(</span><span class="o">**</span><span class="n">params</span><span class="p">)</span>
+        <span class="n">start_date</span> <span class="o">=</span> <span class="k">await</span> <span class="n">reset_tail</span><span class="p">(</span><span class="n">codes</span><span class="p">,</span> <span class="n">frame_type</span><span class="p">)</span>
+        <span class="n">params</span><span class="p">[</span><span class="s2">"start"</span><span class="p">]</span> <span class="o">=</span> <span class="n">start_date</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+        <span class="k">await</span> <span class="n">trigger_bars_sync</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+</code></pre>
+</div>
+</details>
+</div>
+</div>
+<div class="doc doc-object doc-function">
 <h5 class="doc doc-heading" id="omega.jobs.syncjobs.load_sync_params">
 <code class="highlight language-python">
 load_sync_params<span class="p">(</span><span class="n">frame_type</span><span class="p">)</span> </code>
@@ -3266,6 +3350,104 @@ a space. Defaults to empty string.</p>
     <span class="n">codes</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">include</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">codes</span><span class="p">,</span> <span class="n">frame_type</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">stop</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">delay</span><span class="p">)</span>
+</code></pre>
+</div>
+</details>
+</div>
+</div>
+<div class="doc doc-object doc-function">
+<h5 class="doc doc-heading" id="omega.jobs.syncjobs.reset_tail">
+<code class="highlight language-python">
+reset_tail<span class="p">(</span><span class="n">codes</span><span class="p">,</span> <span class="n">frame_type</span><span class="p">,</span> <span class="n">days</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span> </code>
+<span class="doc doc-properties">
+<small class="doc doc-property doc-property-async"><code>async</code></small>
+</span>
+<a class="headerlink" href="#omega.jobs.syncjobs.reset_tail" title="Permanent link">¶</a></h5>
+<div class="doc doc-contents">
+<p>重置tail的值，来同步数据</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>days</code></td>
+<td><code></code></td>
+<td>
+<p>需要重置到多少天之前</p>
+</td>
+<td><code>-1</code></td>
+</tr>
+<tr>
+<td><code>codes</code></td>
+<td><code>[]</code></td>
+<td></td>
+<td><em>required</em></td>
+</tr>
+<tr>
+<td><code>frame_type</code></td>
+<td><code>FrameType</code></td>
+<td></td>
+<td><em>required</em></td>
+</tr>
+</tbody>
+</table>
+<details class="quote">
+<summary>Source code in <code>omega/jobs/syncjobs.py</code></summary>
+<div class="highlight">
+<pre><span></span><code><span class="k">async</span> <span class="k">def</span> <span class="nf">reset_tail</span><span class="p">(</span><span class="n">codes</span><span class="p">:</span> <span class="p">[],</span> <span class="n">frame_type</span><span class="p">:</span> <span class="n">FrameType</span><span class="p">,</span> <span class="n">days</span><span class="o">=-</span><span class="mi">1</span><span class="p">):</span>
+    <span class="sd">"""</span>
+<span class="sd">    重置tail的值，来同步数据</span>
+<span class="sd">    Args:</span>
+<span class="sd">        days: 需要重置到多少天之前</span>
+<span class="sd">        codes:</span>
+<span class="sd">        frame_type:</span>
+<span class="sd">    Returns:</span>
+<span class="sd">    """</span>
+
+    <span class="n">now</span> <span class="o">=</span> <span class="n">arrow</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+    <span class="n">_day</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">day_shift</span><span class="p">(</span><span class="n">now</span><span class="p">,</span> <span class="n">days</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">frame_type</span> <span class="ow">in</span> <span class="p">[</span>
+        <span class="n">FrameType</span><span class="o">.</span><span class="n">MIN1</span><span class="p">,</span>
+        <span class="n">FrameType</span><span class="o">.</span><span class="n">MIN5</span><span class="p">,</span>
+        <span class="n">FrameType</span><span class="o">.</span><span class="n">MIN15</span><span class="p">,</span>
+        <span class="n">FrameType</span><span class="o">.</span><span class="n">MIN30</span><span class="p">,</span>
+        <span class="n">FrameType</span><span class="o">.</span><span class="n">MIN60</span><span class="p">]:</span>
+        <span class="n">date</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="n">_day</span><span class="o">.</span><span class="n">year</span><span class="p">,</span> <span class="n">_day</span><span class="o">.</span><span class="n">month</span><span class="p">,</span> <span class="n">_day</span><span class="o">.</span><span class="n">day</span><span class="p">,</span> <span class="mi">15</span><span class="p">)</span>
+        <span class="n">tail</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">time2int</span><span class="p">(</span><span class="n">date</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">frame_type</span> <span class="o">==</span> <span class="n">FrameType</span><span class="o">.</span><span class="n">DAY</span><span class="p">:</span>
+        <span class="n">date</span> <span class="o">=</span> <span class="n">_day</span>
+        <span class="n">tail</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">date2int</span><span class="p">(</span><span class="n">date</span><span class="p">)</span>
+
+    <span class="k">elif</span> <span class="n">frame_type</span> <span class="o">==</span> <span class="n">FrameType</span><span class="o">.</span><span class="n">WEEK</span><span class="p">:</span>
+        <span class="n">date</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">shift</span><span class="p">(</span><span class="n">now</span><span class="p">,</span> <span class="n">days</span><span class="p">,</span> <span class="n">FrameType</span><span class="o">.</span><span class="n">WEEK</span><span class="p">)</span>
+        <span class="n">tail</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">date2int</span><span class="p">(</span><span class="n">date</span><span class="p">)</span>
+
+    <span class="k">elif</span> <span class="n">frame_type</span> <span class="o">==</span> <span class="n">FrameType</span><span class="o">.</span><span class="n">MONTH</span><span class="p">:</span>
+        <span class="n">date</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">shift</span><span class="p">(</span><span class="n">now</span><span class="p">,</span> <span class="n">days</span><span class="p">,</span> <span class="n">FrameType</span><span class="o">.</span><span class="n">MONTH</span><span class="p">)</span>
+        <span class="n">tail</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">date2int</span><span class="p">(</span><span class="n">date</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">"不支持的frame_type"</span><span class="p">)</span>
+    <span class="c1"># print(f"reset tail to[m:{m}, day:{day}, week:{week}, month:{month}] ")</span>
+
+    <span class="k">for</span> <span class="n">code</span> <span class="ow">in</span> <span class="n">codes</span><span class="p">:</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">code</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">frame_type</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">"</span>
+        <span class="n">resp</span> <span class="o">=</span> <span class="k">await</span> <span class="n">cache</span><span class="o">.</span><span class="n">security</span><span class="o">.</span><span class="n">hget</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="s2">"tail"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">resp</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">_tail</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">resp</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">_tail</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">_tail</span> <span class="o">&gt;</span> <span class="n">tail</span><span class="p">:</span>  <span class="c1"># 只有数据库里的时间大于tail 才可以</span>
+            <span class="k">await</span> <span class="n">cache</span><span class="o">.</span><span class="n">security</span><span class="o">.</span><span class="n">hset</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="s1">'tail'</span><span class="p">,</span> <span class="n">tail</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">date</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s1">'%Y-%m-</span><span class="si">%d</span><span class="s1">'</span><span class="p">)</span>
 </code></pre>
 </div>
 </details>
