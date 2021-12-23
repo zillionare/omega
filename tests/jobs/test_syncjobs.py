@@ -22,14 +22,13 @@ from pyemit import emit
 import omega.core.sanity
 import omega.jobs
 import omega.jobs.syncjobs as syncjobs
-from omega.config.schema import Config
 from omega.core.events import Events, ValidationError
 from omega.fetcher import archive
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from tests import init_test_env, start_archive_server, start_omega
 
 logger = logging.getLogger(__name__)
-cfg: Config = cfg4py.get_instance()
+cfg = cfg4py.get_instance()
 
 
 class TestSyncJobs(unittest.IsolatedAsyncioTestCase):

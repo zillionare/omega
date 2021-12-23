@@ -21,12 +21,11 @@ from sanic import Sanic, response
 
 import omega.jobs.syncjobs as syncjobs
 from omega.config import get_config_dir
-from omega.config.schema import Config
 from omega.logreceivers.redis import RedisLogReceiver
 
 app = Sanic("Omega-jobs")
 logger = logging.getLogger(__name__)
-cfg: Config = cfg4py.get_instance()
+cfg = cfg4py.get_instance()
 scheduler: Optional[AsyncIOScheduler] = None
 receiver: RedisLogReceiver = None
 
