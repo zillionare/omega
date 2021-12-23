@@ -18,12 +18,12 @@ from omicron.core.types import Frame, FrameType
 from omicron.models.securities import Securities
 from pyemit import emit
 
-from omega.config.schema import Config
 from omega.core.events import Events
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 
 logger = logging.getLogger(__name__)
-cfg: Config = cfg4py.get_instance()
+cfg = cfg4py.get_instance()
+
 
 
 async def _start_job_timer(job_name: str):
