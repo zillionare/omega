@@ -53,7 +53,12 @@ async def start_omega(timeout=60):
     password = os.environ["JQ_PASSWORD"]
 
     # hack: by default postgres is disabled, but we need it enabled for ut
-    cfg_ = json.dumps({"postgres": {"dsn": cfg.postgres.dsn, "enabled": "true"}})
+    cfg_ = json.dumps({
+        "postgres": {"dsn": cfg.postgres.dsn, "enabled": "true"},
+        "logreceiver": {
+            "filename": "/tmp/omega.log"
+        }
+    })
 
     process = subprocess.Popen(
         [
