@@ -18,12 +18,12 @@ from omicron.core.types import Frame, FrameType
 from omicron.models.securities import Securities
 from pyemit import emit
 
-from omega.config.schema import Config
 from omega.core.events import Events
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 
 logger = logging.getLogger(__name__)
-cfg: Config = cfg4py.get_instance()
+cfg = cfg4py.get_instance()
+
 
 
 async def _start_job_timer(job_name: str):
@@ -423,10 +423,85 @@ async def sync_security_list():
     logger.info("%s secs are fetched and saved.", len(secs))
 
 
+async def reset_tail(codes: [], frame_type: FrameType, days=-1):
+    """
+    重置tail的值，来同步数据
+    Args:
+        days: 需要重置到多少天之前
+        codes:
+        frame_type:
+    Returns:
+    """
+
+    now = arrow.now()
+    _day = tf.day_shift(now, days)
+
+    if frame_type in [
+        FrameType.MIN1,
+        FrameType.MIN5,
+        FrameType.MIN15,
+        FrameType.MIN30,
+        FrameType.MIN60]:
+        date = datetime.datetime(_day.year, _day.month, _day.day, 15)
+        tail = tf.time2int(date)
+    elif frame_type == FrameType.DAY:
+        date = _day
+        tail = tf.date2int(date)
+
+    elif frame_type == FrameType.WEEK:
+        date = tf.shift(now, days, FrameType.WEEK)
+        tail = tf.date2int(date)
+
+    elif frame_type == FrameType.MONTH:
+        date = tf.shift(now, days, FrameType.MONTH)
+        tail = tf.date2int(date)
+    else:
+        raise Exception("不支持的frame_type")
+    # print(f"reset tail to[m:{m}, day:{day}, week:{week}, month:{month}] ")
+
+    for code in codes:
+        key = f"{code}:{frame_type.value}"
+        resp = await cache.security.hget(key, "tail")
+        if resp is None:
+            continue
+        _tail = int(resp)
+        print(_tail)
+        if _tail > tail:  # 只有数据库里的时间大于tail 才可以
+            await cache.security.hset(key, 'tail', tail)
+
+    return date.strftime('%Y-%m-%d')
+
+
+async def closing_quotation_sync_bars(all_params):
+    """
+    收盘之后从新同步今天的分钟线数据和日周月
+    Returns:
+        {
+                    "frame": "1m",
+                    "start": "2020-01-02",
+                    "stop": "2020-01-02",
+                    "delay": 3,
+                    "cat": [],
+                    "include": "000001.XSHE",
+                    "exclude": "000001.XSHG",
+                },
+    """
+
+    logger.info("正在同步今天的分钟线数据和日周月")
+    for params in all_params:
+        codes, frame_type, start, stop, delay = parse_sync_params(**params)
+        start_date = await reset_tail(codes, frame_type)
+        params["start"] = start_date
+        logger.info(params)
+        await trigger_bars_sync(params)
+
+
 def load_bars_sync_jobs(scheduler):
+    all_params = []
     frame_type = FrameType.MIN1
     params = load_sync_params(frame_type)
     if params:
+        all_params.append(params)
         params["delay"] = params.get("delay") or 5
         scheduler.add_job(
             trigger_bars_sync,
@@ -471,6 +546,7 @@ def load_bars_sync_jobs(scheduler):
     frame_type = FrameType.MIN5
     params = load_sync_params(frame_type)
     if params:
+        all_params.append(params)
         params["delay"] = params.get("delay") or 60
         scheduler.add_job(
             trigger_bars_sync,
@@ -515,6 +591,7 @@ def load_bars_sync_jobs(scheduler):
     frame_type = FrameType.MIN15
     params = load_sync_params(frame_type)
     if params:
+        all_params.append(params)
         params["delay"] = params.get("delay") or 60
         scheduler.add_job(
             trigger_bars_sync,
@@ -559,6 +636,7 @@ def load_bars_sync_jobs(scheduler):
     frame_type = FrameType.MIN30
     params = load_sync_params(frame_type)
     if params:
+        all_params.append(params)
         params["delay"] = params.get("delay") or 60
         scheduler.add_job(
             trigger_bars_sync,
@@ -588,6 +666,7 @@ def load_bars_sync_jobs(scheduler):
     frame_type = FrameType.MIN60
     params = load_sync_params(frame_type)
     if params:
+        all_params.append(params)
         params["delay"] = params.get("delay") or 60
         scheduler.add_job(
             trigger_bars_sync,
@@ -617,6 +696,7 @@ def load_bars_sync_jobs(scheduler):
     for frame_type in tf.day_level_frames:
         params = load_sync_params(frame_type)
         if params:
+            all_params.append(params)
             params["delay"] = params.get("delay") or 60
             scheduler.add_job(
                 trigger_bars_sync,
@@ -625,3 +705,12 @@ def load_bars_sync_jobs(scheduler):
                 args=(params,),
                 name=f"{frame_type.value}:15:00",
             )
+
+    scheduler.add_job(
+        closing_quotation_sync_bars,
+        "cron",
+        hour=15,
+        minute=5,
+        args=(all_params, ),
+        name="closing_quotation_sync_bars",
+    )
