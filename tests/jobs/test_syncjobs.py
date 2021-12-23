@@ -731,6 +731,3 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         await syncjobs.sync_security_list()
         secs = await cache.get_securities()
         self.assertTrue(len(secs) > 0)
-
-    async def test_reset_tail(self):
-        await syncjobs.reset_tail()
