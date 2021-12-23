@@ -41,6 +41,8 @@ async def start_logging():
         filename = cfg.logreceiver.filename
         backup_count = cfg.logreceiver.backup_count
         max_bytes = cfg.logreceiver.max_bytes
+        print("================filename", filename)
+        print("================dsn", dsn)
         receiver = RedisLogReceiver(dsn, channel, filename, backup_count, max_bytes)
         await receiver.start()
 

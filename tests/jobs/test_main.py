@@ -52,7 +52,7 @@ class TestJobsMain(unittest.IsolatedAsyncioTestCase):
                 }
             }
         )
-
+        print(cfg4py.logreceiver)
         await start_logging()
         for i in range(5):
             redis_logger.info("this is %sth test log", i)
