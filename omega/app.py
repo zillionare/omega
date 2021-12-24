@@ -20,13 +20,12 @@ from sanic import Blueprint, Sanic
 from sanic.websocket import WebSocketProtocol
 
 from omega.config import get_config_dir
-from omega.config.schema import Config
 from omega.core.events import Events
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omega.interfaces import jobs, quotes, sys
 from omega.jobs import syncjobs
 
-cfg: Config = cfg4py.get_instance()
+cfg = cfg4py.get_instance()
 
 app = Sanic("Omega")
 

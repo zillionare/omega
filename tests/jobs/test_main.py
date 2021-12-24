@@ -12,11 +12,10 @@ import rlog
 from omicron import cache
 from omicron.core.types import FrameType
 
-from omega.config.schema import Config
 from omega.jobs.__main__ import init, start_logging
 from tests import find_free_port, init_test_env, start_job_server
 
-cfg: Config = cfg4py.get_instance()
+cfg = cfg4py.get_instance()
 
 
 class TestJobsMain(unittest.IsolatedAsyncioTestCase):
@@ -53,7 +52,7 @@ class TestJobsMain(unittest.IsolatedAsyncioTestCase):
                 }
             }
         )
-
+        print("1111111111111",cfg.logreceiver.filename) 
         await start_logging()
         for i in range(5):
             redis_logger.info("this is %sth test log", i)

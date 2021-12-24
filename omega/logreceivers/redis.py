@@ -22,7 +22,9 @@ class RedisLogReceiver:
         self._channel_name = channel_name
         self._backup_count = backup_count
         self._max_bytes = self.parse_max_bytes(max_bytes)
+        print("redis.filename", filename)
         self._dir = os.path.dirname(filename)
+        print("self._dir=", self._dir)
         if not os.path.exists(self._dir):
             os.makedirs(self._dir)
 

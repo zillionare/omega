@@ -42,7 +42,7 @@ jobs:
 
       - name: pre-publish documentation
         run: |
-          poetry install -E dev
+          poetry install -E doc
           poetry run mkdocs build
 
       - name: publish documentation
