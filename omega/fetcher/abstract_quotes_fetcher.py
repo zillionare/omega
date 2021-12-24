@@ -16,6 +16,7 @@ from omicron.core.lang import static_vars
 from omicron.core.timeframe import tf
 from omicron.core.types import Frame, FrameType
 from omicron.models.valuation import Valuation
+from omicron.models.funds import Funds, FundNetValue, FundPortfolioStock, FundShareDaily
 
 from omega.core.accelerate import merge
 from omega.fetcher.quotes_fetcher import QuotesFetcher
@@ -258,3 +259,91 @@ class AbstractQuotesFetcher(QuotesFetcher):
         mapping = dict(valuation.dtype.descr)
         fields = [(name, mapping[name]) for name in fields]
         return rfn.require_fields(valuation, fields)
+
+    @classmethod
+    async def get_fund_list(
+        cls, code: Union[str, List[str]] = None, fields: List[str] = None
+    ) -> Union[None, np.ndarray]:
+
+        funds = await cls.get_instance().get_fund_list(code)
+
+        if len(funds) == 0:
+            logger.warning(f"failed to update funds. {funds} is returned")
+            return funds
+        await Funds.save(funds)
+
+        if not fields:
+            return funds
+        if isinstance(fields, str):
+            fields = [fields]
+        mapping = dict(funds.dtype.descr)
+        fields = [(name, mapping[name]) for name in fields]
+        return rfn.require_fields(funds, fields)
+
+    @classmethod
+    async def get_fund_net_value(
+        cls, code: Union[str, List[str]] = None, day=None, fields: List[str] = None
+    ) -> Union[None, np.ndarray]:
+
+        fund_net_values = await cls.get_instance().get_fund_net_value(code, day)
+
+        if len(fund_net_values) == 0:
+            logger.warning(f"failed to update funds. {fund_net_values} is returned")
+            return fund_net_values
+        await FundNetValue.save(fund_net_values)
+
+        if not fields:
+            return fund_net_values
+        if isinstance(fields, str):
+            fields = [fields]
+        mapping = dict(fund_net_values.dtype.descr)
+        fields = [(name, mapping[name]) for name in fields]
+        return rfn.require_fields(fund_net_values, fields)
+
+    @classmethod
+    async def get_fund_share_daily(
+        cls,
+        code: Union[str, List[str]] = None,
+        day: Union[str, datetime.date] = None,
+        fields: List[str] = None,
+    ) -> Union[None, np.ndarray]:
+
+        fund_net_values = await cls.get_instance().get_fund_share_daily(code, day)
+
+        if len(fund_net_values) == 0:
+            logger.warning(f"failed to update funds. {fund_net_values} is returned")
+            return fund_net_values
+        await FundShareDaily.save(fund_net_values)
+
+        if not fields:
+            return fund_net_values
+        if isinstance(fields, str):
+            fields = [fields]
+        mapping = dict(fund_net_values.dtype.descr)
+        fields = [(name, mapping[name]) for name in fields]
+        return rfn.require_fields(fund_net_values, fields)
+
+    @classmethod
+    async def get_fund_portfolio_stock(
+        cls,
+        code: Union[str, List[str]] = None,
+        pub_date: Union[str, datetime.date] = None,
+        fields: List[str] = None,
+    ) -> Union[None, np.ndarray]:
+
+        fund_net_values = await cls.get_instance().get_fund_portfolio_stock(
+            code, pub_date
+        )
+
+        if len(fund_net_values) == 0:
+            logger.warning(f"failed to update funds. {fund_net_values} is returned")
+            return fund_net_values
+        await FundPortfolioStock.save(fund_net_values)
+
+        if not fields:
+            return fund_net_values
+        if isinstance(fields, str):
+            fields = [fields]
+        mapping = dict(fund_net_values.dtype.descr)
+        fields = [(name, mapping[name]) for name in fields]
+        return rfn.require_fields(fund_net_values, fields)

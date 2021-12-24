@@ -731,3 +731,34 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         await syncjobs.sync_security_list()
         secs = await cache.get_securities()
         self.assertTrue(len(secs) > 0)
+
+    async def test_sync_funds(self):
+        secs = await syncjobs.sync_funds()
+        self.assertTrue(len(secs))
+
+    async def test_sync_fund_net_value(self):
+        await syncjobs.sync_fund_net_value()
+
+    async def test_sync_fund_share_daily(self):
+        await syncjobs.sync_fund_share_daily()
+
+    async def test_sync_fund_portfolio_stock(self):
+        await syncjobs.sync_fund_portfolio_stock(ndays=200)
+
+    async def test_load_funds_sync_jobs(self):
+        origin = cfg.omega.sync.bars
+        try:
+            scheduler = AsyncIOScheduler(timezone=cfg.tz)
+            syncjobs.load_funds_sync_jobs(scheduler)
+
+            actual = set([job.name for job in scheduler.get_jobs()])
+            expected = set(
+                [
+                    "sync_fund_net_value",
+                    "sync_fund_share_daily",
+                    "sync_fund_portfolio_stock",
+                ]
+            )
+            self.assertSetEqual(expected, actual)
+        finally:
+            cfg.omega.sync.bars = origin

@@ -91,7 +91,18 @@ async def init(app, loop):  # noqa
         minute=m,
     )
 
+    # sync fund daily
+    scheduler.add_job(
+        syncjobs.trigger_single_worker_sync,
+        "cron",
+        hour=h,
+        minute=m,
+        args=("funds",),
+        name="sync_funds",
+    )
+
     syncjobs.load_bars_sync_jobs(scheduler)
+    syncjobs.load_funds_sync_jobs(scheduler)
 
     # sync bars at startup
     last_sync = await cache.sys.get("jobs.bars_sync.stop")

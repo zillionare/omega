@@ -29,3 +29,11 @@ class TestJobs(TestWebInterfaces):
         except Exception as e:
             logger.exception(e)
             self.assertTrue(False)
+
+    async def test_funds_sync(self):
+        try:
+            await self.server_post("jobs", "sync_funds", is_pickled=False)
+            self.assertTrue(True, "no errors")
+        except Exception as e:
+            logger.exception(e)
+            self.assertTrue(False)

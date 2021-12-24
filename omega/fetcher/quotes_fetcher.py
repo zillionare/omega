@@ -95,3 +95,7 @@ class QuotesFetcher(ABC):
             numpy.ndarray: [description]
         """
         raise NotImplementedError
+
+    async def get_fund_list(self) -> numpy.ndarray:
+
+        raise NotImplementedError

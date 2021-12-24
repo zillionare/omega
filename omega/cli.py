@@ -773,6 +773,13 @@ async def sync_calendar():
     await syncjobs.trigger_single_worker_sync("calendar")
 
 
+async def sync_funds():
+    """发起同步基金列表请求"""
+    await _init()
+
+    await syncjobs.trigger_single_worker_sync("funds")
+
+
 async def sync_bars(frame: str = None, codes: str = None):
     """立即同步行情数据
 
@@ -1004,6 +1011,7 @@ def main():
             "sync_calendar": run_with_init(sync_calendar),
             "sync_bars": run_with_init(sync_bars),
             "download": run_with_init(download_archive),
+            "sync_funds": run_with_init(sync_funds),
         }
     )
 

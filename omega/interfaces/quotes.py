@@ -90,3 +90,16 @@ async def get_all_trade_days_handler(request):
 
     body = pickle.dumps(days, protocol=cfg.pickle.ver)
     return response.raw(body)
+
+
+@bp.route("funds")
+async def get_fund_list(request):
+    try:
+        code = request.json.get('code')
+        fields = request.json.get('fields')
+        funds = await aq.get_fund_list(code=code, fields=fields)
+        body = pickle.dumps(funds, protocol=cfg.pickle.ver)
+        return response.raw(body)
+    except Exception as e:
+        logger.exception(e)
+        return response.raw(pickle.dumps(None, protocol=cfg.pickle.ver))

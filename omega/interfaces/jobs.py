@@ -41,3 +41,12 @@ async def bars_sync_handler(request):
     app = request.app
     app.add_task(syncjobs.trigger_bars_sync(secs, frames_to_sync))
     return response.text(f"sync_bars with {secs}, {frames_to_sync} is scheduled.")
+
+@bp.route("sync_funds", methods=["POST"])
+async def sync_funds_hander(request):
+    try:
+        await syncjobs.sync_funds()
+        return response.json(body=None, status=200)
+    except Exception as e:
+        logger.exception(e)
+        return response.json(body=e, status=500)

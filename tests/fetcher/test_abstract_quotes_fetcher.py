@@ -259,3 +259,35 @@ class TestAbstractQuotesFetcher(unittest.IsolatedAsyncioTestCase):
         n = tf.count_frames(start, stop, frame_type)
         bars = await aq.get_bars(code, stop, n, frame_type)
         print(bars)
+
+    async def test_get_fund_list(self):
+        code = ["512690"]
+        vals = await aq.get_fund_list(code=code)
+        self.assertEqual(len(code), len(vals))
+
+        vals = await aq.get_fund_list()
+        self.assertTrue(len(vals))
+
+    async def test_get_fund_net_value(self):
+        code = ["512690"]
+        vals = await aq.get_fund_list(code=code)
+        self.assertEqual(len(code), len(vals))
+        vals = await aq.get_fund_net_value(day="2021-12-21")
+        self.assertTrue(len(vals))
+
+    async def test_get_fund_share_daily(self):
+        # code = ["000029"]
+        # vals = await aq.get_fund_share_daily(code=code)
+        # self.assertEqual(len(code), len(vals))
+        vals = await aq.get_fund_share_daily(day="2021-12-21")
+        self.assertTrue(len(vals))
+
+    async def test_get_fund_portfolio_stock(self):
+        vals = await aq.get_fund_portfolio_stock(pub_date="2021-12-21")
+        self.assertEqual(len(vals), 0)
+
+        vals = await aq.get_fund_portfolio_stock(pub_date="2021-01-22")
+        self.assertTrue(len(vals))
+
+        vals = await aq.get_fund_portfolio_stock(code=["150016"])
+        self.assertTrue(len(vals))
