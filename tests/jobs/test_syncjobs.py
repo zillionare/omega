@@ -35,7 +35,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         init_test_env()
 
-        await emit.start(engine=emit.Engine.REDIS, dsn=cfg.redis.dsn, start_server=True)
+        await emit.start(engine=emit.Engine.REDIS, dsn=cfg.redis.dsn, start_server=True, heart_beat=1)
 
         await self.create_quotes_fetcher()
         await omicron.init(aq)
@@ -92,7 +92,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         async def on_sync_bars(params: dict):
             sync_request.append(params)
 
-        emit.register(Events.OMEGA_DO_SYNC, on_sync_bars)
+        await emit.async_register(Events.OMEGA_DO_SYNC, on_sync_bars)
         with mock.patch("arrow.now", return_value=arrow.get("2020-1-6 10:00")):
             await syncjobs.trigger_bars_sync(sync_params, force=True)
 
@@ -583,6 +583,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                     "60m:14-15:00",
                     "1d:15:00",
                     "1M:15:00",
+                    "closing_quotation_sync_bars"
                 ]
             )
             self.assertSetEqual(expected, actual)
@@ -608,10 +609,10 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         async def __hset():
             return 1
 
-        emit.register(Events.OMEGA_DO_SYNC, on_sync_bars)
+        await emit.async_register(Events.OMEGA_DO_SYNC, on_sync_bars)
 
         with mock.patch("arrow.now", return_value=arrow.get("2020-01-06 15:05")):
-            with mock.patch("omicron.cache.security.hset", return_value=__hset()):
+            with mock.patch("omicron.cache.security.hset", return_value=__hset):
                 await syncjobs.closing_quotation_sync_bars(all_params)
 
         await asyncio.sleep(0.5)
@@ -634,7 +635,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             if report[0] != ValidationError.UNKNOWN:
                 errors.add(report)
 
-        emit.register(Events.OMEGA_VALIDATION_ERROR, collect_error)
+        await emit.async_register(Events.OMEGA_VALIDATION_ERROR, collect_error)
 
         codes = ["000001.XSHE"]
         await cache.sys.set("jobs.bars_validation.range.start", "20200511")

@@ -56,7 +56,7 @@ class Omega(object):
         app.blueprint(interfaces)
 
         # listen on omega events
-        emit.register(Events.OMEGA_DO_SYNC, syncjobs.sync_bars)
+        await emit.async_register(Events.OMEGA_DO_SYNC, syncjobs.sync_bars)
         await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
         await self.heart_beat()
         self.scheduler.add_job(self.heart_beat, trigger="interval", seconds=3)

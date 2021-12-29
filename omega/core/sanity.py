@@ -291,7 +291,7 @@ async def start_validation():
     await cache.sys.lpush("jobs.bars_validation.scope", *codes)
 
     logger.info("start validation %s secs from %s to %s.", len(codes), start, end)
-    emit.register(Events.OMEGA_VALIDATION_ERROR, on_validation_error)
+    await emit.async_register(Events.OMEGA_VALIDATION_ERROR, on_validation_error)
 
     t0 = time.time()
 
