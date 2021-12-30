@@ -949,7 +949,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [[package]]
 name = "pyemit"
-version = "0.4.8"
+version = "0.4.9"
 description = "轻量级的异步消息通信，支持进程内消息通信，以及基于REDIS PUBSUB的远程消息。提供了进一步封装RPC的底层机制。"
 category = "main"
 optional = false
@@ -1685,7 +1685,7 @@ test = ["pytest", "black", "isort", "doc8", "flake8", "pytest-cov"]
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.9,<3.10"
-content-hash = "10fda0696ba7b949d26797ca94196cb8e472ef2a93c2dc29d48daa7f82cd8d04"
+content-hash = "d90802a84ada4393877c61ae69c9adc0fccb22e5bb84b060c3e79cbb4af2b19e"
 
 [metadata.files]
 aiocache = [
@@ -2560,8 +2560,8 @@ pycparser = [
     {file = "pycparser-2.21.tar.gz", hash = "sha256:e644fdec12f7872f86c58ff790da456218b10f863970249516d60a5eaca77206"},
 ]
 pyemit = [
-    {file = "pyemit-0.4.8-py3-none-any.whl", hash = "sha256:6cd72f844a234175070183924fdcb417031595f06a594b8c061da9a0708b76c4"},
-    {file = "pyemit-0.4.8.tar.gz", hash = "sha256:331395c986662712c01253b705a12cb0d1914301d1d5dd86b65612d5913aedc5"},
+    {file = "pyemit-0.4.9-py3-none-any.whl", hash = "sha256:d98ddd3bbbc15db31c47ab580af487c1f0eb3ce247ccbc6c4cb6435269b3cc32"},
+    {file = "pyemit-0.4.9.tar.gz", hash = "sha256:d681c7a80359850d49f5c1fdc501f185b54e675ac2f8f50f75603f416d9d472b"},
 ]
 pyflakes = [
     {file = "pyflakes-2.2.0-py2.py3-none-any.whl", hash = "sha256:0d94e0e05a19e57a99444b6ddcf9a6eb2e5c68d3ca1e98e90707af8152c90a92"},
