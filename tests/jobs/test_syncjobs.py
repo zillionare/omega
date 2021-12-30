@@ -96,7 +96,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         with mock.patch("arrow.now", return_value=arrow.get("2020-1-6 10:00")):
             await syncjobs.trigger_bars_sync(sync_params, force=True)
 
-        await asyncio.sleep(0.2)
+        await asyncio.sleep(2)
         self.assertDictEqual(
             {
                 "start": arrow.get("2019-12-31").date(),
@@ -110,7 +110,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         with mock.patch("arrow.now", return_value=arrow.get("2020-1-6 15:00")):
             await syncjobs.trigger_bars_sync(sync_params, force=True)
 
-            await asyncio.sleep(0.2)
+            await asyncio.sleep(2)
             self.assertDictEqual(
                 {
                     "start": arrow.get("2019-12-31").date(),
@@ -615,7 +615,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             with mock.patch("omicron.cache.security.hset", return_value=__hset):
                 await syncjobs.closing_quotation_sync_bars(all_params)
 
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(2)
         self.assertDictEqual(
             {
                 "start": arrow.get("2020-01-03 09:45:00").date(),
