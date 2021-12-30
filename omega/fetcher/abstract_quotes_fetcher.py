@@ -5,7 +5,7 @@
 import datetime
 import importlib
 import logging
-from typing import List, Union
+from typing import List, Union, Optional
 
 import arrow
 import cfg4py
@@ -258,3 +258,32 @@ class AbstractQuotesFetcher(QuotesFetcher):
         mapping = dict(valuation.dtype.descr)
         fields = [(name, mapping[name]) for name in fields]
         return rfn.require_fields(valuation, fields)
+
+    @classmethod
+    async def get_price(
+        cls,
+        sec: Union[List, str],
+        end_date: Union[str, datetime.datetime],
+        n_bars: Optional[int],
+        start_date: Optional[Union[str, datetime.datetime]] = None,
+    ) -> np.ndarray:
+        fields = ['open', 'close', 'high', 'low', 'volume', 'money', 'high_limit', 'low_limit', 'avg', 'factor']
+        params = {
+            "security": sec,
+            "end_date": end_date,
+            "fields": fields,
+            "fq": None,
+            "fill_paused": False,
+            "frequency": FrameType.MIN1.value,
+        }
+        if start_date:
+            params.update({"start_date": start_date})
+        if n_bars is not None:
+            params.update({"count": start_date})
+        if "start_date" in params and "count" in params:
+            raise ValueError("start_date and count cannot appear at the same time")
+
+        bars = await cls.get_instance().get_price(**params)
+
+        if len(bars) == 0:
+            return

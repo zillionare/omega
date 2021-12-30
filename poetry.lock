@@ -140,6 +140,18 @@ tests = ["cloudpickle", "coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "py
 tests_no_zope = ["cloudpickle", "coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "pytest (>=4.3.0)", "six", "mypy", "pytest-mypy-plugins"]
 
 [[package]]
+name = "backports.entry-points-selectable"
+version = "1.1.1"
+description = "Compatibility shim providing selectable entry points for older implementations"
+category = "main"
+optional = true
+python-versions = ">=2.7"
+
+[package.extras]
+docs = ["sphinx", "jaraco.packaging (>=8.2)", "rst.linker (>=1.9)"]
+testing = ["pytest", "pytest-flake8", "pytest-cov", "pytest-black (>=0.3.7)", "pytest-mypy", "pytest-checkdocs (>=2.4)", "pytest-enabler (>=1.0.1)"]
+
+[[package]]
 name = "beautifulsoup4"
 version = "4.10.0"
 description = "Screen-scraping library"
@@ -922,14 +934,14 @@ numpy = ">=1.16.6"
 
 [[package]]
 name = "pybind11"
-version = "2.9.0"
+version = "2.8.1"
 description = "Seamless operability between C++11 and Python"
 category = "main"
 optional = false
 python-versions = "!=3.0,!=3.1,!=3.2,!=3.3,!=3.4,>=2.7"
 
 [package.extras]
-global = ["pybind11-global (==2.9.0)"]
+global = ["pybind11-global (==2.8.1)"]
 
 [[package]]
 name = "pycodestyle"
@@ -949,7 +961,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [[package]]
 name = "pyemit"
-version = "0.4.9"
+version = "0.4.6"
 description = "轻量级的异步消息通信，支持进程内消息通信，以及基于REDIS PUBSUB的远程消息。提供了进一步封装RPC的底层机制。"
 category = "main"
 optional = false
@@ -1420,7 +1432,7 @@ python-versions = ">= 3.5"
 
 [[package]]
 name = "tox"
-version = "3.24.5"
+version = "3.24.4"
 description = "tox is a generic virtualenv management and test command line tool"
 category = "main"
 optional = true
@@ -1438,7 +1450,7 @@ virtualenv = ">=16.0.0,<20.0.0 || >20.0.0,<20.0.1 || >20.0.1,<20.0.2 || >20.0.2,
 
 [package.extras]
 docs = ["pygments-github-lexers (>=0.0.5)", "sphinx (>=2.0.0)", "sphinxcontrib-autoprogram (>=0.1.5)", "towncrier (>=18.5.0)"]
-testing = ["flaky (>=3.4.0)", "freezegun (>=0.3.11)", "pytest (>=4.0.0)", "pytest-cov (>=2.5.1)", "pytest-mock (>=1.10.0)", "pytest-randomly (>=1.0.0)", "psutil (>=5.6.1)", "pathlib2 (>=2.3.3)"]
+testing = ["flaky (>=3.4.0)", "freezegun (>=0.3.11)", "psutil (>=5.6.1)", "pytest (>=4.0.0)", "pytest-cov (>=2.5.1)", "pytest-mock (>=1.10.0)", "pytest-randomly (>=1.0.0)", "pytest-xdist (>=1.22.2)", "pathlib2 (>=2.3.3)"]
 
 [[package]]
 name = "tqdm"
@@ -1546,13 +1558,14 @@ python-versions = "*"
 
 [[package]]
 name = "virtualenv"
-version = "20.11.1"
+version = "20.10.0"
 description = "Virtual Python Environment builder"
 category = "main"
 optional = true
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7"
 
 [package.dependencies]
+"backports.entry-points-selectable" = ">=1.0.4"
 distlib = ">=0.3.1,<1"
 filelock = ">=3.2,<4"
 platformdirs = ">=2,<3"
@@ -1685,7 +1698,7 @@ test = ["pytest", "black", "isort", "doc8", "flake8", "pytest-cov"]
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.9,<3.10"
-content-hash = "d90802a84ada4393877c61ae69c9adc0fccb22e5bb84b060c3e79cbb4af2b19e"
+content-hash = "10fda0696ba7b949d26797ca94196cb8e472ef2a93c2dc29d48daa7f82cd8d04"
 
 [metadata.files]
 aiocache = [
@@ -1789,6 +1802,10 @@ atomicwrites = [
 attrs = [
     {file = "attrs-21.3.0-py2.py3-none-any.whl", hash = "sha256:8f7335278dedd26b58c38e006338242cc0977f06d51579b2b8b87b9b33bff66c"},
     {file = "attrs-21.3.0.tar.gz", hash = "sha256:50f3c9b216dc9021042f71b392859a773b904ce1a029077f58f6598272432045"},
+]
+"backports.entry-points-selectable" = [
+    {file = "backports.entry_points_selectable-1.1.1-py2.py3-none-any.whl", hash = "sha256:7fceed9532a7aa2bd888654a7314f864a3c16a4e710b34a58cfc0f08114c663b"},
+    {file = "backports.entry_points_selectable-1.1.1.tar.gz", hash = "sha256:914b21a479fde881635f7af5adc7f6e38d6b274be32269070c53b698c60d5386"},
 ]
 beautifulsoup4 = [
     {file = "beautifulsoup4-4.10.0-py3-none-any.whl", hash = "sha256:9a315ce70049920ea4572a4055bc4bd700c940521d36fc858205ad4fcde149bf"},
@@ -2548,8 +2565,8 @@ pyarrow = [
     {file = "pyarrow-6.0.0.tar.gz", hash = "sha256:5be62679201c441356d3f2a739895dcc8d4d299f2a6eabcd2163bfb6a898abba"},
 ]
 pybind11 = [
-    {file = "pybind11-2.9.0-py2.py3-none-any.whl", hash = "sha256:0c178c6e5806e8e58a7eec5a363d052bb9dac860a3ff64fbddb7226110644977"},
-    {file = "pybind11-2.9.0.tar.gz", hash = "sha256:46d315a669a59b660def6c5ca4e128f6fa975ec4abce6019a43d92084ad1bf89"},
+    {file = "pybind11-2.8.1-py2.py3-none-any.whl", hash = "sha256:4ecbc2a0d4d1f3636edd8296705cc164991b704f3389ebcfa52986a0101f913b"},
+    {file = "pybind11-2.8.1.tar.gz", hash = "sha256:2ff4e50f171e3ae12b11c69e6ad49b05aa5e4b7eaa17b8148bee3cb3f0e4284b"},
 ]
 pycodestyle = [
     {file = "pycodestyle-2.6.0-py2.py3-none-any.whl", hash = "sha256:2295e7b2f6b5bd100585ebcb1f616591b652db8a741695b3d8f5d28bdc934367"},
@@ -2560,8 +2577,8 @@ pycparser = [
     {file = "pycparser-2.21.tar.gz", hash = "sha256:e644fdec12f7872f86c58ff790da456218b10f863970249516d60a5eaca77206"},
 ]
 pyemit = [
-    {file = "pyemit-0.4.9-py3-none-any.whl", hash = "sha256:d98ddd3bbbc15db31c47ab580af487c1f0eb3ce247ccbc6c4cb6435269b3cc32"},
-    {file = "pyemit-0.4.9.tar.gz", hash = "sha256:d681c7a80359850d49f5c1fdc501f185b54e675ac2f8f50f75603f416d9d472b"},
+    {file = "pyemit-0.4.6-py3-none-any.whl", hash = "sha256:f091f7b83aa4c53e944d6df6dd98127b79c290cc80ca73c2a8f6a08425ae019b"},
+    {file = "pyemit-0.4.6.tar.gz", hash = "sha256:4610b94863b967919355893500a87acc634a8446c2c159cbf0c06eec6c168e3a"},
 ]
 pyflakes = [
     {file = "pyflakes-2.2.0-py2.py3-none-any.whl", hash = "sha256:0d94e0e05a19e57a99444b6ddcf9a6eb2e5c68d3ca1e98e90707af8152c90a92"},
@@ -2959,8 +2976,8 @@ tornado = [
     {file = "tornado-6.1.tar.gz", hash = "sha256:33c6e81d7bd55b468d2e793517c909b139960b6c790a60b7991b9b6b76fb9791"},
 ]
 tox = [
-    {file = "tox-3.24.5-py2.py3-none-any.whl", hash = "sha256:be3362472a33094bce26727f5f771ca0facf6dafa217f65875314e9a6600c95c"},
-    {file = "tox-3.24.5.tar.gz", hash = "sha256:67e0e32c90e278251fea45b696d0fef3879089ccbe979b0c556d35d5a70e2993"},
+    {file = "tox-3.24.4-py2.py3-none-any.whl", hash = "sha256:5e274227a53dc9ef856767c21867377ba395992549f02ce55eb549f9fb9a8d10"},
+    {file = "tox-3.24.4.tar.gz", hash = "sha256:c30b57fa2477f1fb7c36aa1d83292d5c2336cd0018119e1b1c17340e2c2708ca"},
 ]
 tqdm = [
     {file = "tqdm-4.62.3-py2.py3-none-any.whl", hash = "sha256:8dd278a422499cd6b727e6ae4061c40b48fce8b76d1ccbf5d34fca9b7f925b0c"},
@@ -3071,8 +3088,8 @@ uvloop = [
     {file = "uvloop-0.14.0.tar.gz", hash = "sha256:123ac9c0c7dd71464f58f1b4ee0bbd81285d96cdda8bc3519281b8973e3a461e"},
 ]
 virtualenv = [
-    {file = "virtualenv-20.11.1-py2.py3-none-any.whl", hash = "sha256:43973fb93cf1d04ec00a190f5e062919798a0fec94daaafcb4db1eda1aa8f340"},
-    {file = "virtualenv-20.11.1.tar.gz", hash = "sha256:17f26e9d0c4350d9df713d41077b2b3344cba59e104306e4105c8c75deeddcf7"},
+    {file = "virtualenv-20.10.0-py2.py3-none-any.whl", hash = "sha256:4b02e52a624336eece99c96e3ab7111f469c24ba226a53ec474e8e787b365814"},
+    {file = "virtualenv-20.10.0.tar.gz", hash = "sha256:576d05b46eace16a9c348085f7d0dc8ef28713a2cabaa1cf0aea41e8f12c9218"},
 ]
 watchdog = [
     {file = "watchdog-2.1.6-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:9693f35162dc6208d10b10ddf0458cc09ad70c30ba689d9206e02cd836ce28a3"},
