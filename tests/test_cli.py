@@ -20,7 +20,7 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
         self.cfg = init_test_env()
 
         # disable catch up sync, since test_cli, jobs will be launched many times and cache might by empty
-        redis = await aioredis.create_redis(self.cfg.redis.dsn)
+        redis = aioredis.from_url(self.cfg.redis.dsn)
         last_sync = arrow.now(self.cfg.tz).format("YYYY-MM-DD HH:mm:SS")
         await redis.set("jobs.bars_sync.stop", last_sync)
         await omicron.init()
@@ -250,10 +250,9 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
 
     async def test_setup(self):
         # clear cache to simulate first setup
-        redis = await aioredis.create_redis("redis://localhost:6379")
+        redis = aioredis.from_url("redis://localhost:6379")
         await redis.flushall()
-        redis.close()
-        await redis.wait_closed()
+        await redis.close()
 
         # backup configuration files
         origin = os.path.join(get_config_dir(), "defaults.yaml")

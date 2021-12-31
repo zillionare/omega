@@ -325,10 +325,9 @@ def get_input(
 
 
 async def check_redis(dsn: str):
-    redis = await aioredis.create_redis(dsn)
+    redis = aioredis.from_url(dsn)
     await redis.set("omega-test", "delete me on sight")
-    redis.close()
-    await redis.wait_closed()
+    await redis.close()
 
 
 async def config_redis(settings):
