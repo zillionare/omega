@@ -36,15 +36,14 @@ include = [
     "tests/*"
 ]
 
-version = "1.1.4"
+version = "1.1.5"
 
 [tool.poetry.dependencies]
 python=">=3.9,<3.10"
 zillionare_omega_adaptors_jq="1.0.3"
-zillionare_omicron = "1.1.*"
+zillionare_omicron = "^1.1.5"
 aiohttp = "3.7.4"
-pyemit = "^0.4.9"
-aioredis = "1.3.1"
+pyemit = "^0.5"
 asyncpg = "0.21"
 gino = "1.0.1"
 sh = "1.14.1"
