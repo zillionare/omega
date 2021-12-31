@@ -606,13 +606,15 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             sync_request["stop"] = params["stop"].date()
             sync_request["frame_type"] = params["frame_type"]
 
-        async def __hset():
-            return 1
+        def __hset():
+            async def inner():
+                return 1
+            return inner()
 
         await emit.async_register(Events.OMEGA_DO_SYNC, on_sync_bars)
 
         with mock.patch("arrow.now", return_value=arrow.get("2020-01-06 15:05")):
-            with mock.patch("omicron.cache.security.hset", return_value=__hset):
+            with mock.patch("omicron.cache.security.hset", return_value=__hset()):
                 await syncjobs.closing_quotation_sync_bars(all_params)
 
         await asyncio.sleep(2)
