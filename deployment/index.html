@@ -998,16 +998,16 @@ conda activate omega
 <span class="normal"> 7</span>
 <span class="normal"> 8</span>
 <span class="normal"> 9</span>
-<span class="normal">10</span></pre></div></td><td class="code"><div class="highlight"><pre><span></span><code>    <span class="nt">omega</span><span class="p">:</span>
-        <span class="nt">urls</span><span class="p">:</span>
-            <span class="nt">quotes_server</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">http://localhost:3181</span>
-  <span class=" -Error"> </span><span class="nt">quotes_fetchers</span><span class="p">:</span>
-    <span class="p p-Indicator">-</span> <span class="nt">impl</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">jqadaptor</span>    <span class="c1"># there must be a create_instance method in this module</span>
-        <span class="nt">workers</span><span class="p">:</span>
-        <span class="p p-Indicator">-</span> <span class="nt">account</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">${jq_account}</span>
-            <span class="l l-Scalar l-Scalar-Plain">password</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">${jq_password}</span>
-            <span class="l l-Scalar l-Scalar-Plain">port</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">3181</span>
-            <span class="l l-Scalar l-Scalar-Plain">sessions</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">2</span>
+<span class="normal">10</span></pre></div></td><td class="code"><div class="highlight"><pre><span></span><code><span class="w">    </span><span class="nt">omega</span><span class="p">:</span><span class="w"></span>
+<span class="w">        </span><span class="nt">urls</span><span class="p">:</span><span class="w"></span>
+<span class="w">            </span><span class="nt">quotes_server</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://localhost:3181</span><span class="w"></span>
+<span class="w">  </span><span class="w w-Error"> </span><span class="nt">quotes_fetchers</span><span class="p">:</span><span class="w"></span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">impl</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jqadaptor</span><span class="w">    </span><span class="c1"># there must be a create_instance method in this module</span><span class="w"></span>
+<span class="w">        </span><span class="nt">workers</span><span class="p">:</span><span class="w"></span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">account</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${jq_account}</span><span class="w"></span>
+<span class="w">            </span><span class="l l-Scalar l-Scalar-Plain">password</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${jq_password}</span><span class="w"></span>
+<span class="w">            </span><span class="l l-Scalar l-Scalar-Plain">port</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3181</span><span class="w"></span>
+<span class="w">            </span><span class="l l-Scalar l-Scalar-Plain">sessions</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w"></span>
 </code></pre></div>
 </td></tr></table>
 <p>这里有几点需要注意：</p>
