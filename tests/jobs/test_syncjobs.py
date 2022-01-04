@@ -3,6 +3,7 @@ import datetime
 import logging
 import os
 import time
+from typing import Tuple
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -35,9 +36,10 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         init_test_env()
 
-        await emit.start(engine=emit.Engine.REDIS, dsn=cfg.redis.dsn, start_server=True, heart_beat=1)
+        await emit.start(engine=emit.Engine.REDIS, dsn=cfg.redis.dsn, start_server=True)
 
         await self.create_quotes_fetcher()
+        #await asyncio.sleep(0.01)
         await omicron.init(aq)
 
     async def asyncTearDown(self) -> None:
@@ -45,7 +47,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         await emit.stop()
 
     async def create_quotes_fetcher(self):
-        cfg: Config = cfg4py.get_instance()
+        cfg = cfg4py.get_instance()
         fetcher_info = cfg.quotes_fetchers[0]
         impl = fetcher_info["impl"]
         params = fetcher_info["workers"][0]
@@ -606,15 +608,13 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             sync_request["stop"] = params["stop"].date()
             sync_request["frame_type"] = params["frame_type"]
 
-        def __hset():
-            async def inner():
-                return 1
-            return inner()
+        async def bypass_hset(*args):
+            pass
 
         await emit.async_register(Events.OMEGA_DO_SYNC, on_sync_bars)
 
         with mock.patch("arrow.now", return_value=arrow.get("2020-01-06 15:05")):
-            with mock.patch("omicron.cache.security.hset", return_value=__hset()):
+            with mock.patch("omicron.cache.security.hset", side_effect=bypass_hset):
                 await syncjobs.closing_quotation_sync_bars(all_params)
 
         await asyncio.sleep(2)

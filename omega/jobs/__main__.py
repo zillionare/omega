@@ -150,7 +150,7 @@ async def on_shutdown(app, loop):  # pragma: no cover
 
 
 def start(host: str = "0.0.0.0", port: int = 3180):  # pragma: no cover
-    logger.info("starting omega jobs ...")
+    logger.info("starting omega jobs on port %s...", port)
     app.register_listener(init, "before_server_start")
     app.run(host=host, port=port, register_sys_signals=True)
     logger.info("omega jobs exited.")
