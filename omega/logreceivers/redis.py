@@ -109,19 +109,20 @@ class RedisLogReceiver:
         self._fh.close()
         self._fh = None
 
-        await self._redis.unsubscribe(self._channel_name)
+        await self._channel.unsubscribe(self._channel_name)
         await self._reader_task
-        self._redis.close()
+        await self._channel.close()
+        await self._redis.close()
 
     async def start(self):
-        self._redis = await aioredis.create_redis(self._dsn)
-        res = await self._redis.subscribe(self._channel_name)
-        self._channel = res[0]
+        self._redis = aioredis.from_url(self._dsn)
+        self._channel = self._redis.pubsub(ignore_subscribe_messages=True)
+        await self._channel.subscribe(self._channel_name)
         self._reader_task = asyncio.create_task(self.reader())
 
     async def reader(self):
-        while await self._channel.wait_message():
-            msg = (await self._channel.get()).decode("utf-8")
+        async for msg in self._channel.listen():
+            msg = msg.get("data").decode("utf-8")
             self._write(msg)
 
     @staticmethod

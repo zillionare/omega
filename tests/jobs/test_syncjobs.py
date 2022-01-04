@@ -606,8 +606,10 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             sync_request["stop"] = params["stop"].date()
             sync_request["frame_type"] = params["frame_type"]
 
-        async def __hset():
-            return 1
+        def __hset():
+            async def inner():
+                return 1
+            return inner()
 
         await emit.async_register(Events.OMEGA_DO_SYNC, on_sync_bars)
 

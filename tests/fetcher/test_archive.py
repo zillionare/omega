@@ -70,19 +70,19 @@ class TestArchieveFetcher(unittest.IsolatedAsyncioTestCase):
     async def test_main(self, mock_print):
         # either head or tail is None
         await cache.security.hdel("000001.XSHE:1d", "head")
-        await cache.security.hmset("000001.XSHE:1d", "tail", 2020)
+        await cache.security.hmset("000001.XSHE:1d", {"tail": 2020})
 
         # arc_tail (202103311500) < head (2021 0401 1500)
         await cache.security.hmset(
-            "000001.XSHE:30m", "head", 202104011500, "tail", 202104031500
+            "000001.XSHE:30m", {"head": 202104011500, "tail": 202104031500}
         )
 
         # arc_head (20210104) > tail (20191231)
-        await cache.security.hmset("600000.XSHG:1d", "head", 20191230, "tail", 20191231)
+        await cache.security.hmset("600000.XSHG:1d", {"head": 20191230, "tail": 20191231})
 
         # overlapped
         await cache.security.hmset(
-            "600001.XSHG:30m", "head", 202101051400, "tail", 202103021130
+            "600001.XSHG:30m", {"head": 202101051400, "tail": 202103021130}
         )
 
         await archive.clear_range()
@@ -139,7 +139,7 @@ class TestArchieveFetcher(unittest.IsolatedAsyncioTestCase):
         await cache.sys.lpush("archive.ranges.000001.XSHE:1d", *frames)
         # either head or tail is None
         await cache.security.hdel("000001.XSHE:1d", "head")
-        await cache.security.hmset("000001.XSHE:1d", "tail", 20200104)
+        await cache.security.hmset("000001.XSHE:1d", {"tail": 20200104})
 
         frames = [202101011030, 202101011100, 202101011330, 202101011400]
         await cache.sys.lpush("archive.ranges.000001.XSHE:30m", *frames)
@@ -152,15 +152,15 @@ class TestArchieveFetcher(unittest.IsolatedAsyncioTestCase):
 
         # arc_tail (2021 0101 1400) < head (2021 0102 1100)
         await cache.security.hmset(
-            "000001.XSHE:30m", "head", 202101021030, "tail", 202101021100
+            "000001.XSHE:30m", {"head": 202101021030, "tail": 202101021100}
         )
 
         # arch_head (2020 0101) > tail (2019 1231)
-        await cache.security.hmset("600001.XSHG:1d", "head", 20191230, "tail", 20191231)
+        await cache.security.hmset("600001.XSHG:1d", {"head": 20191230, "tail": 20191231})
 
         # others: overlapped
         await cache.security.hmset(
-            "600001.XSHG:30m", "head", 202101011100, "tail", 202101011500
+            "600001.XSHG:30m", {"head": 202101011100, "tail": 202101011500}
         )
 
         await archive.adjust_range(batch=2)
