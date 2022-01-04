@@ -52,8 +52,8 @@ class TestJobsMain(unittest.IsolatedAsyncioTestCase):
                 }
             }
         )
-        print("1111111111111",cfg.logreceiver.filename) 
         await start_logging()
+        await asyncio.sleep(1)
         for i in range(5):
             redis_logger.info("this is %sth test log", i)
 
