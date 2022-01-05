@@ -10,7 +10,7 @@
       
       
       <link rel="shortcut icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.1.2, mkdocs-material-6.2.8">
+      <meta name="generator" content="mkdocs-1.2.3, mkdocs-material-6.2.8">
     
     
       
@@ -805,7 +805,9 @@
 <h4 id="112-网络">1.1.2. 网络<a class="headerlink" href="#112-网络" title="Permanent link">&para;</a></h4>
 <p>如果您使用分布式部署，建议Zillionare各服务都运行在同一个千兆局域网内。</p>
 <h3 id="12-软件清单">1.2. 软件清单<a class="headerlink" href="#12-软件清单" title="Permanent link">&para;</a></h3>
-<details class="note" open="open"><summary>Note</summary><p>Omega不适合部署在Windows操作系统上。Omega的各个版本均只在Ubuntu 18， Ubuntu 20上进行测试。因此，即使Omega能在Windows上运行起来，我们也不推荐您这样使用。</p>
+<details class="note" open="open">
+<summary>Note</summary>
+<p>Omega不适合部署在Windows操作系统上。Omega的各个版本均只在Ubuntu 18， Ubuntu 20上进行测试。因此，即使Omega能在Windows上运行起来，我们也不推荐您这样使用。</p>
 <p>如果您是个人研究使用，只有Windows机器，建议您启用Windows的WSL平台，这样就可以在同一台机器上，同时使用Ubuntu和Windows了。关于如何在Windows上启用WSL，您可以参考这篇文章<a href="https://zhuanlan.zhihu.com/p/138005979">Windows下如何构建Python开发环境</a></p>
 </details>
 <p>Omega使用Python 3.8开发，理论上可以部署在任何类Unix的机器上。但只在Ubuntu上经过严格的测试。以下为软件环境类清单：</p>
@@ -901,7 +903,9 @@ conda activate omega
 <p>如果您只是普通用户，那么一般来说，应该设置为PRODUCTION。</p>
 <h3 id="33-安装第三方软件">3.3. 安装第三方软件<a class="headerlink" href="#33-安装第三方软件" title="Permanent link">&para;</a></h3>
 <p>请参照Redis和Postgres的安装指南，分别完成Redis和Postgres的安装。</p>
-<details class="note" open="open"><summary>Note</summary><p>如果您的机器上已经有其它程序在使用Redis服务，为避免冲突，请在本机上启动第二个Redis实例，
+<details class="note" open="open">
+<summary>Note</summary>
+<p>如果您的机器上已经有其它程序在使用Redis服务，为避免冲突，请在本机上启动第二个Redis实例，
 独立为Omega提供服务。这个实例应该使用不同的端口。</p>
 <p>您可以为Omega安装一个全新的Postgres数据库服务器，也重复使用现有的Postgres数据库服务器，
 只要为Omega准备一个单独的数据库即可。Omega将在该数据库中创建一系列表（table)。</p>
@@ -982,7 +986,9 @@ conda activate omega
 <p>在使用聚宽之前，您需要在 聚宽_ 官网上申请 <code>jqdatasdk</code> 的使用权限。在安装过程中，将需要您提供这些信息。每个聚宽账号最多允许3个并发连接。在安装时，Omega需要您为每个账号决定同时允许的最大会话（连接）数。</p>
 <p><img alt="" src="../_static/setup_jq_fetcher.jpg" /></p>
 <p>Omega支持多个数据源同时工作（但当前只提供了对聚宽的接口适配），并且支持在同一数据源下，配置多个账号，多个会话（如果您这样做，请确保得到了服务提供商的许可），从而可以最快速获取实时行情。所以在上面的安装过程中，将提示您输入并发会话数，以及是否配置多个账号。</p>
-<details class="tip" open="open"><summary>Tip</summary><p>Omega通过HTTP微服务向Zillionare的其它组件提供行情数据，因此Omega本身也是一种行情服务器。默认地，Omega的服务端口从3181开始，如果您有多个数据源，或者多个账号，那么Omega将为不同的数据源、或者同一数据源的不同账号，启用新的端口。</p>
+<details class="tip" open="open">
+<summary>Tip</summary>
+<p>Omega通过HTTP微服务向Zillionare的其它组件提供行情数据，因此Omega本身也是一种行情服务器。默认地，Omega的服务端口从3181开始，如果您有多个数据源，或者多个账号，那么Omega将为不同的数据源、或者同一数据源的不同账号，启用新的端口。</p>
 <p>比如，如果您拥有两个jqdatasdk的账号，并配置在Omega中使用，那么，Omega将启动两个HTTP服务器，一个监听在3181端口，另一个监听在3182端口。</p>
 </details>
 <p>安装程序没有提供端口定制的功能。但是，您可以在配置文件中找到它们并进行修改：</p>
@@ -995,16 +1001,16 @@ conda activate omega
 <span class="normal"> 7</span>
 <span class="normal"> 8</span>
 <span class="normal"> 9</span>
-<span class="normal">10</span></pre></div></td><td class="code"><div class="highlight"><pre><span></span><code>    <span class="nt">omega</span><span class="p">:</span>
-        <span class="nt">urls</span><span class="p">:</span>
-            <span class="nt">quotes_server</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">http://localhost:3181</span>
-  <span class=" -Error"> </span><span class="nt">quotes_fetchers</span><span class="p">:</span>
-    <span class="p p-Indicator">-</span> <span class="nt">impl</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">jqadaptor</span>    <span class="c1"># there must be a create_instance method in this module</span>
-        <span class="nt">workers</span><span class="p">:</span>
-        <span class="p p-Indicator">-</span> <span class="nt">account</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">${jq_account}</span>
-            <span class="l l-Scalar l-Scalar-Plain">password</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">${jq_password}</span>
-            <span class="l l-Scalar l-Scalar-Plain">port</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">3181</span>
-            <span class="l l-Scalar l-Scalar-Plain">sessions</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">2</span>
+<span class="normal">10</span></pre></div></td><td class="code"><div class="highlight"><pre><span></span><code><span class="w">    </span><span class="nt">omega</span><span class="p">:</span><span class="w"></span>
+<span class="w">        </span><span class="nt">urls</span><span class="p">:</span><span class="w"></span>
+<span class="w">            </span><span class="nt">quotes_server</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://localhost:3181</span><span class="w"></span>
+<span class="w">  </span><span class="w w-Error"> </span><span class="nt">quotes_fetchers</span><span class="p">:</span><span class="w"></span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">impl</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jqadaptor</span><span class="w">    </span><span class="c1"># there must be a create_instance method in this module</span><span class="w"></span>
+<span class="w">        </span><span class="nt">workers</span><span class="p">:</span><span class="w"></span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">account</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${jq_account}</span><span class="w"></span>
+<span class="w">            </span><span class="l l-Scalar l-Scalar-Plain">password</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${jq_password}</span><span class="w"></span>
+<span class="w">            </span><span class="l l-Scalar l-Scalar-Plain">port</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3181</span><span class="w"></span>
+<span class="w">            </span><span class="l l-Scalar l-Scalar-Plain">sessions</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w"></span>
 </code></pre></div>
 </td></tr></table>
 <p>这里有几点需要注意：</p>

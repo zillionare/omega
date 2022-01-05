@@ -10,7 +10,7 @@
       
       
       <link rel="shortcut icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.1.2, mkdocs-material-6.2.8">
+      <meta name="generator" content="mkdocs-1.2.3, mkdocs-material-6.2.8">
     
     
       
@@ -425,8 +425,8 @@
 <p>配置文件使用YAML文件格式，并支持环境变量。比如，如果您通过环境变量<code>POSTGRES_USER</code>来设置了数据库
 账号，则可以在配置文件中这样使用它：</p>
 <table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
-<span class="normal">2</span></pre></div></td><td class="code"><div class="highlight"><pre><span></span><code><span class="nt">postgres</span><span class="p">:</span>
-    <span class="nt">dsn</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost/zillionare</span>
+<span class="normal">2</span></pre></div></td><td class="code"><div class="highlight"><pre><span></span><code><span class="nt">postgres</span><span class="p">:</span><span class="w"></span>
+<span class="w">    </span><span class="nt">dsn</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost/zillionare</span><span class="w"></span>
 </code></pre></div>
 </td></tr></table>
 <p>上述环境变量的扩展是通过<a href="https://pypi.org/project/cfg4py/">cfg4py</a>来支持的。</p>
@@ -441,10 +441,10 @@
 <p><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
 <span class="normal">2</span>
 <span class="normal">3</span>
-<span class="normal">4</span></pre></div></td><td class="code"><div class="highlight"><pre><span></span><code><span class="nt">omega</span><span class="p">:</span>  <span class="c1"># omega服务自身相关的配置</span>
-    <span class="nt">sync</span><span class="p">:</span> <span class="c1"># 同步相关的配置都在sync节下</span>
-        <span class="nt">security_list</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">02:00</span>
-        <span class="nt">calendar</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">02:00</span>
+<span class="normal">4</span></pre></div></td><td class="code"><div class="highlight"><pre><span></span><code><span class="nt">omega</span><span class="p">:</span><span class="w">  </span><span class="c1"># omega服务自身相关的配置</span><span class="w"></span>
+<span class="w">    </span><span class="nt">sync</span><span class="p">:</span><span class="w"> </span><span class="c1"># 同步相关的配置都在sync节下</span><span class="w"></span>
+<span class="w">        </span><span class="nt">security_list</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">02:00</span><span class="w"></span>
+<span class="w">        </span><span class="nt">calendar</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">02:00</span><span class="w"></span>
 </code></pre></div>
 </td></tr></table>
 建议在每个交易日盘前进行同步。如无特别需求，请保持默认值就好。</p>
@@ -471,21 +471,21 @@
 <span class="normal">12</span>
 <span class="normal">13</span>
 <span class="normal">14</span>
-<span class="normal">15</span></pre></div></td><td class="code"><div class="highlight"><pre><span></span><code><span class="nt">omega</span><span class="p">:</span>
-  <span class="nt">sync</span><span class="p">:</span> <span class="c1"># 同步相关的配置都在sync节下</span>
-    <span class="nt">bars</span><span class="p">:</span> <span class="c1"># K线数据同步配置都在bars节下</span>
-      <span class="p p-Indicator">-</span> <span class="nt">frame</span><span class="p">:</span> <span class="s">&#39;1d&#39;</span> <span class="c1"># k线帧类型</span>
-        <span class="nt">start</span><span class="p">:</span> <span class="s">&#39;2005-1-1&#39;</span> <span class="c1"># 可以不指定，系统会从当前日期倒推到1000个数据记录前的时间</span>
-        <span class="nt">stop</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">2020-12-30</span> <span class="c1"># 可以不指定，以便同步到最新的日期</span>
-        <span class="nt">include</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">000001.XSHG 399001.XSHE</span>
-        <span class="nt">exclude</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">000001.XSHE 600001.XSHG</span>
-        <span class="nt">delay</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">5</span>
-        <span class="nt">cat</span><span class="p">:</span>    <span class="c1"># 证券分类，如股票(stock), 指数(index)等</span>
-            <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">stock</span>
-      <span class="p p-Indicator">-</span> <span class="nt">frame</span><span class="p">:</span> <span class="s">&#39;1m&#39;</span>
-        <span class="nt">start</span><span class="p">:</span> <span class="s">&#39;2005-1-1&#39;</span>
-        <span class="nt">cat</span><span class="p">:</span>
-            <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">stock</span>
+<span class="normal">15</span></pre></div></td><td class="code"><div class="highlight"><pre><span></span><code><span class="nt">omega</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="nt">sync</span><span class="p">:</span><span class="w"> </span><span class="c1"># 同步相关的配置都在sync节下</span><span class="w"></span>
+<span class="w">    </span><span class="nt">bars</span><span class="p">:</span><span class="w"> </span><span class="c1"># K线数据同步配置都在bars节下</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">frame</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;1d&#39;</span><span class="w"> </span><span class="c1"># k线帧类型</span><span class="w"></span>
+<span class="w">        </span><span class="nt">start</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;2005-1-1&#39;</span><span class="w"> </span><span class="c1"># 可以不指定，系统会从当前日期倒推到1000个数据记录前的时间</span><span class="w"></span>
+<span class="w">        </span><span class="nt">stop</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2020-12-30</span><span class="w"> </span><span class="c1"># 可以不指定，以便同步到最新的日期</span><span class="w"></span>
+<span class="w">        </span><span class="nt">include</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">000001.XSHG 399001.XSHE</span><span class="w"></span>
+<span class="w">        </span><span class="nt">exclude</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">000001.XSHE 600001.XSHG</span><span class="w"></span>
+<span class="w">        </span><span class="nt">delay</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span><span class="w"></span>
+<span class="w">        </span><span class="nt">cat</span><span class="p">:</span><span class="w">    </span><span class="c1"># 证券分类，如股票(stock), 指数(index)等</span><span class="w"></span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stock</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">frame</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;1m&#39;</span><span class="w"></span>
+<span class="w">        </span><span class="nt">start</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;2005-1-1&#39;</span><span class="w"></span>
+<span class="w">        </span><span class="nt">cat</span><span class="p">:</span><span class="w"></span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stock</span><span class="w"></span>
 </code></pre></div>
 </td></tr></table>
 <p>上述配置格式提供了要同步的证券标的、K线的帧类型(比如，是30分钟线还是日线)，起始时间和延迟等关键
@@ -573,14 +573,14 @@
 <span class="normal">5</span>
 <span class="normal">6</span>
 <span class="normal">7</span>
-<span class="normal">8</span></pre></div></td><td class="code"><div class="highlight"><pre><span></span><code><span class="nt">omega</span><span class="p">:</span>
-  <span class="nt">sync</span><span class="p">:</span>
-    <span class="nt">bars</span><span class="p">:</span>
-      <span class="p p-Indicator">-</span> <span class="nt">frame</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">1d</span>   <span class="c1"># 要求同步日线数据</span>
-        <span class="nt">include</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">000001.XSHG 399001.XSHE</span> <span class="c1"># 使用空格分隔</span>
-        <span class="nt">exclude</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">600001.XSHG 000001.XSHE ...</span>
-        <span class="nt">cat</span><span class="p">:</span>
-            <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">stock</span> <span class="c1"># 仅包含股票</span>
+<span class="normal">8</span></pre></div></td><td class="code"><div class="highlight"><pre><span></span><code><span class="nt">omega</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="nt">sync</span><span class="p">:</span><span class="w"></span>
+<span class="w">    </span><span class="nt">bars</span><span class="p">:</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">frame</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1d</span><span class="w">   </span><span class="c1"># 要求同步日线数据</span><span class="w"></span>
+<span class="w">        </span><span class="nt">include</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">000001.XSHG 399001.XSHE</span><span class="w"> </span><span class="c1"># 使用空格分隔</span><span class="w"></span>
+<span class="w">        </span><span class="nt">exclude</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">600001.XSHG 000001.XSHE ...</span><span class="w"></span>
+<span class="w">        </span><span class="nt">cat</span><span class="p">:</span><span class="w"></span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stock</span><span class="w"> </span><span class="c1"># 仅包含股票</span><span class="w"></span>
 </code></pre></div>
 </td></tr></table></p>
 <h2 id="3-管理omega">3. 管理omega<a class="headerlink" href="#3-管理omega" title="Permanent link">&para;</a></h2>
