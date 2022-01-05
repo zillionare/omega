@@ -22,14 +22,13 @@ from pyemit import emit
 import omega.core.sanity
 import omega.jobs
 import omega.jobs.syncjobs as syncjobs
-from omega.config.schema import Config
 from omega.core.events import Events, ValidationError
 from omega.fetcher import archive
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from tests import init_test_env, start_archive_server, start_omega
 
 logger = logging.getLogger(__name__)
-cfg: Config = cfg4py.get_instance()
+cfg = cfg4py.get_instance()
 
 
 class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
@@ -584,11 +583,51 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                     "60m:14-15:00",
                     "1d:15:00",
                     "1M:15:00",
+                    "closing_quotation_sync_bars"
                 ]
             )
             self.assertSetEqual(expected, actual)
         finally:
             cfg.omega.sync.bars = origin
+
+    async def test_closing_quotation_sync_bars(self):
+        all_params = [{
+            "frame": "15m",
+            "start": "2020-01-02",
+            "delay": 3,
+            "cat": [],
+            "include": "000001.XSHE",
+        }, ]
+
+        sync_request = {}
+
+        async def on_sync_bars(params: dict):
+            try:
+                sync_request["start"] = params["start"].strftime("%Y-%m-%d %H:%M:%S")
+                sync_request["stop"] = params["stop"].strftime("%Y-%m-%d %H:%M:%S")
+                sync_request["frame_type"] = params["frame_type"]
+            except Exception as e:
+                logger.exception(e)
+                pass
+
+        async def bypass_hset(*args):
+            return 1
+
+        emit.register(Events.OMEGA_DO_SYNC, on_sync_bars)
+
+        with mock.patch("arrow.now", return_value=arrow.get("2020-01-06 15:05")):
+            with mock.patch("omicron.cache.security.hset", side_effect=bypass_hset):
+                await syncjobs.closing_quotation_sync_bars(all_params)
+
+        await asyncio.sleep(2)
+        self.assertDictEqual(
+            {
+                "start": "2020-01-03 09:45:00",
+                "stop": "2020-01-06 15:00:00",
+                "frame_type": FrameType.MIN15,
+            },
+            sync_request,
+        )
 
     async def _test_200_validation(self):
         # fixme: recover later. All validation/checksum related cases need to be redesigned.

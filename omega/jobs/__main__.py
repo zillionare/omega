@@ -5,6 +5,7 @@ import asyncio
 import functools
 import itertools
 import logging
+import os
 import time
 from typing import Optional
 
@@ -20,12 +21,11 @@ from sanic import Sanic, response
 
 import omega.jobs.syncjobs as syncjobs
 from omega.config import get_config_dir
-from omega.config.schema import Config
 from omega.logreceivers.redis import RedisLogReceiver
 
 app = Sanic("Omega-jobs")
 logger = logging.getLogger(__name__)
-cfg: Config = cfg4py.get_instance()
+cfg = cfg4py.get_instance()
 scheduler: Optional[AsyncIOScheduler] = None
 receiver: RedisLogReceiver = None
 
@@ -47,6 +47,14 @@ async def start_logging():
         logger.info("%s is working now", cfg.logreceiver.klass)
 
 
+async def heartbeat():
+    global scheduler
+
+    pid = os.getpid()
+    key = "process.jobs"
+    await omicron.cache.sys.hmset(key, "pid", pid, "heartbeat", time.time())
+
+
 async def init(app, loop):  # noqa
     global scheduler
 
@@ -60,6 +68,8 @@ async def init(app, loop):  # noqa
     await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
 
     scheduler = AsyncIOScheduler(timezone=cfg.tz)
+    await heartbeat()
+    scheduler.add_job(heartbeat, "interval", seconds=5)
 
     # sync securities daily
     h, m = map(int, cfg.omega.sync.security_list.split(":"))

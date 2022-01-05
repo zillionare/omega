@@ -4,8 +4,9 @@
 """
 Interface for quotes fetcher
 """
+import datetime
 from abc import ABC
-from typing import List, Union
+from typing import List, Union, Optional
 
 import numpy
 from omicron.core.types import Frame, FrameType
@@ -55,6 +56,16 @@ class QuotesFetcher(ABC):
             'amount': the buy/sell amount in total, double
             'factor': float, may exist or not
         """
+        raise NotImplementedError
+
+    async def get_price(
+        self,
+        sec: Union[List, str],
+        end_date: Union[str, datetime.datetime],
+        n_bars: Optional[int],
+        start_date: Optional[Union[str, datetime.datetime]] = None,
+    ) -> numpy.ndarray:
+
         raise NotImplementedError
 
     async def create_instance(self, **kwargs):
