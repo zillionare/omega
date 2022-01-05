@@ -10,7 +10,7 @@
       
       
       <link rel="shortcut icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.2.3, mkdocs-material-6.2.8">
+      <meta name="generator" content="mkdocs-1.1.2, mkdocs-material-6.2.8">
     
     
       
@@ -399,8 +399,8 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#356-导入历史行情数据" class="md-nav__link">
-    3.5.6. 导入历史行情数据
+  <a href="#356-配置系统日志" class="md-nav__link">
+    3.5.6. 配置系统日志
   </a>
   
 </li>
@@ -693,8 +693,8 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#356-导入历史行情数据" class="md-nav__link">
-    3.5.6. 导入历史行情数据
+  <a href="#356-配置系统日志" class="md-nav__link">
+    3.5.6. 配置系统日志
   </a>
   
 </li>
@@ -799,16 +799,14 @@
 <p>如果您的学习模型需要结合基本面（财务数据），从而可能需要相应更长周期的行情数据。在这种情况下，建议您只保存日线及以上级别的数据。公司基本面的数据，对日线以下级别的股价波动是没有影响的。保存全市场10年的日线数据，也只要2GB左右的内存。</p>
 <p>Omega社区版被设计为支持从个人到小型团队的AI量化研究。如果您需要保存tick级的数据，或者较长时间范围的分钟级别数据，请使用企业版。</p>
 <h4 id="cpu">CPU<a class="headerlink" href="#cpu" title="Permanent link">&para;</a></h4>
-<p>Omega被设计为能运行在从台式机到多台服务器集群上。由于Python本身的限制，Python程序一般无法有效地使用机器的多个CPU（内核）。为了避免这一限制，Omega设计成异步<strong>多进程</strong>协作模式，从而可以最大限度地利用您机器的CPU。因此，在您配置机器时，CPU仍然是越多越好。</p>
+<p>Omega被设计为能运行在从台式机到多台服务器集群上。由于Python本身的限制，Python程序一般无法有效地使用机器的多个CPU（内核）。为了避免这一限制，Omega设计成异步多进程协作模式，从而可以最大限度地利用您机器的CPU。因此，在您配置机器时，CPU仍然是越多越好。</p>
 <h4 id="硬盘">硬盘<a class="headerlink" href="#硬盘" title="Permanent link">&para;</a></h4>
 <p>Omega对硬盘的性能和容量几乎没有要求。一般而言，在安装Omega之前，系统最好至少还有50GB磁盘空间。</p>
 <h4 id="112-网络">1.1.2. 网络<a class="headerlink" href="#112-网络" title="Permanent link">&para;</a></h4>
 <p>如果您使用分布式部署，建议Zillionare各服务都运行在同一个千兆局域网内。</p>
 <h3 id="12-软件清单">1.2. 软件清单<a class="headerlink" href="#12-软件清单" title="Permanent link">&para;</a></h3>
-<details class="note" open="open">
-<summary>Note</summary>
-<p>Omega不适合部署在Windows操作系统上。Omega的各个版本均只在Ubuntu 18， Ubuntu 20上进行测试。因此，即使Omega能在Windows上运行起来，我们也不推荐您这样使用。</p>
-<p>如果您是个人研究使用，只有Windows机器，建议您启用Windows的WSL平台，这样就可以在同一台机器上，同时使用Ubuntu和Windows了。关于如何在Windows上启用WSL，您可以参考这篇文章<a href="http://www.jieyu.ai/blog/best_practice_python/chap1/">开发环境和IDE</a></p>
+<details class="note" open="open"><summary>Note</summary><p>Omega不适合部署在Windows操作系统上。Omega的各个版本均只在Ubuntu 18， Ubuntu 20上进行测试。因此，即使Omega能在Windows上运行起来，我们也不推荐您这样使用。</p>
+<p>如果您是个人研究使用，只有Windows机器，建议您启用Windows的WSL平台，这样就可以在同一台机器上，同时使用Ubuntu和Windows了。关于如何在Windows上启用WSL，您可以参考这篇文章<a href="https://zhuanlan.zhihu.com/p/138005979">Windows下如何构建Python开发环境</a></p>
 </details>
 <p>Omega使用Python 3.8开发，理论上可以部署在任何类Unix的机器上。但只在Ubuntu上经过严格的测试。以下为软件环境类清单：</p>
 <table>
@@ -872,8 +870,8 @@
 <p><img alt="" src="../_static/deploy.png" /></p>
 <h3 id="21-个人研究">2.1. 个人研究<a class="headerlink" href="#21-个人研究" title="Permanent link">&para;</a></h3>
 <p>对于个人研究，我们推荐可以在单台笔记本、台式机上进行部署。您可以将Omega, redis和Postgres安装在同一台机器上。如果您只做动量研究，也可以不安装Postgres。</p>
-<p>如果您的操作系统是Windows的话，建议您按照 <a href="http://www.jieyu.ai/blog/best_practice_python/chap1/">开发环境和IDE</a> 来安装WSL，以获得Omega安装需要的Ubuntu操作系统环境。</p>
-<p>如果您使用Mac机器的话，应该可以直接安装Omega。</p>
+<p>如果您的操作系统是Windows的话，建议您按照 <a href="http://blog.jieyu.ai/blog_2020/%E5%A6%82%E4%BD%95%E6%9E%84%E5%BB%BAPython%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83/">这篇文章</a> 来安装WSL，以获得Omega安装需要的Ubuntu操作系统环境。</p>
+<p>如果您使用Mac机器的话，应该可以直接安装Omega。但您可能需要自行研究如何将rsyslog服务配置成功。</p>
 <h3 id="22-团队使用">2.2. 团队使用<a class="headerlink" href="#22-团队使用" title="Permanent link">&para;</a></h3>
 <p>如果您有一个团队需要使用Omega提供的行情服务，非常棒！Omega完全适合这种场景下的应用。建议您根据团队使用数据的频度、量级和人数，来决定需要多少台机器安装Omega，以及安装Nginx作为Omega的前置代理。</p>
 <h2 id="3-安装步骤">3. 安装步骤<a class="headerlink" href="#3-安装步骤" title="Permanent link">&para;</a></h2>
@@ -903,9 +901,7 @@ conda activate omega
 <p>如果您只是普通用户，那么一般来说，应该设置为PRODUCTION。</p>
 <h3 id="33-安装第三方软件">3.3. 安装第三方软件<a class="headerlink" href="#33-安装第三方软件" title="Permanent link">&para;</a></h3>
 <p>请参照Redis和Postgres的安装指南，分别完成Redis和Postgres的安装。</p>
-<details class="note" open="open">
-<summary>Note</summary>
-<p>如果您的机器上已经有其它程序在使用Redis服务，为避免冲突，请在本机上启动第二个Redis实例，
+<details class="note" open="open"><summary>Note</summary><p>如果您的机器上已经有其它程序在使用Redis服务，为避免冲突，请在本机上启动第二个Redis实例，
 独立为Omega提供服务。这个实例应该使用不同的端口。</p>
 <p>您可以为Omega安装一个全新的Postgres数据库服务器，也重复使用现有的Postgres数据库服务器，
 只要为Omega准备一个单独的数据库即可。Omega将在该数据库中创建一系列表（table)。</p>
@@ -929,6 +925,10 @@ conda activate omega
 </code></pre></div>
 </td></tr></table>
 <p>记下这里使用的用户名和口令，在安装Omega时需要使用。</p>
+<p>Omega使用了rsyslog来收集和输出生产环境下的日志。请使用下面的命令安装:</p>
+<table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div class="highlight"><pre><span></span><code>    sudo apt install rsyslog
+</code></pre></div>
+</td></tr></table>
 <h3 id="34-安装omega">3.4. 安装Omega<a class="headerlink" href="#34-安装omega" title="Permanent link">&para;</a></h3>
 <h4 id="341-从pip安装omega">3.4.1. 从pip安装Omega<a class="headerlink" href="#341-从pip安装omega" title="Permanent link">&para;</a></h4>
 <p>请运行以下命令来从pip安装zillionare-omega(以下称为Omega):</p>
@@ -951,7 +951,7 @@ conda activate omega
 </td></tr></table>
 <p>除非您是Omega的协同开发者，或者遇到紧急修复的bug，否则都应该通过<code>pip</code>的方式来安装稳定版，而不应该从源代码安装。</p>
 <h3 id="35-初始化">3.5. 初始化<a class="headerlink" href="#35-初始化" title="Permanent link">&para;</a></h3>
-<p>由于pip执行安装的过程中，无法与用户进行交互（这是wheel格式包的缺陷），所以初始化的任务，我们通过<code>omega setup</code>命令来完成：</p>
+<p>通过Pip安装的Python包，如果是wheel格式安装，是无法在安装过程中向用户进行交互式提示的，并不适合制作复杂的初始化程序，所以Omega选择在安装之后，再通过<code>setup</code>命令来完成安装定制部分。</p>
 <p>初始化主要完成以下任务：</p>
 <ol>
 <li>检测安装环境。</li>
@@ -959,14 +959,13 @@ conda activate omega
 <li>配置Redis数据库</li>
 <li>配置Postgres数据库</li>
 <li>其它设置（如日志等）</li>
-<li>导入历史K线数据</li>
 </ol>
 <h4 id="351-初始化前的检查">3.5.1. 初始化前的检查<a class="headerlink" href="#351-初始化前的检查" title="Permanent link">&para;</a></h4>
 <p>现在，请确认您已经准备好：</p>
 <ol>
 <li>设置好了服务器角色</li>
 <li>已切换至专门为Omega创建的虚拟运行环境</li>
-<li>Redis服务、Postgres服务已安装好，并且都已经启动。</li>
+<li>Redis服务、Postgres服务和rsyslog已安装好，并且都已经启动。</li>
 <li>zillionare数据库已经创建，并且已得到数据库账户。</li>
 <li>已安装了Omega</li>
 </ol>
@@ -979,13 +978,11 @@ conda activate omega
 <p>Omega使用 cfg4py_ 来管理配置。Cfg4py要求您为部署机器设置场景（开发、测试、生产环境），以便根据对应的场景来应用配置。因此，在Omega安装时，也会检测当前机器是否正确地设置了场景。</p>
 <p><img alt="" src="../_static/setup_detect_env.jpg" /></p>
 <h4 id="353-配置行情服务器">3.5.3. 配置行情服务器<a class="headerlink" href="#353-配置行情服务器" title="Permanent link">&para;</a></h4>
-<p>Omega通过插件来从上游服务器获取行情数据。当前支持的数据提供源是聚宽(JoinQuant)。</p>
-<p>在使用聚宽之前，您需要在<a href="https://www.joinquant.com">聚宽官网</a>上申请 <code>jqdatasdk</code> 的使用权限。在安装过程中，将需要您提供这些信息。每个聚宽账号最多允许3个并发连接。在安装时，Omega需要您为每个账号决定同时允许的最大会话（连接）数。</p>
+<p>Omega通过插件来从上游服务器获取行情数据。当前支持的数据提供源有聚宽(JoinQuant)。</p>
+<p>在使用聚宽之前，您需要在 聚宽_ 官网上申请 <code>jqdatasdk</code> 的使用权限。在安装过程中，将需要您提供这些信息。每个聚宽账号最多允许3个并发连接。在安装时，Omega需要您为每个账号决定同时允许的最大会话（连接）数。</p>
 <p><img alt="" src="../_static/setup_jq_fetcher.jpg" /></p>
-<p>Omega支持多个数据源同时工作（但当前只提供了对聚宽的接口适配），并且支持在同一数据源下，配置多个账号，多个会话（如果您这样做，请确保得到了服务提供商的许可），从而可以快速获取实时行情。所以在上面的安装过程中，将提示您输入并发会话数，以及是否配置多个账号。</p>
-<details class="tip" open="open">
-<summary>Tip</summary>
-<p>Omega通过HTTP微服务向Zillionare的其它组件提供行情数据，因此Omega本身也是一种行情服务器。默认地，Omega的服务端口从3181开始，如果您有多个数据源，或者多个账号，那么Omega将为不同的数据源、或者同一数据源的不同账号，启用新的端口。</p>
+<p>Omega支持多个数据源同时工作（但当前只提供了对聚宽的接口适配），并且支持在同一数据源下，配置多个账号，多个会话（如果您这样做，请确保得到了服务提供商的许可），从而可以最快速获取实时行情。所以在上面的安装过程中，将提示您输入并发会话数，以及是否配置多个账号。</p>
+<details class="tip" open="open"><summary>Tip</summary><p>Omega通过HTTP微服务向Zillionare的其它组件提供行情数据，因此Omega本身也是一种行情服务器。默认地，Omega的服务端口从3181开始，如果您有多个数据源，或者多个账号，那么Omega将为不同的数据源、或者同一数据源的不同账号，启用新的端口。</p>
 <p>比如，如果您拥有两个jqdatasdk的账号，并配置在Omega中使用，那么，Omega将启动两个HTTP服务器，一个监听在3181端口，另一个监听在3182端口。</p>
 </details>
 <p>安装程序没有提供端口定制的功能。但是，您可以在配置文件中找到它们并进行修改：</p>
@@ -998,22 +995,22 @@ conda activate omega
 <span class="normal"> 7</span>
 <span class="normal"> 8</span>
 <span class="normal"> 9</span>
-<span class="normal">10</span></pre></div></td><td class="code"><div class="highlight"><pre><span></span><code><span class="w">    </span><span class="nt">omega</span><span class="p">:</span><span class="w"></span>
-<span class="w">        </span><span class="nt">urls</span><span class="p">:</span><span class="w"></span>
-<span class="w">            </span><span class="nt">quotes_server</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://localhost:3181</span><span class="w"></span>
-<span class="w">  </span><span class="w w-Error"> </span><span class="nt">quotes_fetchers</span><span class="p">:</span><span class="w"></span>
-<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">impl</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jqadaptor</span><span class="w">    </span><span class="c1"># there must be a create_instance method in this module</span><span class="w"></span>
-<span class="w">        </span><span class="nt">workers</span><span class="p">:</span><span class="w"></span>
-<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">account</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${jq_account}</span><span class="w"></span>
-<span class="w">            </span><span class="l l-Scalar l-Scalar-Plain">password</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${jq_password}</span><span class="w"></span>
-<span class="w">            </span><span class="l l-Scalar l-Scalar-Plain">port</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3181</span><span class="w"></span>
-<span class="w">            </span><span class="l l-Scalar l-Scalar-Plain">sessions</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w"></span>
+<span class="normal">10</span></pre></div></td><td class="code"><div class="highlight"><pre><span></span><code>    <span class="nt">omega</span><span class="p">:</span>
+        <span class="nt">urls</span><span class="p">:</span>
+            <span class="nt">quotes_server</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">http://localhost:3181</span>
+  <span class=" -Error"> </span><span class="nt">quotes_fetchers</span><span class="p">:</span>
+    <span class="p p-Indicator">-</span> <span class="nt">impl</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">jqadaptor</span>    <span class="c1"># there must be a create_instance method in this module</span>
+        <span class="nt">workers</span><span class="p">:</span>
+        <span class="p p-Indicator">-</span> <span class="nt">account</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">${jq_account}</span>
+            <span class="l l-Scalar l-Scalar-Plain">password</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">${jq_password}</span>
+            <span class="l l-Scalar l-Scalar-Plain">port</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">3181</span>
+            <span class="l l-Scalar l-Scalar-Plain">sessions</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">2</span>
 </code></pre></div>
 </td></tr></table>
 <p>这里有几点需要注意：</p>
 <ol>
-<li>Omega使用Sanic作为HTTP服务器。由于Sanic的原因，如果您需要Omega与上游服务器同时建立3个并发会话，那么会话设置应该设置为2，而不是3，即您得到的会话数，总会比设置值大1。</li>
-<li>在上面的配置示例中，出现了${jq_account}这样的宏，这是 <a href="https://cfg4py.readthedocs.io/en/latest/">cfg4py</a> 支持的功能，如果您设置了同名的环境变量，则 <a href="https://cfg4py.readthedocs.io/en/latest/">cfg4py</a> 将会将其替换成为环境变量确定的值。建议Omega的协作开发者始终使用这一语法，以避免误将账号和口令公开的互联网上。</li>
+<li>Omega使用Sanic作为HTTP服务器。可能是由于Sanic的原因，如果您需要Omega与上游服务器同时建立3个并发会话，那么会话设置应该设置为2，而不是3，即您得到的会话数，总会比设置值大1。</li>
+<li>在上面的配置示例中，出现了${jq_account}这样的宏，这是 cfg4py_ 支持的功能，如果您设置了同名的环境变量，则 cfg4py_ 将会将其替换成为环境变量确定的值。建议Omega的协作开发者始终使用这一语法，以避免误将账号和口令公开的互联网上。</li>
 <li>Omega作为本地行情服务器，其它组件在访问它时，需要得到服务地址。安装程序没有提供配置项，默认地，它被配置在 http://localhost:3181 上，这个配置是供独立研究者使用的，但无法使用多账号、多数据源功能，也没有负载均衡功能。为实现负载均衡，您需要自行安装nginx做代理，并将nginx的代理地址配置在下面的配置当中：</li>
 </ol>
 <table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
@@ -1030,9 +1027,8 @@ conda activate omega
 <h4 id="355-配置postgres数据库">3.5.5. 配置Postgres数据库<a class="headerlink" href="#355-配置postgres数据库" title="Permanent link">&para;</a></h4>
 <p>如果您急于开始使用Omega,您可以略过Postgres的安装和配置。但是配置数据库将使得您访问财务数据时，能获得更好的性能。因为如果您没有配置Postgres数据库的话，这些数据都将从上游服务器去实时获取。</p>
 <p><img alt="" src="../_static/setup_postgres.jpg" /></p>
-<h4 id="356-导入历史行情数据">3.5.6. 导入历史行情数据<a class="headerlink" href="#356-导入历史行情数据" title="Permanent link">&para;</a></h4>
-<p>我们提供了从2015年以来30分钟及以上级别的A股历史行情数据（不含指数），并且在每个月结束后更新上一个月的数据。您可以根据提示选择导入这些数据。</p>
-<p>安装向导将提示您输入导入多少个月的数据。数据是从服务器上最新的数据，按月往前计算的。如果当前是2021年3月，则服务器上存在2015年1月到2021年2月的全部数据。如果您选择导入2个月的数据，则将为您导入从2021年1月到2021年2月的所有数据。其它数据，您将通过正常的同步来获得。</p>
+<h4 id="356-配置系统日志">3.5.6. 配置系统日志<a class="headerlink" href="#356-配置系统日志" title="Permanent link">&para;</a></h4>
+<p>在生产环境下，Omega使用rsyslog来收集日志文件，并写入同一个omega.log文件中。为了实现这一功能，Omega需要将一些配置文件拷入/etc/rsyslog.d/文件夹下。在这个过程中，可能需要您提供相关权限。</p>
 <p>最后，安装全部结束，Omega将为您启动服务，并显示服务状态：</p>
 <p><img alt="" src="../_static/setup_finished.jpg" /></p>
                 

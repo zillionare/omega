@@ -6,7 +6,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1" name="viewport"/>
 <link href="../assets/images/favicon.png" rel="shortcut icon"/>
-<meta content="mkdocs-1.2.3, mkdocs-material-6.2.8" name="generator"/>
+<meta content="mkdocs-1.1.2, mkdocs-material-6.2.8" name="generator"/>
 <title>API文档 - Omega帮助文档</title>
 <link href="../assets/stylesheets/main.cb6bc1d0.min.css" rel="stylesheet"/>
 <link href="../assets/stylesheets/palette.39b8e14a.min.css" rel="stylesheet"/>
@@ -1068,36 +1068,35 @@ config_postgres<span class="p">(</span><span class="n">settings</span><span clas
 <h4 class="doc doc-heading" id="omega.cli.find_fetcher_processes">
 <code class="highlight language-python">
 find_fetcher_processes<span class="p">()</span> </code>
-<span class="doc doc-properties">
-<small class="doc doc-property doc-property-async"><code>async</code></small>
-</span>
 <a class="headerlink" href="#omega.cli.find_fetcher_processes" title="Permanent link">¶</a></h4>
 <div class="doc doc-contents">
-<p>从redis中查找已启动的fetcher进程</p>
-<p>返回 f"{impl}:{gid}" -&gt; (pid, port, alive)</p>
+<p>查找所有的omega(fetcher)进程</p>
+<p>Omega进程在ps -aux中显示应该包含 omega.app --impl=&amp;ltfetcher&amp;gt --port=&amp;ltport&amp;gt信息</p>
 <details class="quote">
 <summary>Source code in <code>omega/cli.py</code></summary>
 <div class="highlight">
-<pre><span></span><code><span class="k">async</span> <span class="k">def</span> <span class="nf">find_fetcher_processes</span><span class="p">():</span>
-    <span class="sd">"""从redis中查找已启动的fetcher进程</span>
+<pre><span></span><code><span class="k">def</span> <span class="nf">find_fetcher_processes</span><span class="p">():</span>
+    <span class="sd">"""查找所有的omega(fetcher)进程</span>
 
-<span class="sd">    返回 f"{impl}:{gid}" -&gt; (pid, port, alive)</span>
+<span class="sd">    Omega进程在ps -aux中显示应该包含 omega.app --impl=&amp;ltfetcher&amp;gt --port=&amp;ltport&amp;gt信息</span>
 <span class="sd">    """</span>
-    <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
-    <span class="n">keys</span> <span class="o">=</span> <span class="k">await</span> <span class="n">cache</span><span class="o">.</span><span class="n">sys</span><span class="o">.</span><span class="n">keys</span><span class="p">(</span><span class="s2">"process.fetchers.*"</span><span class="p">)</span>
-    <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">keys</span><span class="p">:</span>
-        <span class="n">info</span> <span class="o">=</span> <span class="k">await</span> <span class="n">cache</span><span class="o">.</span><span class="n">sys</span><span class="o">.</span><span class="n">hgetall</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">psutil</span><span class="o">.</span><span class="n">process_iter</span><span class="p">():</span>
+        <span class="n">cmd</span> <span class="o">=</span> <span class="s2">" "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">cmdline</span><span class="p">())</span>
+        <span class="k">if</span> <span class="s2">"omega.app start"</span> <span class="ow">in</span> <span class="n">cmd</span> <span class="ow">and</span> <span class="s2">"--impl"</span> <span class="ow">in</span> <span class="n">cmd</span> <span class="ow">and</span> <span class="s2">"--port"</span> <span class="ow">in</span> <span class="n">cmd</span><span class="p">:</span>
 
-        <span class="n">heartbeat</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">info</span><span class="p">[</span><span class="s2">"heartbeat"</span><span class="p">])</span>
+            <span class="n">m</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s2">"--impl=([^\s]+)"</span><span class="p">,</span> <span class="n">cmd</span><span class="p">)</span>
+            <span class="n">impl</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="k">if</span> <span class="n">m</span> <span class="k">else</span> <span class="s2">""</span>
 
-        <span class="n">group</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">info</span><span class="p">[</span><span class="s1">'impl'</span><span class="p">]</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">info</span><span class="p">[</span><span class="s1">'gid'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span>
-        <span class="n">pid</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">info</span><span class="p">[</span><span class="s2">"pid"</span><span class="p">])</span>
-        <span class="n">port</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">info</span><span class="p">[</span><span class="s2">"port"</span><span class="p">])</span>
-        <span class="n">alive</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">heartbeat</span> <span class="o">&lt;</span> <span class="mi">10</span>
+            <span class="n">m</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s2">"--port=(\d+)"</span><span class="p">,</span> <span class="n">cmd</span><span class="p">)</span>
+            <span class="n">port</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="k">if</span> <span class="n">m</span> <span class="k">else</span> <span class="s2">""</span>
 
-        <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">pid</span><span class="p">,</span> <span class="n">port</span><span class="p">,</span> <span class="n">alive</span><span class="p">,</span> <span class="n">group</span><span class="p">))</span>
+            <span class="n">group</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">impl</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">port</span><span class="si">}</span><span class="s2">"</span>
+            <span class="n">pids</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">group</span><span class="p">,</span> <span class="p">[])</span>
+            <span class="n">pids</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">pid</span><span class="p">)</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">group</span><span class="p">]</span> <span class="o">=</span> <span class="n">pids</span>
 
-    <span class="k">return</span> <span class="n">results</span>
+    <span class="k">return</span> <span class="n">result</span>
 </code></pre>
 </div>
 </details>
@@ -1227,7 +1226,7 @@ setup<span class="p">(</span><span class="n">reset_factory</span><span class="o"
         <span class="n">config_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">get_config_dir</span><span class="p">(),</span> <span class="s2">"defaults.yaml"</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">config_file</span><span class="p">):</span>
             <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">colored</span><span class="p">(</span><span class="s1">'[PASS]'</span><span class="p">,</span> <span class="s1">'green'</span><span class="p">)</span><span class="si">}</span><span class="s2"> 安装程序已在本机上成功运行"</span><span class="p">)</span>
-            <span class="k">return</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">reset_factory</span><span class="p">:</span>
         <span class="kn">import</span> <span class="nn">sh</span>
@@ -1243,7 +1242,7 @@ setup<span class="p">(</span><span class="n">reset_factory</span><span class="o"
     <span class="n">settings</span> <span class="o">=</span> <span class="n">load_factory_settings</span><span class="p">()</span>
 
     <span class="k">if</span> <span class="ow">not</span> <span class="n">check_environment</span><span class="p">():</span>
-        <span class="k">return</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
 
     <span class="n">print_title</span><span class="p">(</span><span class="s2">"Step 2. 配置日志"</span><span class="p">)</span>
     <span class="n">config_logging</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span>
@@ -1990,7 +1989,7 @@ start_validation<span class="p">()</span> </code>
     <span class="k">await</span> <span class="n">cache</span><span class="o">.</span><span class="n">sys</span><span class="o">.</span><span class="n">lpush</span><span class="p">(</span><span class="s2">"jobs.bars_validation.scope"</span><span class="p">,</span> <span class="o">*</span><span class="n">codes</span><span class="p">)</span>
 
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"start validation </span><span class="si">%s</span><span class="s2"> secs from </span><span class="si">%s</span><span class="s2"> to </span><span class="si">%s</span><span class="s2">."</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">codes</span><span class="p">),</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">)</span>
-    <span class="k">await</span> <span class="n">emit</span><span class="o">.</span><span class="n">async_register</span><span class="p">(</span><span class="n">Events</span><span class="o">.</span><span class="n">OMEGA_VALIDATION_ERROR</span><span class="p">,</span> <span class="n">on_validation_error</span><span class="p">)</span>
+    <span class="n">emit</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">Events</span><span class="o">.</span><span class="n">OMEGA_VALIDATION_ERROR</span><span class="p">,</span> <span class="n">on_validation_error</span><span class="p">)</span>
 
     <span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
 
@@ -2389,7 +2388,7 @@ get_security_list<span class="p">()</span> </code>
 </thead>
 <tbody>
 <tr>
-<td><code>Optional[numpy.ndarray]</code></td>
+<td><code>Union[NoneType, numpy.ndarray]</code></td>
 <td>
 <p>Union[None, np.ndarray]: [description]</p>
 </td>
