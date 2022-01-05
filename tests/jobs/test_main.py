@@ -11,7 +11,7 @@ import omicron
 import rlog
 from omicron import cache
 from omicron.core.types import FrameType
-
+from pyemit import emit
 from omega.jobs.__main__ import init, start_logging
 from tests import find_free_port, init_test_env, start_job_server
 
@@ -19,6 +19,11 @@ cfg = cfg4py.get_instance()
 
 
 class TestJobsMain(unittest.IsolatedAsyncioTestCase):
+    async def asyncTearDown(self) -> None:
+        await omicron.shutdown()
+        await emit.stop()
+        await cache.close()
+
     async def test_start_logging(self):
         init_test_env()
         # remove handlers set by config file, if there is.
