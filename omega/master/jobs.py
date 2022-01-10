@@ -4,42 +4,38 @@
 import asyncio
 import datetime
 import logging
-import os
 from typing import List, Optional, Tuple, Union
-
+import async_timeout
 import aiohttp
 import arrow
 import cfg4py
-from dateutil import tz
 from omicron import cache
-from omicron.core.errors import FetcherQuotaError
 from omicron.core.timeframe import tf
 from omicron.core.types import Frame, FrameType
 from omicron.models.securities import Securities
 from pyemit import emit
 
 from omega.core.events import Events
-from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
+from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
 
 
-
 async def _start_job_timer(job_name: str):
-    key_start = f"jobs.bars_{job_name}.start"
+    key_start = f"master.bars_{job_name}.start"
 
     pl = cache.sys.pipeline()
-    pl.delete(f"jobs.bars_{job_name}.*")
+    pl.delete(f"master.bars_{job_name}.*")
 
     pl.set(key_start, arrow.now(tz=cfg.tz).format("YYYY-MM-DD HH:mm:ss"))
     await pl.execute()
 
 
 async def _stop_job_timer(job_name: str) -> int:
-    key_start = f"jobs.bars_{job_name}.start"
-    key_stop = f"jobs.bars_{job_name}.stop"
-    key_elapsed = f"jobs.bars_{job_name}.elapsed"
+    key_start = f"master.bars_{job_name}.start"
+    key_stop = f"master.bars_{job_name}.stop"
+    key_elapsed = f"master.bars_{job_name}.elapsed"
 
     start = arrow.get(await cache.sys.get(key_start), tzinfo=cfg.tz)
     stop = arrow.now(tz=cfg.tz)
@@ -60,7 +56,7 @@ def load_sync_params(frame_type: FrameType) -> dict:
         frame_type (FrameType): [description]
 
     Returns:
-        dict: see @[omega.jobs.syncjobs.parse_sync_params]
+        dict: see @[omega.master.syncjobs.parse_sync_params]
     """
     for item in cfg.omega.sync.bars:
         if item.get("frame") == frame_type.value:
@@ -91,7 +87,7 @@ async def trigger_bars_sync(sync_params: dict = None, force=False):
                 delay: seconds for sync to wait.
             }
             ```
-            see more @[omega.jobs.syncjobs.parse_sync_params][]
+            see more @[omega.master.syncjobs.parse_sync_params][]
         force: 即使当前不是交易日，是否也强行进行同步。
     Returns:
 
@@ -100,7 +96,7 @@ async def trigger_bars_sync(sync_params: dict = None, force=False):
         return
 
     codes, frame_type, start, stop, delay = parse_sync_params(**sync_params)
-    key_scope = f"jobs.bars_sync.scope.{frame_type.value}"
+    key_scope = f"master.bars_sync.scope.{frame_type.value}"
 
     if len(codes) == 0:
         logger.warning("no securities are specified for sync %s", frame_type)
@@ -109,7 +105,7 @@ async def trigger_bars_sync(sync_params: dict = None, force=False):
     fmt_str = "sync from %s to %s in frame_type(%s) for %s secs"
     logger.info(fmt_str, start, stop, frame_type, len(codes))
 
-    # secs are stored into cache, so each fetcher can polling it
+    # secs are stored into cache, so each worker can polling it
     pl = cache.sys.pipeline()
     pl.delete(key_scope)
     pl.lpush(key_scope, *codes)
@@ -127,13 +123,13 @@ async def trigger_bars_sync(sync_params: dict = None, force=False):
 
 
 def parse_sync_params(
-    frame: Union[str, Frame],
-    cat: List[str] = None,
-    start: Union[str, datetime.date] = None,
-    stop: Union[str, Frame] = None,
-    delay: int = 0,
-    include: str = "",
-    exclude: str = "",
+        frame: Union[str, Frame],
+        cat: List[str] = None,
+        start: Union[str, datetime.date] = None,
+        stop: Union[str, Frame] = None,
+        delay: int = 0,
+        include: str = "",
+        exclude: str = "",
 ) -> Tuple:
     """按照[使用手册](usage.md#22-如何同步K线数据)中的规则，解析和补全同步参数。
 
@@ -204,77 +200,11 @@ def parse_sync_params(
     return codes, frame_type, start, stop, int(delay)
 
 
-async def sync_bars(params: dict):
-    """sync bars on signal OMEGA_DO_SYNC received
-
-    Args:
-        params (dict): composed of the following:
-            ```
-            {
-                secs (List[str]): 待同步的证券标的.如果为None或者为空，则从数据库中轮询
-                frame_type (FrameType):k线的帧类型
-                start (Frame): k线起始时间
-                stop (Frame): k线结束时间
-            }
-            ```
-    Returns:
-        [type]: [description]
-    """
-    secs, frame_type, start, stop = (
-        params.get("secs"),
-        params.get("frame_type"),
-        params.get("start"),
-        params.get("stop"),
-    )
-
-    if secs is not None:
-        logger.info(
-            "sync bars with %s(%s ~ %s) for given %s secs",
-            frame_type,
-            start,
-            stop,
-            len(secs),
-        )
-
-        async def get_sec():
-            return secs.pop() if len(secs) else None
-
-    else:
-        logger.info(
-            "sync bars with %s(%s ~ %s) in polling mode", frame_type, start, stop
-        )
-
-        async def get_sec():
-            return await cache.sys.lpop(key_scope)
-
-    key_scope = f"jobs.bars_sync.scope.{frame_type.value}"
-
-    if start is None or frame_type is None:
-        raise ValueError("you must specify a start date/frame_type for sync")
-
-    if stop is None:
-        stop = tf.floor(arrow.now(tz=cfg.tz), frame_type)
-
-    while code := await get_sec():
-        try:
-            await sync_bars_for_security(code, frame_type, start, stop)
-        except FetcherQuotaError as e:
-            logger.warning("Quota exceeded when syncing %s. Sync aborted.", code)
-            logger.exception(e)
-            return  # stop the sync
-        except Exception as e:
-            logger.warning("Failed to sync %s", code)
-            logger.exception(e)
-
-    elapsed = await _stop_job_timer("sync")
-    logger.info("%s finished quotes sync in %s seconds", os.getpid(), elapsed)
-
-
 async def sync_bars_for_security(
-    code: str,
-    frame_type: FrameType,
-    start: Union[datetime.date, datetime.datetime],
-    stop: Union[None, datetime.date, datetime.datetime],
+        code: str,
+        frame_type: FrameType,
+        start: Union[datetime.date, datetime.datetime],
+        stop: Union[None, datetime.date, datetime.datetime],
 ):
     counters = 0
 
@@ -711,6 +641,60 @@ def load_bars_sync_jobs(scheduler):
         "cron",
         hour=15,
         minute=5,
-        args=(all_params, ),
+        args=(all_params,),
         name="closing_quotation_sync_bars",
     )
+
+
+async def sync_minute_bars():
+    """
+    1. 读取上次数据同步的截止时间, 总是
+    2. 读取证券列表（股票和指数），写入redis的sys库中的jobs.bars_sync.scope.minute列表。
+    3. 发出DO_SYNC_MIN消息 {"start": xxx, "end":xxx}
+    4. 在with语句中每秒检查一次jobs.bars_sync.done.minute列表是不是和生产的任务个数一致，直到执行完
+    5. 同步完成之后，更新数据同步时间戳
+    6. 如果同步超时，将jobs.bars_sync.scope.minute清空，并发出报警邮件
+    Returns:
+    """
+
+    is_running = int(await cache.sys.hget("master.bars_sync.state.minute", "is_running"))
+    now = datetime.datetime.now()
+    start = now.strftime("%Y-%m-%d %H:%M:00")
+    if is_running:
+        logger.info(f"检测到有正在执行的分钟同步任务，本次不执行：{start}")
+        print(f"检测到有正在执行的分钟同步任务，本次不执行：{start}")
+        return
+    await cache.sys.hset("master.bars_sync.state.minute", "is_running", 1)
+    async def check_done():
+        while True:
+            try:
+                async with async_timeout.timeout(60):
+                    while True:
+                        if await cache.sys.llen("master.bars_sync.done.minute") != count:
+                            await asyncio.sleep(1)
+                        else:
+                            await cache.sys.delete("master.bars_sync.done.minute")
+                            return
+            except asyncio.exceptions.TimeoutError:
+                print("超时了, 继续等待，并发送报警邮件")
+
+    end = await cache.sys.hget("master.bars_sync.state.minute", "end")
+    if not end:
+        # 如果么有end,则取上一分钟的时间
+        end = (now - datetime.timedelta(minutes=1)).strftime("%Y-%m-%d %H:%M:00")
+    # todo 取股票列表下发任务
+    tasks = ("12", "23", "34")
+    count = len(tasks)
+    p = cache.sys.pipeline()
+    p.delete("master.bars_sync.done.minute")
+    p.hmset("master.bars_sync.state.minute", "task_count", count)
+    p.delete("master.bars_sync.scope.minute")
+    p.lpush("master.bars_sync.scope.minute", *tasks)
+    await p.execute()
+    await emit.emit(Events.OMEGA_DO_SYNC_MIN, {"start": start, "end": end})
+    await check_done()
+    await cache.sys.hmset("master.bars_sync.state.minute",
+                          "is_running", 0,
+                          "end", start,
+                          "task_count", 0)
+

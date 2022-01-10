@@ -20,11 +20,11 @@ from omicron.models.securities import Securities
 from pyemit import emit
 
 import omega.core.sanity
-import omega.jobs
-import omega.jobs.syncjobs as syncjobs
+import omega.master
+import omega.master.jobs as syncjobs
 from omega.core.events import Events, ValidationError
-from omega.fetcher import archive
-from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
+from omega.worker import archive
+from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from tests import init_test_env, start_archive_server, start_omega
 
 logger = logging.getLogger(__name__)
@@ -454,7 +454,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         try:
             days, weeks, months = tf.day_frames, tf.week_frames, tf.month_frames
             tf.day_frames, tf.week_frames, tf.month_frames = None, None, None
-            await omega.jobs.syncjobs.sync_calendar()
+            await omega.master.jobs.sync_calendar()
 
             self.assertIn(20200102, tf.day_frames)
             self.assertIn(20200403, tf.week_frames)
@@ -467,11 +467,11 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         # if source server returns None, we still have old tf.*_frames
         async_mock = mock.AsyncMock(return_value=None)
         with mock.patch(
-            "omega.fetcher.abstract_quotes_fetcher.AbstractQuotesFetcher"
+            "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher"
             ".get_all_trade_days",
             side_effect=async_mock,
         ):
-            await omega.jobs.syncjobs.sync_calendar()
+            await omega.master.jobs.sync_calendar()
             self.assertIn(20200102, tf.day_frames)
             self.assertIn(20200403, tf.week_frames)
             self.assertIn(20200630, tf.month_frames)
@@ -642,8 +642,8 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         emit.register(Events.OMEGA_VALIDATION_ERROR, collect_error)
 
         codes = ["000001.XSHE"]
-        await cache.sys.set("jobs.bars_validation.range.start", "20200511")
-        await cache.sys.set("jobs.bars_validation.range.stop", "20200513")
+        await cache.sys.set("master.bars_validation.range.start", "20200511")
+        await cache.sys.set("master.bars_validation.range.stop", "20200513")
         await omega.core.sanity.do_validation(codes, "20200511", "20200512")
         self.assertSetEqual({(0, 20200511, None, None, None, None)}, set(errors))
 
@@ -666,8 +666,8 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             },
         }
 
-        await cache.sys.set("jobs.bars_validation.range.start", "20200511")
-        await cache.sys.set("jobs.bars_validation.range.stop", "20200513")
+        await cache.sys.set("master.bars_validation.range.start", "20200511")
+        await cache.sys.set("master.bars_validation.range.stop", "20200513")
         with mock.patch(
             "omega.core.sanity.calc_checksums",
             side_effect=[mock_checksum, mock_checksum],
@@ -697,7 +697,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
     async def prepare_checksum_data(self):
         end = datetime.datetime(2020, 5, 12, 15)
 
-        await cache.sys.set("jobs.checksum.cursor", 20200511)
+        await cache.sys.set("master.checksum.cursor", 20200511)
 
         for frame_type in tf.minute_level_frames:
             n = len(tf.ticks[frame_type])
@@ -735,3 +735,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         await syncjobs.sync_security_list()
         secs = await cache.get_securities()
         self.assertTrue(len(secs) > 0)
+
+    async def test_sync_minute_bars(self):
+        await cache.sys.hset("master.bars_sync.state.minute", "is_running", 0)
+        await syncjobs.sync_minute_bars()

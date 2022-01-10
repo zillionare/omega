@@ -12,6 +12,8 @@ class Events:
     OMEGA_DO_CHECKSUM = "omega/do_checksum"
     OMEGA_VALIDATION_ERROR = "omega/validation_error"
 
+    OMEGA_DO_SYNC_MIN = "omega/sync_min"
+
 
 class ValidationError:
     NO_CHECKSUM = 0

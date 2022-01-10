@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Interface for quotes fetcher
+Interface for quotes worker
 """
 import datetime
 from abc import ABC

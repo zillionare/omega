@@ -33,9 +33,9 @@ from termcolor import colored
 
 import omega
 from omega.config import get_config_dir
-from omega.fetcher import archive
-from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher
-from omega.jobs import syncjobs
+from omega.worker import archive
+from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher
+from omega.master import jobs as syncjobs
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
@@ -81,7 +81,7 @@ def format_msg(msg: str):
     msg = []
     for line in lines:
         for i in range(int(len(line) / 80 + 1)):
-            msg.append(line[i * 80 : min(len(line), (i + 1) * 80)])
+            msg.append(line[i * 80: min(len(line), (i + 1) * 80)])
     return "\n".join(msg)
 
 
@@ -112,7 +112,7 @@ def append_fetcher(settings: dict, worker):
 def is_in_venv():
     # 是否为virtual env
     is_venv = hasattr(sys, "real_prefix") or (
-        hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
+            hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
     )
 
     if is_venv:
@@ -288,10 +288,10 @@ def config_fetcher(settings):
 
 
 def get_input(
-    prompt: str,
-    validation: Union[None, List, Callable],
-    default: Any,
-    op_hint: str = None,
+        prompt: str,
+        validation: Union[None, List, Callable],
+        default: Any,
+        op_hint: str = None,
 ):
     if op_hint is None:
         op_hint = f"忽略此项(C)，退出(Q)，回车选择默认值[{default}]："
@@ -463,7 +463,7 @@ def check_environment():
         """
         hint = "按任意键忽略错误继续安装，退出安装[Q]:\n"
 
-        prompt = f"[{colored('FAIL','green')}] {msg} \\n{hint}"
+        prompt = f"[{colored('FAIL', 'green')}] {msg} \\n{hint}"
         print(format_msg(prompt))
         if input().upper() == "Q":
             print("您选择了终止安装程序")
@@ -486,7 +486,6 @@ def find_fetcher_processes():
     for p in psutil.process_iter():
         cmd = " ".join(p.cmdline())
         if "omega.app start" in cmd and "--impl" in cmd and "--port" in cmd:
-
             m = re.search(r"--impl=([^\s]+)", cmd)
             impl = m.group(1) if m else ""
 
@@ -573,7 +572,7 @@ def show_fetcher_processes():
 
 
 def _start_fetcher(
-    impl: str, account: str, password: str, port: int, sessions: int = 1
+        impl: str, account: str, password: str, port: int, sessions: int = 1
 ):
     subprocess.Popen(
         [

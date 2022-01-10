@@ -12,7 +12,7 @@ import rlog
 from omicron import cache
 from omicron.core.types import FrameType
 from pyemit import emit
-from omega.jobs.__main__ import init, start_logging
+from omega.master.app import init, start_logging
 from tests import find_free_port, init_test_env, start_job_server
 
 cfg = cfg4py.get_instance()

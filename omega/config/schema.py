@@ -43,7 +43,7 @@ class Config(object):
     class postgres:
         dsn: Optional[str] = None
 
-        enabled: Optional[bool] = None
+        enabled: Optional[str] = None
 
     class pickle:
         ver: Optional[int] = None
@@ -69,3 +69,19 @@ class Config(object):
             bars: Optional[list] = None
 
     quotes_fetchers: Optional[list] = None
+
+    class dfs:
+        engine: Optional[str] = None
+
+        class minio:
+            host: Optional[str] = None
+
+            port: Optional[int] = None
+
+            access: Optional[str] = None
+
+            secret: Optional[str] = None
+
+            secure: Optional[bool] = None
+
+            bucket: Optional[str] = None

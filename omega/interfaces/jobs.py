@@ -3,7 +3,7 @@ import logging
 from sanic import response
 from sanic.blueprints import Blueprint
 
-from omega.jobs import syncjobs
+from omega.master import jobs as syncjobs
 
 bp = Blueprint("jobs", url_prefix="/jobs/")
 logger = logging.getLogger(__name__)

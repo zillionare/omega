@@ -18,7 +18,7 @@ from omicron.core.types import Frame, FrameType
 from omicron.models.valuation import Valuation
 
 from omega.core.accelerate import merge
-from omega.fetcher.quotes_fetcher import QuotesFetcher
+from omega.worker.quotes_fetcher import QuotesFetcher
 
 logger = logging.getLogger(__file__)
 
@@ -40,7 +40,7 @@ class AbstractQuotesFetcher(QuotesFetcher):
 
         impl: QuotesFetcher = await factory_method(**kwargs)
         cls._instances.append(impl)
-        logger.info("add one quotes fetcher implementor: %s", module_name)
+        logger.info("add one quotes worker implementor: %s", module_name)
 
     @classmethod
     @static_vars(i=0)

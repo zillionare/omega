@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-quotes fetcher
+quotes worker
 """
 import logging
 
