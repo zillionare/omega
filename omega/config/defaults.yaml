@@ -29,7 +29,7 @@ logreceiver:
   klass: omega.logging.receiver.redis.RedisLogReceiver
   dsn: redis://${REDIS_HOST}:${REDIS_PORT}
   channel: omega.log
-  filename: /var/log/zillionare/omega.log
+  filename: /tmp/log/zillionare/omega.log
   backup_count: 7
   max_bytes: 10M
 redis:
@@ -51,24 +51,10 @@ omega:
     security_list: 02:00
     calendar: 02:00
     bars:
-      - frame: '1W'
-        start: '2020-12-1'
-        cat:
-          - stock
-      - frame: '1M'
-        start: '2020-12-1'
-        cat:
-          - stock
-      - frame: '1d'
-        start: '2020-12-1'
-        delay: 5 # delay * seconds after the frame is done
-        cat:
-          - stock
-      - frame: '30m'
-        start: '2021-3-31'
-        delay: 5
-        cat:
-          - stock
+      cat:
+        - stock
+        - index
+
 
 quotes_fetchers:
   - impl: jqadaptor    # there must be a create_instance method in this module
@@ -78,3 +64,18 @@ quotes_fetchers:
         port: 3181
         # note! for the first group, if you set n, then you'll get n + 1 workers
         sessions: 1
+
+dfs:
+  engine: minio
+  minio:
+    host: ${MINIO_HOST}
+    port: ${MINIO_PORT}
+    access: ${MINIO_ACCESS}
+    secret: ${MINIO_SECRET}
+    secure: false
+    bucket: zillionare
+
+influxdb:
+  url: http://192.168.100.111:8086
+  token: Gui_t2RaMJ44bTyPHWs1cLIuJDyyUjldvq52HzlLXcz3z5jyCdPIgrGZIJAh4gZXhny9JGveOzi1r72WgtJ-xg==
+  org: my-org

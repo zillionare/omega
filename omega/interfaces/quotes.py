@@ -3,8 +3,8 @@ import pickle
 
 import arrow
 import cfg4py
-from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
+from omicron.models.calendar import Calendar as cal
 from sanic import Blueprint, response
 
 from omega.fetcher.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
@@ -50,7 +50,7 @@ async def get_bars_batch_handler(request):
         frame_type = FrameType(request.json.get("frame_type"))
 
         end = arrow.get(request.json.get("end"), tzinfo=cfg.tz)
-        end = end.date() if frame_type in tf.day_level_frames else end.datetime
+        end = end.date() if frame_type in cal.day_level_frames else end.datetime
 
         n_bars = request.json.get("n_bars")
         include_unclosed = request.json.get("include_unclosed", False)
@@ -71,7 +71,7 @@ async def get_bars_handler(request):
         frame_type = FrameType(request.json.get("frame_type"))
 
         end = arrow.get(request.json.get("end"), tzinfo=cfg.tz)
-        end = end.date() if frame_type in tf.day_level_frames else end.datetime
+        end = end.date() if frame_type in cal.day_level_frames else end.datetime
         n_bars = request.json.get("n_bars")
         include_unclosed = request.json.get("include_unclosed", False)
 

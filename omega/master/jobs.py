@@ -5,21 +5,28 @@ import asyncio
 import datetime
 import logging
 from typing import List, Optional, Tuple, Union
-import async_timeout
+
 import aiohttp
 import arrow
+import async_timeout
 import cfg4py
+from cfg4py.config import Config
 from omicron import cache
-from omicron.core.timeframe import tf
-from omicron.core.types import Frame, FrameType
-from omicron.models.securities import Securities
+from omicron.core.types import FrameType
+from omicron.models.calendar import Calendar as cal
+from omicron.models.stock import Stock
 from pyemit import emit
 
+from omega.core.constants import (
+    BAR_SYNC_ARCHIVE_HEAD,
+    BAR_SYNC_ARCHIVE_TAIl,
+    get_queue_name,
+)
 from omega.core.events import Events
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 
 logger = logging.getLogger(__name__)
-cfg = cfg4py.get_instance()
+cfg: Config = cfg4py.get_instance()
 
 
 async def _start_job_timer(job_name: str):
@@ -49,237 +56,6 @@ async def _stop_job_timer(job_name: str) -> int:
     return elapsed
 
 
-def load_sync_params(frame_type: FrameType) -> dict:
-    """根据指定的frame_type，从配置文件中加载同步参数
-
-    Args:
-        frame_type (FrameType): [description]
-
-    Returns:
-        dict: see @[omega.master.syncjobs.parse_sync_params]
-    """
-    for item in cfg.omega.sync.bars:
-        if item.get("frame") == frame_type.value:
-            try:
-                secs, frame_type, start, stop, delay = parse_sync_params(**item)
-                return item
-            except Exception as e:
-                logger.exception(e)
-                logger.warning("failed to parse %s", item)
-                return None
-
-    return None
-
-
-async def trigger_bars_sync(sync_params: dict = None, force=False):
-    """初始化bars_sync的任务，发信号给各quotes_fetcher进程以启动同步。
-
-    Args:
-        frame_type (FrameType): 要同步的帧类型
-        sync_params (dict): 同步参数
-            ```
-            {
-                start: 起始帧
-                stop: 截止帧
-                frame: 帧类型
-                delay: 延迟启动时间，以秒为单位
-                cat: 证券分类，如stock, index等
-                delay: seconds for sync to wait.
-            }
-            ```
-            see more @[omega.master.syncjobs.parse_sync_params][]
-        force: 即使当前不是交易日，是否也强行进行同步。
-    Returns:
-
-    """
-    if not force and not tf.is_trade_day(arrow.now()):
-        return
-
-    codes, frame_type, start, stop, delay = parse_sync_params(**sync_params)
-    key_scope = f"master.bars_sync.scope.{frame_type.value}"
-
-    if len(codes) == 0:
-        logger.warning("no securities are specified for sync %s", frame_type)
-        return
-
-    fmt_str = "sync from %s to %s in frame_type(%s) for %s secs"
-    logger.info(fmt_str, start, stop, frame_type, len(codes))
-
-    # secs are stored into cache, so each worker can polling it
-    pl = cache.sys.pipeline()
-    pl.delete(key_scope)
-    pl.lpush(key_scope, *codes)
-    await pl.execute()
-
-    await asyncio.sleep(delay)
-    await _start_job_timer("sync")
-
-    await emit.emit(
-        Events.OMEGA_DO_SYNC, {"frame_type": frame_type, "start": start, "stop": stop}
-    )
-
-    fmt_str = "send trigger sync event to fetchers: from %s to %s in frame_type(%s) for %s secs"
-    logger.info(fmt_str, start, stop, frame_type, len(codes))
-
-
-def parse_sync_params(
-        frame: Union[str, Frame],
-        cat: List[str] = None,
-        start: Union[str, datetime.date] = None,
-        stop: Union[str, Frame] = None,
-        delay: int = 0,
-        include: str = "",
-        exclude: str = "",
-) -> Tuple:
-    """按照[使用手册](usage.md#22-如何同步K线数据)中的规则，解析和补全同步参数。
-
-    如果`frame_type`为分钟级，则当`start`指定为`date`类型时，自动更正为对应交易日的起始帧；
-    当`stop`为`date`类型时，自动更正为对应交易日的最后一帧。
-    Args:
-        frame (Union[str, Frame]): frame type to be sync.  The word ``frame`` is used
-            here for easy understand by end user. It actually implies "FrameType".
-        cat (List[str]): which catetories is about to be synced. Should be one of
-            ['stock', 'index']. Defaults to None.
-        start (Union[str, datetime.date], optional): [description]. Defaults to None.
-        stop (Union[str, Frame], optional): [description]. Defaults to None.
-        delay (int, optional): [description]. Defaults to 5.
-        include (str, optional): which securities should be included, seperated by
-            space, for example, "000001.XSHE 000004.XSHE". Defaults to empty string.
-        exclude (str, optional):  which securities should be excluded, seperated by
-            a space. Defaults to empty string.
-
-    Returns:
-        - codes (List[str]): 待同步证券列表
-        - frame_type (FrameType):
-        - start (Frame):
-        - stop (Frame):
-        - delay (int):
-    """
-    frame_type = FrameType(frame)
-
-    if frame_type in tf.minute_level_frames:
-        if stop:
-            stop = arrow.get(stop, tzinfo=cfg.tz)
-            if stop.hour == 0:  # 未指定有效的时间帧，使用当日结束帧
-                stop = tf.last_min_frame(tf.day_shift(stop.date(), 0), frame_type)
-            else:
-                stop = tf.floor(stop, frame_type)
-        else:
-            stop = tf.floor(arrow.now(tz=cfg.tz).datetime, frame_type)
-
-        if stop > arrow.now(tz=cfg.tz):
-            raise ValueError(f"请勿将同步截止时间设置在未来: {stop}")
-
-        if start:
-            start = arrow.get(start, tzinfo=cfg.tz)
-            if start.hour == 0:  # 未指定有效的交易帧，使用当日的起始帧
-                start = tf.first_min_frame(tf.day_shift(start.date(), 0), frame_type)
-            else:
-                start = tf.floor(start, frame_type)
-        else:
-            start = tf.shift(stop, -999, frame_type)
-    else:
-        stop = (stop and arrow.get(stop).date()) or arrow.now().date()
-        if stop == arrow.now().date():
-            stop = arrow.now(tz=cfg.tz)
-
-        stop = tf.floor(stop, frame_type)
-        start = tf.floor((start and arrow.get(start).date()), frame_type) or tf.shift(
-            stop, -1000, frame_type
-        )
-
-    secs = Securities()
-    codes = secs.choose(cat or [])
-
-    exclude = map(lambda x: x, exclude.split(" "))
-    codes = list(set(codes) - set(exclude))
-
-    include = list(filter(lambda x: x, include.split(" ")))
-    codes.extend(include)
-
-    return codes, frame_type, start, stop, int(delay)
-
-
-async def sync_bars_for_security(
-        code: str,
-        frame_type: FrameType,
-        start: Union[datetime.date, datetime.datetime],
-        stop: Union[None, datetime.date, datetime.datetime],
-):
-    counters = 0
-
-    # 取数据库中该frame_type下该code的k线起始点
-    head, tail = await cache.get_bars_range(code, frame_type)
-    if not all([head, tail]):
-        await cache.clear_bars_range(code, frame_type)
-        n_bars = tf.count_frames(start, stop, frame_type)
-
-        bars = await aq.get_bars(code, stop, n_bars, frame_type)
-        if bars is not None and len(bars):
-            logger.debug(
-                "sync %s(%s), from %s to %s: actual got %s ~ %s (%s)",
-                code,
-                frame_type,
-                start,
-                head,
-                bars[0]["frame"],
-                bars[-1]["frame"],
-                len(bars),
-            )
-            counters = len(bars)
-        return
-
-    if start < head:
-        n = tf.count_frames(start, head, frame_type) - 1
-        if n > 0:
-            _end_at = tf.shift(head, -1, frame_type)
-            bars = await aq.get_bars(code, _end_at, n, frame_type)
-            if bars is not None and len(bars):
-                counters += len(bars)
-                logger.debug(
-                    "sync %s(%s), from %s to %s: actual got %s ~ %s (%s)",
-                    code,
-                    frame_type,
-                    start,
-                    head,
-                    bars[0]["frame"],
-                    bars[-1]["frame"],
-                    len(bars),
-                )
-                if bars["frame"][-1] != _end_at:
-                    logger.warning(
-                        "discrete frames found:%s, bars[-1](%s), " "head(%s)",
-                        code,
-                        bars["frame"][-1],
-                        head,
-                    )
-
-    if stop > tail:
-        n = tf.count_frames(tail, stop, frame_type) - 1
-        if n > 0:
-            bars = await aq.get_bars(code, stop, n, frame_type)
-            if bars is not None and len(bars):
-                logger.debug(
-                    "sync %s(%s), from %s to %s: actual got %s ~ %s (%s)",
-                    code,
-                    frame_type,
-                    tail,
-                    stop,
-                    bars[0]["frame"],
-                    bars[-1]["frame"],
-                    len(bars),
-                )
-                counters += len(bars)
-                if bars["frame"][0] != tf.shift(tail, 1, frame_type):
-                    logger.warning(
-                        "discrete frames found: %s, tail(%s), bars[0](" "%s)",
-                        code,
-                        tail,
-                        bars["frame"][0],
-                    )
-
-
-
 async def sync_calendar():
     """从上游服务器获取所有交易日，并计算出周线帧和月线帧
 
@@ -290,7 +66,7 @@ async def sync_calendar():
         logger.warning("failed to fetch trade days.")
         return None
 
-    tf.day_frames = [tf.date2int(x) for x in trade_days]
+    cal.day_frames = [cal.date2int(x) for x in trade_days]
     weeks = []
     last = trade_days[0]
     for cur in trade_days:
@@ -301,8 +77,8 @@ async def sync_calendar():
     if weeks[-1] < last:
         weeks.append(last)
 
-    tf.week_frames = [tf.date2int(x) for x in weeks]
-    await cache.save_calendar("week_frames", map(tf.date2int, weeks))
+    cal.week_frames = [cal.date2int(x) for x in weeks]
+    await cache.save_calendar("week_frames", map(cal.date2int, weeks))
 
     months = []
     last = trade_days[0]
@@ -312,8 +88,8 @@ async def sync_calendar():
         last = cur
     months.append(last)
 
-    tf.month_frames = [tf.date2int(x) for x in months]
-    await cache.save_calendar("month_frames", map(tf.date2int, months))
+    cal.month_frames = [cal.date2int(x) for x in months]
+    await cache.save_calendar("month_frames", map(cal.date2int, months))
     logger.info("trade_days is updated to %s", trade_days[-1])
 
 
@@ -326,348 +102,216 @@ async def sync_security_list():
     logger.info("%s secs are fetched and saved.", len(secs))
 
 
-async def reset_tail(codes: [], frame_type: FrameType, days=-1):
+async def generate_task():
+    codes = Stock.choose()
+    exclude = getattr(cfg.omega.sync.bars, "exclude", "")
+    if exclude:
+        exclude = map(lambda x: x, exclude.split(" "))
+        codes = list(set(codes) - set(exclude))
+    include = getattr(cfg.omega.sync.bars, "include", "")
+    if include:
+        include = list(filter(lambda x: x, cfg.omega.sync.bars.include.split(" ")))
+        codes.extend(include)
+    return codes
+
+
+async def check_done(timeout, state, count, done):
+    while True:
+        try:
+            async with async_timeout.timeout(timeout):
+                while True:
+                    done_count = await cache.sys.hget(state, "done_count")
+                    if done_count is None or int(done_count) != count:
+                        await asyncio.sleep(1)
+                    else:
+                        await cache.sys.delete(done)
+                        return
+        except asyncio.exceptions.TimeoutError:
+            print("超时了, 继续等待，并发送报警邮件")
+
+
+async def __daily_calibration_sync(tread_date, head=None, tail=None):
+    suffix = "daily_calibration"
+    start = tread_date.replace(hour=9, minute=31, microsecond=0, second=0)
+    end = tread_date.replace(hour=15, minute=0, microsecond=0, second=0)
+    # 检查 end 是否在交易日
+
+    params = {
+        "suffix": suffix + f'.{tread_date.strftime("%Y-%m-%d")}',
+        "start": start,
+        "end": end,
+        "timeout": 60 * 60 * 6,
+        "resample": True,  # 重采样
+        "check_and_persistence": True,
+        "after_delete": True,  # 因为凌晨2点同步用的是不同的队列，所以需要删除
+    }
+    ret = await sync_bars(params)
+    if ret is not None:
+        return
+
+    # await sync_day_bars(suffix + f'.{head}', start, end, check_and_persistence=True, timeout=60 * 60 * 6)
+    if head is not None:
+        await cache.sys.set(BAR_SYNC_ARCHIVE_HEAD, head.strftime("%Y-%m-%d"))
+    if tail is not None:
+        await cache.sys.set(BAR_SYNC_ARCHIVE_TAIl, tail.strftime("%Y-%m-%d"))
+
+    await daily_calibration_sync()
+
+
+async def daily_calibration_sync():
+    """凌晨2点数据同步，调用sync_day_bars，添加参数写minio和重采样
+    然后需要往前追赶同步，剩余quota > 1天的量就往前赶，并在redis记录已经有daily_calibration_sync在运行了
     """
-    重置tail的值，来同步数据
-    Args:
-        days: 需要重置到多少天之前
-        codes:
-        frame_type:
-    Returns:
-    """
+    # 检查head和tail
+    # 检查tail和最近一个交易日有没有空洞，如果有空洞，先同步空洞
+    total = len(await generate_task())
+    quota = await aq.get_quota()
+    # 检查quota够不够，如果不够则return
+    if quota * 0.75 < total * 240 * 2:
+        print("quota不够，返回")
+        return
 
-    now = arrow.now()
-    _day = tf.day_shift(now, days)
-
-    if frame_type in [
-        FrameType.MIN1,
-        FrameType.MIN5,
-        FrameType.MIN15,
-        FrameType.MIN30,
-        FrameType.MIN60]:
-        date = datetime.datetime(_day.year, _day.month, _day.day, 15)
-        tail = tf.time2int(date)
-    elif frame_type == FrameType.DAY:
-        date = _day
-        tail = tf.date2int(date)
-
-    elif frame_type == FrameType.WEEK:
-        date = tf.shift(now, days, FrameType.WEEK)
-        tail = tf.date2int(date)
-
-    elif frame_type == FrameType.MONTH:
-        date = tf.shift(now, days, FrameType.MONTH)
-        tail = tf.date2int(date)
-    else:
-        raise Exception("不支持的frame_type")
-    # print(f"reset tail to[m:{m}, day:{day}, week:{week}, month:{month}] ")
-
-    for code in codes:
-        key = f"{code}:{frame_type.value}"
-        resp = await cache.security.hget(key, "tail")
-        if resp is None:
-            continue
-        _tail = int(resp)
-        print(_tail)
-        if _tail > tail:  # 只有数据库里的时间大于tail 才可以
-            await cache.security.hset(key, 'tail', tail)
-
-    return date.strftime('%Y-%m-%d')
-
-
-async def closing_quotation_sync_bars(all_params):
-    """
-    收盘之后从新同步今天的分钟线数据和日周月
-    Returns:
-        {
-                    "frame": "1m",
-                    "start": "2020-01-02",
-                    "stop": "2020-01-02",
-                    "delay": 3,
-                    "cat": [],
-                    "include": "000001.XSHE",
-                    "exclude": "000001.XSHG",
-                },
-    """
-
-    logger.info("正在同步今天的分钟线数据和日周月")
-    for params in all_params:
-        codes, frame_type, start, stop, delay = parse_sync_params(**params)
-        start_date = await reset_tail(codes, frame_type)
-        params["start"] = start_date
-        logger.info(params)
-        await trigger_bars_sync(params)
-
-
-def load_bars_sync_jobs(scheduler):
-    all_params = []
-    frame_type = FrameType.MIN1
-    params = load_sync_params(frame_type)
-    if params:
-        all_params.append(params)
-        params["delay"] = params.get("delay") or 5
-        scheduler.add_job(
-            trigger_bars_sync,
-            "cron",
-            hour=9,
-            minute="31-59",
-            args=(params,),
-            name=f"{frame_type.value}:9:31-59",
-        )
-        scheduler.add_job(
-            trigger_bars_sync,
-            "cron",
-            hour=10,
-            minute="*",
-            args=(params,),
-            name=f"{frame_type.value}:10:*",
-        )
-        scheduler.add_job(
-            trigger_bars_sync,
-            "cron",
-            hour=11,
-            minute="0-30",
-            args=(params,),
-            name=f"{frame_type.value}:11:0-30",
-        )
-        scheduler.add_job(
-            trigger_bars_sync,
-            "cron",
-            hour="13-14",
-            minute="*",
-            args=(params,),
-            name=f"{frame_type.value}:13-14:*",
-        )
-        scheduler.add_job(
-            trigger_bars_sync,
-            "cron",
-            hour="15",
-            args=(params,),
-            name=f"{frame_type.value}:15:00",
-        )
-
-    frame_type = FrameType.MIN5
-    params = load_sync_params(frame_type)
-    if params:
-        all_params.append(params)
-        params["delay"] = params.get("delay") or 60
-        scheduler.add_job(
-            trigger_bars_sync,
-            "cron",
-            hour=9,
-            minute="35-55/5",
-            args=(params,),
-            name=f"{frame_type.value}:9:35-55/5",
-        )
-        scheduler.add_job(
-            trigger_bars_sync,
-            "cron",
-            hour=10,
-            minute="*/5",
-            args=(params,),
-            name=f"{frame_type.value}:10:*/5",
-        )
-        scheduler.add_job(
-            trigger_bars_sync,
-            "cron",
-            hour=11,
-            minute="0-30/5",
-            args=(params,),
-            name=f"{frame_type.value}:11:0-30/5",
-        )
-        scheduler.add_job(
-            trigger_bars_sync,
-            "cron",
-            hour="13-14",
-            minute="*/5",
-            args=(params,),
-            name=f"{frame_type.value}:13-14:*/5",
-        )
-        scheduler.add_job(
-            trigger_bars_sync,
-            "cron",
-            hour="15",
-            args=(params,),
-            name=f"{frame_type.value}:15:00",
-        )
-
-    frame_type = FrameType.MIN15
-    params = load_sync_params(frame_type)
-    if params:
-        all_params.append(params)
-        params["delay"] = params.get("delay") or 60
-        scheduler.add_job(
-            trigger_bars_sync,
-            "cron",
-            hour=9,
-            minute="45",
-            args=(params,),
-            name=f"{frame_type.value}:9:45",
-        )
-        scheduler.add_job(
-            trigger_bars_sync,
-            "cron",
-            hour=10,
-            minute="*/15",
-            args=(params,),
-            name=f"{frame_type.value}:10:*/5",
-        )
-        scheduler.add_job(
-            trigger_bars_sync,
-            "cron",
-            hour=11,
-            minute="15,30",
-            args=(params,),
-            name=f"{frame_type.value}:11:15,30",
-        )
-        scheduler.add_job(
-            trigger_bars_sync,
-            "cron",
-            hour="13-14",
-            minute="*/15",
-            args=(params,),
-            name=f"{frame_type.value}:13-14:*/15",
-        )
-        scheduler.add_job(
-            trigger_bars_sync,
-            "cron",
-            hour="15",
-            args=(params,),
-            name=f"{frame_type.value}:15:00",
-        )
-
-    frame_type = FrameType.MIN30
-    params = load_sync_params(frame_type)
-    if params:
-        all_params.append(params)
-        params["delay"] = params.get("delay") or 60
-        scheduler.add_job(
-            trigger_bars_sync,
-            "cron",
-            hour="10-11",
-            minute="*/30",
-            args=(params,),
-            name=f"{frame_type.value}:10-11:*/30",
-        )
-        scheduler.add_job(
-            trigger_bars_sync,
-            "cron",
-            hour="13",
-            minute="30",
-            args=(params,),
-            name=f"{frame_type.value}:13:30",
-        )
-        scheduler.add_job(
-            trigger_bars_sync,
-            "cron",
-            hour="14-15",
-            minute="*/30",
-            args=(params,),
-            name=f"{frame_type.value}:14-15:*/30",
-        )
-
-    frame_type = FrameType.MIN60
-    params = load_sync_params(frame_type)
-    if params:
-        all_params.append(params)
-        params["delay"] = params.get("delay") or 60
-        scheduler.add_job(
-            trigger_bars_sync,
-            "cron",
-            hour="10",
-            minute="30",
-            args=(params,),
-            name=f"{frame_type.value}:10:30",
-        )
-        scheduler.add_job(
-            trigger_bars_sync,
-            "cron",
-            hour="11",
-            minute="30",
-            args=(params,),
-            name=f"{frame_type.value}:11:30",
-        )
-        scheduler.add_job(
-            trigger_bars_sync,
-            "cron",
-            hour="14-15",
-            minute=0,
-            args=(params,),
-            name=f"{frame_type.value}:14-15:00",
-        )
-
-    for frame_type in tf.day_level_frames:
-        params = load_sync_params(frame_type)
-        if params:
-            all_params.append(params)
-            params["delay"] = params.get("delay") or 60
-            scheduler.add_job(
-                trigger_bars_sync,
-                "cron",
-                hour=15,
-                args=(params,),
-                name=f"{frame_type.value}:15:00",
-            )
-
-    scheduler.add_job(
-        closing_quotation_sync_bars,
-        "cron",
-        hour=15,
-        minute=5,
-        args=(all_params,),
-        name="closing_quotation_sync_bars",
+    # state, done, scope = get_queue_name(suffix)
+    days = datetime.timedelta(days=1)
+    head, tail = await cache.sys.get(BAR_SYNC_ARCHIVE_HEAD), await cache.sys.get(
+        BAR_SYNC_ARCHIVE_TAIl
     )
+    now = datetime.datetime.now()
+
+    if not head or not tail:
+        # 任意一个缺失都不行
+        print("说明是首次同步，查找上一个已收盘的交易日")
+        pre_trade_day = cal.day_shift(now, -1)
+        await __daily_calibration_sync(
+            datetime.datetime.combine(pre_trade_day, datetime.time(0, 0)),
+            head=pre_trade_day,
+            tail=pre_trade_day,
+        )
+
+    else:
+        # 说明不是首次同步，检查tail到现在有没有空洞
+        tail_date = datetime.datetime.strptime(tail, "%Y-%m-%d")
+        head_date = datetime.datetime.strptime(head, "%Y-%m-%d")
+        if (
+            cal.count_frames(
+                tail_date,
+                now.replace(hour=0, minute=0, second=0, microsecond=0),
+                FrameType.DAY,
+            )
+            - 1
+            > 1
+        ):
+            await __daily_calibration_sync(tail_date, tail=tail_date + days)
+        else:
+            tread_date = head_date - days
+            await __daily_calibration_sync(tread_date, head=tread_date)
+
+
+async def sync_day_bars():
+    """
+    收盘之后同步今天的数据
+    """
+    suffix = "day"
+    start = datetime.datetime.now().replace(hour=9, minute=31, second=0, microsecond=0)
+    end = datetime.datetime.now().replace(hour=15, minute=0, second=0, microsecond=0)
+    params = {
+        "suffix": suffix,
+        "start": start,
+        "end": end,
+        "timeout": 60 * 60 * 2,
+        "resample": True,  # 重采样
+        "after_delete": True,
+    }
+    await sync_bars(params)
 
 
 async def sync_minute_bars():
+    """盘中同步每分钟的数据
+    1. 从redis拿到上一次同步的分钟数据
+    2. 计算开始和结束时间
     """
-    1. 读取上次数据同步的截止时间, 总是
-    2. 读取证券列表（股票和指数），写入redis的sys库中的jobs.bars_sync.scope.minute列表。
-    3. 发出DO_SYNC_MIN消息 {"start": xxx, "end":xxx}
-    4. 在with语句中每秒检查一次jobs.bars_sync.done.minute列表是不是和生产的任务个数一致，直到执行完
-    5. 同步完成之后，更新数据同步时间戳
-    6. 如果同步超时，将jobs.bars_sync.scope.minute清空，并发出报警邮件
-    Returns:
-    """
+    suffix = "minute"
+    state, done, scope = get_queue_name(suffix)
+    end = datetime.datetime.now().replace(second=0, microsecond=0)
+    # 检查当前时间是否在交易时间内
+    if end.hour * 60 + end.minute not in cal.ticks[FrameType.MIN1]:
+        if 11 <= end.hour < 13:
+            end = end.replace(hour=11, minute=30)
+        else:
+            end = end.replace(hour=15, second=0, minute=0)
 
-    is_running = int(await cache.sys.hget("master.bars_sync.state.minute", "is_running"))
-    now = datetime.datetime.now()
-    start = now.strftime("%Y-%m-%d %H:%M:00")
-    if is_running:
-        logger.info(f"检测到有正在执行的分钟同步任务，本次不执行：{start}")
-        print(f"检测到有正在执行的分钟同步任务，本次不执行：{start}")
-        return
-    await cache.sys.hset("master.bars_sync.state.minute", "is_running", 1)
-    async def check_done():
-        while True:
-            try:
-                async with async_timeout.timeout(60):
-                    while True:
-                        if await cache.sys.llen("master.bars_sync.done.minute") != count:
-                            await asyncio.sleep(1)
-                        else:
-                            await cache.sys.delete("master.bars_sync.done.minute")
-                            return
-            except asyncio.exceptions.TimeoutError:
-                print("超时了, 继续等待，并发送报警邮件")
-
-    end = await cache.sys.hget("master.bars_sync.state.minute", "end")
-    if not end:
+    start = await cache.sys.hget(state, "start")
+    if not start:
         # 如果么有end,则取上一分钟的时间
-        end = (now - datetime.timedelta(minutes=1)).strftime("%Y-%m-%d %H:%M:00")
-    # todo 取股票列表下发任务
-    tasks = ("12", "23", "34")
+        start = end - datetime.timedelta(minutes=1)
+    else:
+        # todo 如果有，这个时间最早只能是今天的9点31分
+        start = datetime.datetime.strptime(start, "%Y-%m-%d %H:%M:00")
+    params = {"suffix": suffix, "start": start, "end": end}
+    await sync_bars(params)
+
+
+async def sync_high_low_limit():
+
+    suffix = "high_low_limit"  # 队列后缀
+    timeout = 60 * 60 * 10
+    end = datetime.datetime.now().replace(hour=15, minute=0, second=0, microsecond=0)
+    state, done, scope = get_queue_name(suffix)
+    params = {"suffix": suffix, "end": end, "sync_high_low_limit": True}
+    await create_task_and_join(
+        state, done, scope, timeout, end, after_delete=False, params=params
+    )
+
+
+async def create_task_and_join(state, done, scope, timeout, end, after_delete, params):
+    """创建任务并且阻塞住"""
+    if after_delete:
+        # 先设置超时时间，防止程序终止导致内存溢出
+        await cache.sys.expire(state, timeout)
+    await cache.sys.hset(state, "is_running", 1)
+    tasks = await generate_task()
     count = len(tasks)
     p = cache.sys.pipeline()
-    p.delete("master.bars_sync.done.minute")
-    p.hmset("master.bars_sync.state.minute", "task_count", count)
-    p.delete("master.bars_sync.scope.minute")
-    p.lpush("master.bars_sync.scope.minute", *tasks)
+    p.delete(done)
+    p.hmset(state, "task_count", count)
+    p.delete(scope)
+    p.lpush(scope, *tasks)
     await p.execute()
-    await emit.emit(Events.OMEGA_DO_SYNC_MIN, {"start": start, "end": end})
-    await check_done()
-    await cache.sys.hmset("master.bars_sync.state.minute",
-                          "is_running", 0,
-                          "end", start,
-                          "task_count", 0)
+    await emit.emit(Events.OMEGA_DO_SYNC_MIN, params)
+    await check_done(timeout, state, count, done)
 
+    p = cache.sys.pipeline()
+    if after_delete:
+        p.delete(state)
+    else:
+        p.hmset(state, "start", end.strftime("%Y-%m-%d %H:%M:00"))
+    p.hdel(state, "is_running")
+    p.hdel(state, "task_count")
+    p.hdel(state, "done_count")
+    await p.execute()
+
+
+async def sync_bars(params):
+    suffix = params.get("suffix", "minute")  # 队列后缀
+    timeout = params.get("timeout", 60)  # 允许的超时时间
+    start = params.get("start")  # 开始时间
+    end = params.get("end")  # 结束时间
+    after_delete = params.get("after_delete")  # 结束时间
+    if not cal.is_trade_day(end):
+        print("非交易日，不同步")
+        return
+    state, done, scope = get_queue_name(suffix)
+
+    is_running = await cache.sys.hget(state, "is_running")
+    if is_running is not None:
+        logger.info(f"检测到有正在执行的分钟同步任务，本次不执行：{end}")
+        print(f"检测到有正在执行的分钟同步任务，本次不执行：{end}")
+        return False
+    n_bars = cal.count_frames(start, end, FrameType.MIN1)  # 获取到一共有多少根k线
+    if n_bars < 1:
+        msg = "k线数量小于1 不同步"
+        logger.info(msg)
+        print(msg)
+        return
+    params.update({"n_bars": n_bars})
+    await create_task_and_join(state, done, scope, timeout, end, after_delete, params)

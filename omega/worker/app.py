@@ -15,11 +15,13 @@ import cfg4py
 import fire
 import omicron
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from jobs import sync_bars
 from pyemit import emit
+
 from omega.config import get_config_dir
 from omega.core.events import Events
+from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher
 
-from jobs import sync_bars
 cfg = cfg4py.get_instance()
 
 logger = logging.getLogger(__name__)
@@ -39,9 +41,11 @@ class Omega(object):
 
         cfg4py.init(get_config_dir(), False)
         cfg4py.update_config(self.inherit_cfg)
+
+        await AbstractQuotesFetcher.create_instance(self.fetcher_impl, **self.params)
+        print(id(AbstractQuotesFetcher))
         # listen on omega events
         emit.register(Events.OMEGA_DO_SYNC_MIN, sync_bars)
-
         await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
         # await self.heart_beat()
         self.scheduler.add_job(self.heart_beat, trigger="interval", seconds=3)
@@ -55,10 +59,14 @@ class Omega(object):
         logger.debug("send heartbeat from omega worker: %s", pid)
         await omicron.cache.sys.hmset(
             key,
-            "impl", self.fetcher_impl,
-            "gid", self.gid,
-            "pid", pid,
-            "heartbeat", time.time(),
+            "impl",
+            self.fetcher_impl,
+            "gid",
+            self.gid,
+            "pid",
+            pid,
+            "heartbeat",
+            time.time(),
         )
 
 

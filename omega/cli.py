@@ -25,17 +25,17 @@ import fire
 import omicron
 import psutil
 import sh
-from omicron.core.timeframe import tf
 from omicron.core.types import FrameType
+from omicron.models.calendar import Calendar as cal
 from pyemit import emit
 from ruamel.yaml import YAML
 from termcolor import colored
 
 import omega
 from omega.config import get_config_dir
+from omega.master import jobs as syncjobs
 from omega.worker import archive
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher
-from omega.master import jobs as syncjobs
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
@@ -428,7 +428,7 @@ async def setup(reset_factory=False, force=False):
     cfg4py.init(config_dir, False)
     remove_console_log_handler()
 
-    await start("fetcher")
+    await start("worker")
 
     print_title("配置已完成。现在为您启动Omega,开启财富之旅！")
 
@@ -477,7 +477,7 @@ def check_environment():
 
 
 def find_fetcher_processes():
-    """查找所有的omega(fetcher)进程
+    """查找所有的omega(worker)进程
 
     Omega进程在ps -aux中显示应该包含 omega.app --impl=&ltfetcher&gt --port=&ltport&gt信息
     """
@@ -503,7 +503,7 @@ async def start(service: str = ""):
     """启动omega主进程或者任务管理进程
 
     Args:
-        service: if service is '', then starts fetcher processes.
+        service: if service is '', then starts worker processes.
 
     Returns:
 
@@ -518,7 +518,7 @@ async def start(service: str = ""):
         await _start_fetcher_processes()
     elif service == "jobs":
         return await _start_jobs()
-    elif service == "fetcher":
+    elif service == "worker":
         return await _start_fetcher_processes()
     else:
         print("不支持的服务")
@@ -527,7 +527,7 @@ async def start(service: str = ""):
 async def _start_fetcher_processes():
     procs = find_fetcher_processes()
 
-    # fetcher processes are started by groups
+    # worker processes are started by groups
     cfg = cfg4py.get_instance()
     for fetcher in cfg.quotes_fetchers:
         impl = fetcher.get("impl")

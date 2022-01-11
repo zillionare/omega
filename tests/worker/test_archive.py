@@ -59,7 +59,7 @@ class TestArchieveFetcher(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(200, status)
         self.assertListEqual([202103, 202102, 202101], index.get("stock"))
 
-        func = "omega.fetcher.archive.get_file"
+        func = "omega.worker.archive.get_file"
         for side_effect in [aiohttp.ServerTimeoutError(), YAMLError(), Exception()]:
             with mock.patch(func, side_effect=side_effect):
                 status, index = await archive.get_index(self.cfg.omega.urls.archive)

@@ -14,10 +14,8 @@ import cfg4py
 import fire
 import omicron
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from omicron import cache
-from omicron.core.timeframe import tf
+from jobs import sync_calendar, sync_security_list
 from pyemit import emit
-from jobs import trigger_bars_sync, load_sync_params, load_bars_sync_jobs, trigger_single_worker_sync
 
 from omega.config import get_config_dir
 from omega.logreceivers.redis import RedisLogReceiver
@@ -26,13 +24,6 @@ logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
 scheduler: Optional[AsyncIOScheduler] = None
 receiver: RedisLogReceiver = None
-
-
-class WorkerState:
-    """用来记录worker的状态"""
-    all = 0
-    normal = 0
-    error = 0
 
 
 async def start_logging():
@@ -76,11 +67,10 @@ async def init():  # noqa
     scheduler = AsyncIOScheduler(timezone=cfg.tz)
     await heartbeat()
     scheduler.add_job(heartbeat, "interval", seconds=5)
-
     # sync securities daily
     h, m = map(int, cfg.omega.sync.security_list.split(":"))
     scheduler.add_job(
-        trigger_single_worker_sync,
+        sync_calendar,
         "cron",
         hour=h,
         minute=m,
@@ -88,42 +78,13 @@ async def init():  # noqa
         name="sync_calendar",
     )
     scheduler.add_job(
-        trigger_single_worker_sync,
+        sync_security_list,
         "cron",
-        args=("security_list",),
         name="sync_security_list",
         hour=h,
         minute=m,
     )
 
-    load_bars_sync_jobs(scheduler)
-
-    # sync bars at startup
-    last_sync = await cache.sys.get("master.bars_sync.stop")
-
-    if last_sync:
-        try:
-            last_sync = arrow.get(last_sync, tzinfo=cfg.tz).timestamp
-        except ValueError:
-            logger.warning("failed to parse last_sync: %s", last_sync)
-            last_sync = None
-
-    if not last_sync or time.time() - last_sync >= 24 * 3600:
-        next_run_time = arrow.now(cfg.tz).shift(minutes=5).datetime
-        logger.info("start catch-up quotes sync at %s", next_run_time)
-
-        for frame_type in itertools.chain(tf.day_level_frames, tf.minute_level_frames):
-            params = load_sync_params(frame_type)
-            if params:
-                scheduler.add_job(
-                    trigger_bars_sync,
-                    args=(params, True),
-                    name=f"catch-up sync for {frame_type}",
-                    next_run_time=next_run_time,
-                )
-    else:
-        logger.info("%s: less than 24 hours since last sync", last_sync)
-    await omicron.init()
     scheduler.start()
     logger.info("omega master finished initialization")
 

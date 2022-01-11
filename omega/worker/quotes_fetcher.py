@@ -6,7 +6,7 @@ Interface for quotes worker
 """
 import datetime
 from abc import ABC
-from typing import List, Union, Optional
+from typing import List, Optional, Union
 
 import numpy
 from omicron.core.types import Frame, FrameType
@@ -58,14 +58,9 @@ class QuotesFetcher(ABC):
         """
         raise NotImplementedError
 
-    async def get_price(
-        self,
-        sec: Union[List, str],
-        end_date: Union[str, datetime.datetime],
-        n_bars: Optional[int],
-        start_date: Optional[Union[str, datetime.datetime]] = None,
+    async def get_high_limit_price(
+        self, sec: Union[List, str], dt: Union[str, datetime.datetime, datetime.date]
     ) -> numpy.ndarray:
-
         raise NotImplementedError
 
     async def create_instance(self, **kwargs):

@@ -8,7 +8,7 @@ import cfg4py
 import numpy as np
 import omicron
 from omicron import cache
-from omicron.core.timeframe import tf
+from omicron.models.calendar import Calendar as cal
 from omicron.core.types import FrameType
 
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
@@ -105,7 +105,7 @@ class TestAbstractQuotesFetcher(unittest.IsolatedAsyncioTestCase):
         # 检查cache,10：32未存入cache
         cache_len = await cache.security.hlen(f"{sec}:{frame_type.value}")
         self.assertEqual(8, cache_len)
-        bars_2 = await cache.get_bars(sec, tf.floor(end, frame_type), 6, frame_type)
+        bars_2 = await cache.get_bars(sec, cal.floor(end, frame_type), 6, frame_type)
         np.array_equal(bars[:-1], bars_2)
 
     async def test_get_bars_012(self):
@@ -161,7 +161,7 @@ class TestAbstractQuotesFetcher(unittest.IsolatedAsyncioTestCase):
         # 检查cache,10：30 已存入cache
         cache_len = await cache.security.hlen(f"{sec}:{frame_type.value}")
         self.assertEqual(8, cache_len)
-        bars_2 = await cache.get_bars(sec, tf.floor(end, frame_type), 6, frame_type)
+        bars_2 = await cache.get_bars(sec, cal.floor(end, frame_type), 6, frame_type)
         np.array_equal(bars, bars_2)
 
     async def test_get_bars_014(self):
@@ -256,6 +256,6 @@ class TestAbstractQuotesFetcher(unittest.IsolatedAsyncioTestCase):
         frame_type = FrameType.MIN30
         code = "000001.XSHE"
 
-        n = tf.count_frames(start, stop, frame_type)
+        n = cal.count_frames(start, stop, frame_type)
         bars = await aq.get_bars(code, stop, n, frame_type)
         print(bars)
