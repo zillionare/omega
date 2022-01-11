@@ -279,33 +279,6 @@ async def sync_bars_for_security(
                     )
 
 
-async def trigger_single_worker_sync(_type: str, params: dict = None):
-    """启动只需要单个quotes fetcher进程来完成的数据同步任务
-
-    比如交易日历、证券列表等如果需要同时启动多个quotes fetcher进程来完成数据同步任务，应该通过
-    pyemit来发送广播消息。
-
-    Args:
-        _type: the type of data to be synced, either ``calendar`` or ``ecurity_list``
-    """
-    url = cfg.omega.urls.quotes_server
-    if _type == "calendar":
-        url += "/jobs/sync_calendar"
-    elif _type == "security_list":
-        url += "/jobs/sync_security_list"
-    else:
-        raise ValueError(f"{_type} is not supported sync type.")
-
-    async with aiohttp.ClientSession() as client:
-        try:
-            async with client.post(url, data=params) as resp:
-                if resp.status != 200:
-                    logger.warning("failed to trigger %s sync", _type)
-                else:
-                    return await resp.json()
-        except Exception as e:
-            logger.exception(e)
-
 
 async def sync_calendar():
     """从上游服务器获取所有交易日，并计算出周线帧和月线帧

@@ -88,26 +88,6 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
         await cli.status()
         await cli.stop("jobs")
 
-    async def test_sync_sec_list(self):
-        try:
-            await self._start_servers()
-            await cli.sync_sec_list()
-        finally:
-            await self._stop_servers()
-
-    async def test_sync_calendar(self):
-        try:
-            await self._start_servers()
-            await cli.sync_calendar()
-        finally:
-            await self._stop_servers()
-
-    async def test_sync_bars(self):
-        try:
-            await self._start_servers()
-            await cli.sync_bars("1d", codes="000001.XSHE")
-        finally:
-            await self._stop_servers()
 
     def test_load_factory_settings(self):
         settings = cli.load_factory_settings()

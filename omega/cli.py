@@ -81,7 +81,7 @@ def format_msg(msg: str):
     msg = []
     for line in lines:
         for i in range(int(len(line) / 80 + 1)):
-            msg.append(line[i * 80: min(len(line), (i + 1) * 80)])
+            msg.append(line[i * 80 : min(len(line), (i + 1) * 80)])
     return "\n".join(msg)
 
 
@@ -112,7 +112,7 @@ def append_fetcher(settings: dict, worker):
 def is_in_venv():
     # 是否为virtual env
     is_venv = hasattr(sys, "real_prefix") or (
-            hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
+        hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
     )
 
     if is_venv:
@@ -288,10 +288,10 @@ def config_fetcher(settings):
 
 
 def get_input(
-        prompt: str,
-        validation: Union[None, List, Callable],
-        default: Any,
-        op_hint: str = None,
+    prompt: str,
+    validation: Union[None, List, Callable],
+    default: Any,
+    op_hint: str = None,
 ):
     if op_hint is None:
         op_hint = f"忽略此项(C)，退出(Q)，回车选择默认值[{default}]："
@@ -429,7 +429,6 @@ async def setup(reset_factory=False, force=False):
     remove_console_log_handler()
 
     await start("fetcher")
-    await download_archive(None)
 
     print_title("配置已完成。现在为您启动Omega,开启财富之旅！")
 
@@ -572,7 +571,7 @@ def show_fetcher_processes():
 
 
 def _start_fetcher(
-        impl: str, account: str, password: str, port: int, sessions: int = 1
+    impl: str, account: str, password: str, port: int, sessions: int = 1
 ):
     subprocess.Popen(
         [
@@ -714,54 +713,6 @@ async def restart(service: str = ""):
         await _start_fetcher_processes()
 
 
-async def sync_sec_list():
-    """发起同步证券列表请求"""
-    await _init()
-
-    await syncjobs.trigger_single_worker_sync("security_list")
-
-
-async def sync_calendar():
-    """发起同步交易日历请求"""
-    await _init()
-    await syncjobs.trigger_single_worker_sync("calendar")
-
-
-async def sync_bars(frame: str = None, codes: str = None):
-    """立即同步行情数据
-
-    如果`frame`, `codes`没有提供，则从配置文件中读取相关信息
-
-    Args:
-        frame:
-        codes:
-
-    Returns:
-
-    """
-    await _init()
-
-    if frame:
-        frame_type = FrameType(frame)
-        params = syncjobs.load_sync_params(frame_type)
-        if codes:
-            params["cat"] = None
-            params["include"] = codes
-        await syncjobs.trigger_bars_sync(params, force=True)
-        logger.info("request %s,%s send to workers.", params, codes)
-    else:
-        for frame_type in itertools.chain(tf.day_level_frames, tf.minute_level_frames):
-            params = syncjobs.load_sync_params(frame_type)
-            if not params:
-                continue
-            if codes:
-                params["cat"] = None
-                params["include"] = codes
-            await syncjobs.trigger_bars_sync(params, force=True)
-
-            logger.info("request %s,%s send to workers.", params, codes)
-
-
 async def http_get(url, content_type: str = "json"):
     try:
         async with aiohttp.ClientSession() as client:
@@ -821,69 +772,6 @@ async def show_subprocess_output(stream):
             print(line)
         except Exception:
             pass
-
-
-async def download_archive(n: Union[str, int] = None):
-    await omicron.init()
-    await archive.clear_range()
-    index = await get_archive_index()
-
-    avail_months = [int(m) for m in index.get("stock")]
-    avail_months.sort()
-    if avail_months is None:
-        print("当前没有历史数据可供下载")
-        return
-    else:
-        prompt = f"现有截止到{avail_months[-1]}的{len(avail_months)}个月的数据可供下载。"
-
-    if n is None:
-        op_hint = "请输入要下载的数据的月数，0表示不下载:"
-
-        def is_valid(x):
-            try:
-                return 0 < int(x) <= len(avail_months)
-            except Exception:
-                return False
-
-        n = int(get_input(prompt, is_valid, None, op_hint=op_hint))
-    else:
-        n = int(n)
-    if n is None or n <= 0:
-        return
-
-    t0 = time.time()
-    n = min(n, len(avail_months))
-    # months = ",".join([str(x) for x in avail_months[-n:]])
-    cats = "stock"
-
-    cpus = psutil.cpu_count()
-
-    months_groups = bin_cut(avail_months[-n:], cpus)
-    tasks = []
-    print(f"共启动{len(months_groups)}个进程，正在下载中...")
-    for m in months_groups:
-        if len(m) == 0:
-            break
-        months = ",".join([str(x) for x in m])
-
-        proc = await asyncio.create_subprocess_exec(
-            sys.executable,
-            "-m",
-            "omega.fetcher.archive",
-            "main",
-            f"'{months}'",
-            f"'{cats}'",
-            cfg.omega.urls.archive,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-
-        tasks.append(show_subprocess_output(proc.stdout))
-        tasks.append(show_subprocess_output(proc.stderr))
-
-    await asyncio.gather(*tasks)
-    await archive.adjust_range()
-    print(f"数据导入共费时{int(time.time() - t0)}秒")
 
 
 def remove_console_log_handler():
@@ -947,10 +835,6 @@ def main():
             "stop": run(stop),
             "status": run(status),
             "restart": run(restart),
-            "sync_sec_list": run_with_init(sync_sec_list),
-            "sync_calendar": run_with_init(sync_calendar),
-            "sync_bars": run_with_init(sync_bars),
-            "download": run_with_init(download_archive),
         }
     )
 
