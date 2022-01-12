@@ -152,3 +152,8 @@ class AbstractQuotesFetcher(QuotesFetcher):
 
         if len(bars) == 0:
             return
+
+    @classmethod
+    async def get_quota(cls):
+        quota = await cls.get_instance().get_query_count()
+        return quota.get("spare")
