@@ -68,8 +68,10 @@ async def init():  # noqa
 
     await start_logging()
     logger.info("init omega-master process with config at %s", config_dir)
-
-    await omicron.init()
+    try:
+        await omicron.init()
+    except Exception:
+        pass
     await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
     scheduler = AsyncIOScheduler(timezone=cfg.tz)
     await heartbeat()
@@ -121,7 +123,7 @@ async def init():  # noqa
                 )
     else:
         logger.info("%s: less than 24 hours since last sync", last_sync)
-
+    await omicron.init()
     scheduler.start()
     logger.info("omega master finished initialization")
 
