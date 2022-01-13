@@ -3,17 +3,25 @@
 # @Time     : 2022-01-07 18:28
 import asyncio
 import datetime
+import hashlib
+import json
 import logging
+import pickle
 import time
+from typing import List
 
+import cfg4py
 import numpy as np
+from dfs import Storage
 from omicron import cache
-from omicron.core.types import FrameType
+from omicron.core.types import FrameType, SecurityType
 from omicron.extensions.np import numpy_append_fields
 from omicron.models.stock import Stock
 
-from omega.core.constants import HIGH_LOW_LIMIT, get_queue_name
+from omega.core.constants import HIGH_LOW_LIMIT
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher
+
+cfg = cfg4py.get_instance()
 
 logger = logging.getLogger(__name__)
 
@@ -22,10 +30,11 @@ async def get_limit():
     return 3000
 
 
-async def fetch_min_bars(secs, end, n_bars):
-    """从远端获取分钟线数据"""
+async def fetch_bars(
+    secs: List[str], end: datetime.datetime, n_bars: int, frame_type: FrameType
+):
     bars = await AbstractQuotesFetcher.get_bars_batch(
-        secs, end=end, n_bars=n_bars, frame_type=FrameType.MIN1
+        secs, end=end, n_bars=n_bars, frame_type=frame_type
     )
     temp = []
     if bars is not None:
@@ -34,6 +43,34 @@ async def fetch_min_bars(secs, end, n_bars):
             temp.append(bar)
         return np.concatenate(temp)
     return None
+
+
+async def fetch_min_bars(secs: List[str], end: datetime.datetime, n_bars: int):
+    """
+    从远端获取分钟线数据
+    Args:
+        secs: 股票的列表 ["00001.XSHG", ...]
+        end:  时间
+        n_bars: 多少根bar
+
+    Returns:
+
+    """
+    return await fetch_bars(secs, end, n_bars, FrameType.MIN1)
+
+
+async def fetch_week_bars(secs: List[str], end: datetime.datetime, n_bars: int):
+    """
+    从远端获取分钟线数据
+    Args:
+        secs: 股票的列表 ["00001.XSHG", ...]
+        end:  时间
+        n_bars: 多少根bar
+
+    Returns:
+
+    """
+    return await fetch_bars(secs, end, n_bars, FrameType.WEEK)
 
 
 async def get_high_low_limit(secs, end):
@@ -49,7 +86,18 @@ def get_remnant_s():
     return int((end - now).total_seconds())
 
 
-async def fetch_day_bars(secs, end):
+async def fetch_day_bars(secs: List[str], end: datetime.datetime):
+    """
+    获取日线数据
+    从get_bars中取到标准数据
+    从get_price中取到涨跌停
+    Args:
+        secs: 股票的列表
+        end: 时间
+
+    Returns: 返回np数组
+
+    """
     dtypes = [("high_limit", "<f8"), ("low_limit", "<f8"), ("code", "O")]
     """获取日线数据，和 今日的涨跌停并合并"""
     bars = await AbstractQuotesFetcher.get_bars_batch(
@@ -69,7 +117,17 @@ async def fetch_day_bars(secs, end):
     return np.concatenate(result)
 
 
-async def get_secs(limit, n_bars, scope):
+async def get_secs(limit: int, n_bars: int, scope: str):
+    """
+    从redis遍历取任务执行
+    Args:
+        limit: 调用接口限制条数
+        n_bars: 每支股票需要取多少条
+        scope: 从那个队列取
+
+    Returns:
+
+    """
     while True:
         p = cache.sys.pipeline()
         step = limit // n_bars  # 根据 单次api允许获取的条数 和一共多少根k线 计算每次最多可以获取多少个股票的
@@ -77,12 +135,14 @@ async def get_secs(limit, n_bars, scope):
         p.ltrim(scope, step, -1)
         secs, _ = await p.execute()
         if not len(secs):
-            print("队列无数据，已完成")
             break
         yield secs
 
 
-async def sync_high_low_limit(scope, end):
+async def sync_high_low_limit(params):
+    """同步涨跌停worker"""
+    scope, state, end, n_bars, fail = await parse_params(params)
+
     limit = await get_limit()
     hashmap = []
     total = 0
@@ -91,9 +151,9 @@ async def sync_high_low_limit(scope, end):
         if bars is None:
             continue
         for sec in bars:
-            name = sec[1]
-            high_limit = sec[2]
-            low_limit = sec[3]
+            name = sec["code"]
+            high_limit = sec["high_limit"]
+            low_limit = sec["low_limit"]
             hashmap.extend(
                 [
                     f"{name}.high_limit",
@@ -107,54 +167,286 @@ async def sync_high_low_limit(scope, end):
         await cache.sys.hmset(HIGH_LOW_LIMIT, *hashmap)
         # 取到到晚上12点还有多少秒
         await cache.sys.expire(HIGH_LOW_LIMIT, get_remnant_s())
-    return total
+    await cache.sys.hincrby(state, "done_count", total)
 
 
-async def sync_bars(end, n_bars, scope, resample, check_and_persistence, day_bars):
+async def sync_minute_bars(params):
+    """
+    盘中同步分钟
+    Args:
+        params:
+
+    Returns:
+
+    """
+    scope, state, end, n_bars, fail = await parse_params(params)
     limit = await get_limit()
+    total = 0
+    async for secs in get_secs(limit, n_bars, scope):
+        bars = await fetch_min_bars(secs, end, n_bars)
+        if bars is None:
+            continue
+        await Stock.batch_cache_bars(FrameType.MIN1, bars)
+        total += len(secs)
+
+    await cache.sys.hincrby(state, "done_count", total)
+
+
+async def parse_params(params):
+    return (
+        params.get("__scope"),
+        params.get("__state"),
+        params.get("end"),
+        params.get("n_bars", 1),
+        params.get("__fail"),
+    )
+
+
+async def sync_day_bars(params):
+    """这是下午三点收盘后的同步，仅写cache，同步分钟线和日线"""
+    scope, state, end, n_bars, fail = await parse_params(params)
+    total = 0
+    tasks = []
+    limit = await get_limit()
+
+    async for secs in get_secs(limit, n_bars, scope):
+        min_bars = await fetch_min_bars(secs, end, n_bars)
+        if min_bars is None:
+            continue
+        await Stock.batch_cache_bars(FrameType.MIN1, min_bars)
+        total += len(secs)
+
+        # 写cache
+    for i in range(0, len(tasks), limit):
+        temp = tasks[i : i + limit]
+        bars = await fetch_day_bars(temp, end)
+        if bars is None:
+            continue
+        await Stock.batch_cache_bars(FrameType.DAY, bars)
+        total += len(temp)
+
+    await cache.sys.hincrby(state, "done_count", total // 2)
+
+
+async def checksum(value1, value2):
+    return hashlib.md5(value1).hexdigest() == hashlib.md5(value2).hexdigest()
+
+
+async def handle_dfs_data(bars1, bars2, queue_name):
+    """
+    检查两次数据的md5
+    Args:
+        bars1:
+        bars2:
+        queue_name: 检查通过后把数据放进redis
+
+    Returns: bool
+
+    """
+    value1 = pickle.dumps(bars1, protocol=cfg.pickle.ver)
+    value2 = pickle.dumps(bars2, protocol=cfg.pickle.ver)
+    if await checksum(value1, value2):
+        await cache.temp.lpush(queue_name, value1)
+        return True
+    else:
+        return False
+
+
+async def __sync_daily_calibration(
+    scope: str, queue_min: str, queue_day: str, params: dict
+):
+    """
+    Args:
+        scope: 从那个队列中取任务执行，队列名
+        queue_min: 分钟线队列名
+        queue_day: 日线队列名
+        params: master发送过来的所有参数
+
+    Returns:
+
+    """
+    _, state, end, n_bars, fail = await parse_params(params)
+
+    limit = await get_limit()
+    total = 0
     tasks = []
     async for secs in get_secs(limit, n_bars, scope):
         tasks.extend(secs)
-        bars = await fetch_min_bars(secs, end, n_bars)
-        if resample:
-            print("进行重采样")
-        if check_and_persistence:
-            print("进行校验并持久化")
-            bars = await fetch_min_bars(secs, end, n_bars)
-            await Stock.persist_bars(FrameType.MIN1, bars)
+        min_bars1 = await fetch_min_bars(secs, end, n_bars)
+        min_bars2 = await fetch_min_bars(secs, end, n_bars)
+        if min_bars1 is None or min_bars2 is None:
+            await cache.sys.lpush(
+                fail,
+                str(
+                    {
+                        "code": secs,
+                        "reason": "got none data",
+                        "frame_type": "1m",
+                        "params": params,
+                    }
+                ),
+            )
+            continue
+        # 校验通过，持久化
+        if not await handle_dfs_data(min_bars1, min_bars2, queue_min):
+            await cache.sys.lpush(
+                fail,
+                str(
+                    {
+                        "code": secs,
+                        "reason": "checksum fail",
+                        "frame_type": "1m",
+                        "params": params,
+                    }
+                ),
+            )
+            continue
+        # todo 写dfs
+        await Stock.persist_bars(FrameType.MIN1, min_bars1)
+        total += len(secs)
 
-    if day_bars:
-        for i in range(0, len(tasks), limit):
-            temp = tasks[i : i + limit]
-            bars = await fetch_day_bars(temp, end)
-            if check_and_persistence or True:
-                bars = await fetch_day_bars(temp, end)
-                await Stock.persist_bars(FrameType.DAY, bars)
-            else:
-                print("不进行持久化，写cache")
-                # Stock.cache_bars()
-    return len(tasks)
+    for i in range(0, len(tasks), limit):
+        temp = tasks[i : i + limit]
+        bars1 = await fetch_day_bars(temp, end)
+        bars2 = await fetch_day_bars(temp, end)
+        if bars1 is None or bars2 is None:
+            await cache.sys.lpush(
+                fail,
+                str(
+                    {
+                        "code": temp,
+                        "reason": "got none data",
+                        "frame_type": "1d",
+                        "params": params,
+                    }
+                ),
+            )
+
+            continue
+        if not await handle_dfs_data(bars1, bars2, queue_day):
+            await cache.sys.lpush(
+                fail,
+                str(
+                    {
+                        "code": temp,
+                        "reason": "checksum fail",
+                        "frame_type": "1m",
+                        "params": params,
+                    }
+                ),
+            )
+            continue
+
+        await Stock.persist_bars(FrameType.DAY, bars1)
+        total += len(temp)
+    return total // 2
 
 
-async def sync_consumer(params: dict):
-    """"""
-    s = time.time()
-    end = params.get("end")
-    suffix = params.get("suffix")  # 队列后缀
-    n_bars = params.get("n_bars", 1)  # 多少个bars
-    resample = params.get("resample")  # 重采样
-    check_and_persistence = params.get("check_and_persistence")  # 校验并进行持久化 这个说明是
-    day_bars = params.get("day_bars")  # 是否需要日线
-    high_low_limit = params.get("sync_high_low_limit")  # 是否是同步涨跌停数据
-    state, done, scope = get_queue_name(suffix)
+async def sync_daily_calibration(params):
+    """凌晨2点的数据校准，
+    同步分钟线 持久化
+    同步日线 持久化"""
+    scope, state, end, n_bars, fail = await parse_params(params)
+    stock_min = params.get("stock_min")
+    index_min = params.get("index_min")
+    stock_day = params.get("stock_day")
+    index_day = params.get("index_day")
 
-    if high_low_limit:
-        total = await sync_high_low_limit(scope, end)
-    else:
-        total = await sync_bars(
-            end, n_bars, scope, resample, check_and_persistence, day_bars
-        )
+    stock_queue = params.get("stock_queue")
+    index_queue = params.get("index_queue")
+    total = 0
+    total += await __sync_daily_calibration(stock_queue, stock_min, stock_day, params)
+    total += await __sync_daily_calibration(index_queue, index_min, index_day, params)
 
+    await cache.sys.hincrby(state, "done_count", total // 2)
+
+
+async def sync_year_quarter_month_week(params):
+    scope, state, end, n_bars, fail = await parse_params(params)
+    stock_queue = params.get("stock_queue")
+    index_queue = params.get("index_queue")
+    stock_data = params.get("stock_data")
+    index_data = params.get("index_data")
+    frame_type = params.get("frame_type")
+    limit = await get_limit()
+    total = 0
+    tasks = []
+    async for secs in get_secs(limit, n_bars, stock_queue):
+        tasks.extend(secs)
+        stock_bars1 = await fetch_bars(secs, end, n_bars, frame_type)
+        stock_bars2 = await fetch_bars(secs, end, n_bars, frame_type)
+        if stock_bars1 is None or stock_bars2 is None:
+            await cache.sys.lpush(
+                fail,
+                str(
+                    {
+                        "code": secs,
+                        "reason": "got none data",
+                        "frame_type": frame_type.value,
+                        "params": params,
+                    }
+                ),
+            )
+            continue
+        # 校验通过，持久化
+        if not await handle_dfs_data(stock_bars1, stock_bars2, stock_data):
+            await cache.sys.lpush(
+                fail,
+                str(
+                    {
+                        "code": secs,
+                        "reason": "checksum fail",
+                        "frame_type": frame_type.value,
+                        "params": params,
+                    }
+                ),
+            )
+            continue
+        await Stock.persist_bars(frame_type, stock_bars1)
+        total += len(secs)
+
+    async for secs in get_secs(limit, n_bars, index_queue):
+        tasks.extend(secs)
+        index_bars1 = await fetch_bars(secs, end, n_bars, frame_type)
+        index_bars2 = await fetch_bars(secs, end, n_bars, frame_type)
+        if index_bars1 is None or index_bars2 is None:
+            await cache.sys.lpush(
+                fail,
+                str(
+                    {
+                        "code": secs,
+                        "reason": "got none data",
+                        "frame_type": FrameType.WEEK.value,
+                        "params": params,
+                    }
+                ),
+            )
+            continue
+        # 校验通过，持久化
+        if not await handle_dfs_data(index_bars1, index_bars2, index_data):
+            await cache.sys.lpush(
+                fail,
+                str(
+                    {
+                        "code": secs,
+                        "reason": "checksum fail",
+                        "frame_type": FrameType.WEEK.value,
+                        "params": params,
+                    }
+                ),
+            )
+            continue
+        await Stock.persist_bars(frame_type, index_bars1)
+        total += len(secs)
     await cache.sys.hincrby(state, "done_count", total)
-    print("剩余AbstractQuotesFetcher.quota", AbstractQuotesFetcher.quota)
-    logger.info(f"本次同步已完成，耗时：{time.time() - s}, 参数{params}")
+
+
+async def resample_bars():
+    """
+    重采样
+    分钟线->日线
+    日线 ->周线 根据当前时间和cal里面的ticks中的周frame做对比，
+    日线 ->月线
+
+    """
+    pass

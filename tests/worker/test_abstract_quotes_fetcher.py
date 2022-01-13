@@ -21,13 +21,13 @@ cfg = cfg4py.get_instance()
 
 class TestAbstractQuotesFetcher(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
-        init_test_env()
+        await init_test_env()
 
         await self.create_quotes_fetcher()
         await omicron.init(aq)
 
     async def asyncTearDown(self) -> None:
-        await omicron.shutdown()
+        await omicron.close()
 
     def get_config_path(self):
         src_dir = os.path.dirname(__file__)
@@ -211,7 +211,7 @@ class TestAbstractQuotesFetcher(unittest.IsolatedAsyncioTestCase):
 
         # without cache
         await self.clear_cache(sec, frame_type)
-        bars = await aq.get_bars(sec, end, 1, frame_type, include_unclosed=False)
+        bars = await aq.get_bars(sec, end, 1, frame_type)
         self.assertEqual(datetime.date(2021, 2, 5), bars["frame"][0])
 
     async def test_get_bars_016(self):
@@ -219,22 +219,8 @@ class TestAbstractQuotesFetcher(unittest.IsolatedAsyncioTestCase):
         sec = "605060.XSHG"
         frame_type = FrameType.MONTH
         end = datetime.date(2021, 2, 1)
-        bars = await aq.get_bars(sec, end, 1, frame_type, include_unclosed=False)
+        bars = await aq.get_bars(sec, end, 1, frame_type)
         self.assertIsNone(bars)
-
-    async def test_get_valuation(self):
-        secs = ["000001.XSHE", "600000.XSHG"]
-        date = arrow.get("2020-10-26").date()
-
-        # return two records, one for each
-        vals = await aq.get_valuation(secs, date)
-        self.assertSetEqual(set(secs), set(vals["code"].tolist()))
-        self.assertEqual(len(secs), len(vals))
-
-        # return two records, only two fields
-        vals = await aq.get_valuation(secs, date, fields=["frame", "code"])
-        self.assertEqual(set(secs), set(vals["code"].tolist()))
-        self.assertSequenceEqual(vals.dtype.names, ["frame", "code"])
 
     async def test_get_bars_batch(self):
         secs = ["000001.XSHE", "000001.XSHG"]

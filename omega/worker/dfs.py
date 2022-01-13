@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 # @Author   : xiaohuzi
 # @Time     : 2021-12-31 09:55
+import io
 import logging
 from abc import ABC
 from datetime import date, datetime
 from typing import AnyStr, Dict, Union
 
 import cfg4py
+import numpy as np
 from minio import Minio, error
 from omicron.models.calendar import Calendar as cal
 from omicron.models.calendar import FrameType
@@ -28,7 +30,7 @@ class Storage:
         elif cfg.dfs.engine == "minio":
             cls.__instance = MinioStorage()
         else:
-            raise TypeError(f"unsupported engine {cfg.dfs.engine}")
+            return None
         return cls.__instance
 
     @classmethod
@@ -44,9 +46,9 @@ class AbstractStorage(ABC):
 
     @staticmethod
     def get_filename(
-        _date: Union[datetime, date, AnyStr],
+        prefix: str,
+        dt: Union[datetime, date, AnyStr],
         frame_type: Union[FrameType, AnyStr],
-        prefix: AnyStr = "",
     ) -> AnyStr:
         """拼接文件名"""
         filename = []
@@ -62,28 +64,28 @@ class AbstractStorage(ABC):
             filename.append(frame_type)
         else:
             raise TypeError("prefix must be type FrameType, str")
-        if isinstance(_date, str):
-            filename.append(cal.int2date(_date))
-        elif isinstance(_date, datetime) or isinstance(_date, date):
-            filename.append(str(cal.date2int(_date)))
+        if isinstance(dt, str):
+            filename.append(cal.int2date(dt))
+        elif isinstance(dt, datetime) or isinstance(dt, date):
+            filename.append(str(cal.date2int(dt)))
         else:
-            raise TypeError("_data must be type datetime, date, str")
+            raise TypeError("dt must be type datetime, date, str")
 
         return "/".join(filename)
 
     async def write(
         self,
-        sec: AnyStr,
-        bar: Dict,
-        _date: Union[datetime, date, AnyStr],
+        bar: bytes,
+        prefix,
+        dt: Union[datetime, date, AnyStr],
         frame_type: Union[FrameType, AnyStr],
     ):
         """
         将bar写入dfs中 按照 /日期/
         Args:
-            sec: 股票或基金的名称
+            prefix: 股票或基金的名称
             bar: K线数据字典
-            _date: 日期
+            dt: 日期
             frame_type: K线类型
         Returns:
 
@@ -91,17 +93,17 @@ class AbstractStorage(ABC):
 
     async def read(
         self,
-        sec: AnyStr,
-        _date: Union[datetime, date, AnyStr],
+        prefix,
+        dt: Union[datetime, date, AnyStr],
         frame_type: Union[FrameType, AnyStr],
-    ) -> Dict:
+    ) -> np.array:
         """
         Args:
-            sec:  股票或基金的名称
-            _date:  日期
+            prefix:  股票或基金的名称
+            dt:  日期
             frame_type: K线类型
 
-        Returns: bar: K线数据字典
+        Returns: np.array:
 
         """
 
@@ -132,10 +134,23 @@ class MinioStorage(AbstractStorage):
 
     async def write(
         self,
-        sec: AnyStr,
-        bar: Dict,
-        _date: Union[datetime, date, AnyStr],
+        bar: bytes,
+        prefix,
+        dt: Union[datetime, date, AnyStr],
         frame_type: Union[FrameType, AnyStr],
     ):
-        filename = self.get_filename(_date, frame_type, sec)
-        print(filename)
+        filename = self.get_filename(prefix, dt, frame_type)
+        data = io.BytesIO(bar)
+        ret = self.client.put_object(self.bucket, filename, data, length=len(bar))
+        return ret
+
+    async def read(
+        self,
+        prefix: AnyStr,
+        dt: Union[datetime, date, AnyStr],
+        frame_type: Union[FrameType, AnyStr],
+    ) -> np.array:
+        filename = self.get_filename(prefix, dt, frame_type)
+        response = self.client.get_object(self.bucket, filename)
+        # print(response.read())
+        return response.read()

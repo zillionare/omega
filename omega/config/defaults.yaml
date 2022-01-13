@@ -48,8 +48,8 @@ omega:
     archive: http://stocks.jieyu.ai
   heartbeat: 10
   sync:
-    security_list: 02:00
-    calendar: 02:00
+    security_list: 01:00
+    calendar: 01:00
     bars:
       cat:
         - stock

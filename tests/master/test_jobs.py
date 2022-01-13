@@ -9,24 +9,15 @@ from unittest import mock
 
 import arrow
 import cfg4py
-import numpy as np
 import omicron
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from omicron import cache
-from omicron.models.calendar import Calendar as cal
-from omicron.core.types import FrameType
-from omicron.models.stock import Stock
 from pyemit import emit
 
-import omega.core.sanity
-import omega.master
 import omega.master.jobs as syncjobs
-from omega.core.constants import get_queue_name
-from omega.core.events import Events, ValidationError
-from omega.worker import archive
+from omega.core.events import Events
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
-from omega.worker.jobs import sync_consumer
-from tests import init_test_env, start_archive_server
+from omega.worker import jobs as workjobs
+from tests import init_test_env
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
@@ -63,38 +54,37 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         secs = await cache.get_securities()
         self.assertTrue(len(secs) > 0)
 
-    async def test_sync_minute_bars(self):
-        # await cache.sys.hset("master.bars_sync.state.minute", "is_running", 0)
-        suffix = "minute"
-        state, done, scope = get_queue_name(suffix)
-
-        await omicron.cache.sys.hdel(state, "is_running")
-        await omicron.cache.sys.hdel(state, "done_count")
-        emit.register(Events.OMEGA_DO_SYNC_MIN, sync_consumer)
+    @mock.patch("omega.master.jobs.get_now")
+    async def test_sync_minute_bars(self, get_now):
+        get_now.return_value = datetime.datetime(2022, 1, 11, 9, 32)
+        emit.register(Events.OMEGA_DO_SYNC_MIN, workjobs.sync_minute_bars)
         await syncjobs.sync_minute_bars()
 
-    async def test_sync_day_bars(self):
-        suffix = "day"
-
-        state, done, scope = get_queue_name(suffix)
-
-        await omicron.cache.sys.hdel(state, "is_running")
-        await omicron.cache.sys.hdel(state, "done_count")
-        emit.register(Events.OMEGA_DO_SYNC_MIN, sync_consumer)
+    @mock.patch("omega.master.jobs.get_now")
+    async def test_sync_day_bars(self, get_now):
+        get_now.return_value = datetime.datetime(2022, 1, 11, 16)
+        emit.register(Events.OMEGA_DO_SYNC_DAY, workjobs.sync_day_bars)
         await syncjobs.sync_day_bars()
 
-    async def test_daily_calibration_sync(self):
-        suffix = "daily_calibration"
-        state, done, scope = get_queue_name(suffix)
-        await omicron.cache.sys.hdel(state, "is_running")
-        await omicron.cache.sys.hdel(state, "done_count")
-        emit.register(Events.OMEGA_DO_SYNC_MIN, sync_consumer)
+    @mock.patch("omega.master.jobs.get_now")
+    async def test_daily_calibration_sync(self, get_now):
+        get_now.return_value = datetime.datetime(2022, 1, 11, 16)
+        emit.register(
+            Events.OMEGA_DO_SYNC_DAILY_CALIBRATION, workjobs.sync_daily_calibration
+        )
         await syncjobs.daily_calibration_sync()
 
-    async def test_sync_high_low_limit(self):
-        suffix = "high_low_limit"
-        state, done, scope = get_queue_name(suffix)
-        await omicron.cache.sys.hdel(state, "is_running")
-        await omicron.cache.sys.hdel(state, "done_count")
-        emit.register(Events.OMEGA_DO_SYNC_MIN, sync_consumer)
+    @mock.patch("omega.master.jobs.get_now")
+    async def test_sync_high_low_limit(self, get_now):
+        get_now.return_value = datetime.datetime(2022, 1, 11, 16)
+        emit.register(Events.OMEGA_DO_SYNC_HIGH_LOW_LIMIT, workjobs.sync_high_low_limit)
         await syncjobs.sync_high_low_limit()
+
+    @mock.patch("omega.master.jobs.get_now")
+    async def test_sync_year_quarter_month_week(self, get_now):
+        get_now.return_value = datetime.datetime(2022, 1, 11, 16)
+        emit.register(
+            Events.OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK,
+            workjobs.sync_year_quarter_month_week,
+        )
+        await syncjobs.sync_year_quarter_month_week()

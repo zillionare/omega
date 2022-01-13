@@ -14,7 +14,7 @@ import cfg4py
 import fire
 import omicron
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from jobs import sync_calendar, sync_security_list
+from jobs import load_cron_task, sync_calendar, sync_security_list
 from pyemit import emit
 
 from omega.config import get_config_dir
@@ -68,23 +68,7 @@ async def init():  # noqa
     await heartbeat()
     scheduler.add_job(heartbeat, "interval", seconds=5)
     # sync securities daily
-    h, m = map(int, cfg.omega.sync.security_list.split(":"))
-    scheduler.add_job(
-        sync_calendar,
-        "cron",
-        hour=h,
-        minute=m,
-        args=("calendar",),
-        name="sync_calendar",
-    )
-    scheduler.add_job(
-        sync_security_list,
-        "cron",
-        name="sync_security_list",
-        hour=h,
-        minute=m,
-    )
-
+    await load_cron_task(scheduler)
     scheduler.start()
     logger.info("omega master finished initialization")
 

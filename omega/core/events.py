@@ -13,6 +13,11 @@ class Events:
     OMEGA_VALIDATION_ERROR = "omega/validation_error"
 
     OMEGA_DO_SYNC_MIN = "omega/sync_min"
+    OMEGA_DO_SYNC_DAY = "omega/sync_day"
+    OMEGA_DO_SYNC_DAILY_CALIBRATION = "omega/daily_calibration"
+    OMEGA_DO_SYNC_HIGH_LOW_LIMIT = "omega/high_low_limit"
+    # year_quarter_month_week
+    OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK = "omega/year_quarter_month_week"
 
 
 class ValidationError:
