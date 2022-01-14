@@ -6,18 +6,22 @@ import time
 import unittest
 from pathlib import Path
 from unittest import mock
-
+import numpy as np
 import arrow
 import cfg4py
 import omicron
 from omicron import cache
 from pyemit import emit
-
+import pickle
 import omega.master.jobs as syncjobs
+from omega.core import constants
 from omega.core.events import Events
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omega.worker import jobs as workjobs
+from omega.worker.dfs import TempStorage
 from tests import init_test_env
+from omega.core.constants import HIGH_LOW_LIMIT
+from omicron.core.types import FrameType
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
@@ -77,15 +81,153 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
 
     @mock.patch("omega.master.jobs.get_now")
     async def test_sync_high_low_limit(self, get_now):
-        get_now.return_value = datetime.datetime(2022, 1, 11, 16)
-        emit.register(Events.OMEGA_DO_SYNC_HIGH_LOW_LIMIT, workjobs.sync_high_low_limit)
-        await syncjobs.sync_high_low_limit()
+        async def get_high_limit_price(*args, **kwargs):
+            return np.load("../data/high_low_limit.npy", allow_pickle=True)
 
-    @mock.patch("omega.master.jobs.get_now")
-    async def test_sync_year_quarter_month_week(self, get_now):
         get_now.return_value = datetime.datetime(2022, 1, 11, 16)
+        await cache.sys.delete("master.task.high_low_limit.state")
+        emit.register(Events.OMEGA_DO_SYNC_HIGH_LOW_LIMIT, workjobs.sync_high_low_limit)
+
+        with mock.patch(
+            "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher.get_high_limit_price",
+            side_effect=get_high_limit_price,
+        ):
+            await syncjobs.sync_high_low_limit()
+            # 检查redis中有没有数据
+            resp = await cache.sys.hgetall(HIGH_LOW_LIMIT)
+            self.assertDictEqual(
+                resp,
+                {
+                    "000001.XSHE.high_limit": "18.91",
+                    "000001.XSHE.low_limit": "15.47",
+                    "300001.XSHE.high_limit": "27.43",
+                    "300001.XSHE.low_limit": "18.29",
+                    "600000.XSHG.high_limit": "9.59",
+                    "600000.XSHG.low_limit": "7.85",
+                },
+            )
+
+        email_content = None
+
+        async def send_email(error):
+            # global email_content
+            nonlocal email_content
+            email_content = error
+
+        # 测试bars 为None
+        with mock.patch(
+            "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher.get_high_limit_price",
+            return_value=None,
+        ):
+            with mock.patch(
+                "omega.master.jobs.Task.send_email", side_effect=send_email
+            ):
+                await syncjobs.sync_high_low_limit()
+                self.assertEqual(email_content, "Got None Data")
+        # 非交易日返回false
+        get_now.return_value = datetime.datetime(2022, 1, 9, 16)
+        ret = await syncjobs.sync_high_low_limit()
+        self.assertFalse(ret)
+
+    @mock.patch("omicron.models.stock.Stock.persist_bars")
+    @mock.patch(
+        "omega.master.jobs.get_now", return_value=datetime.datetime(2022, 1, 11, 16)
+    )
+    @mock.patch("omega.master.jobs.Storage", side_effect=TempStorage)
+    @mock.patch(
+        "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher.get_quota",
+        return_value=1000000,
+    )
+    @mock.patch("omega.master.jobs.mail_notify")
+    @mock.patch(
+        "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher.get_bars_batch"
+    )
+    async def test_sync_year_quarter_month_week(
+        self, get_bars_batch, mail_notify, get_quota, *args
+    ):
+        week_state = f"{constants.TASK_PREFIX}.{FrameType.WEEK.value}.state"
+        month_state = f"{constants.TASK_PREFIX}.{FrameType.MONTH.value}.state"
+
+        async def clear():
+            p = cache.sys.pipeline()
+            p.delete(constants.BAR_SYNC_WEEK_TAIl)
+            p.delete(constants.BAR_SYNC_MONTH_TAIl)
+            p.delete(week_state)
+            p.delete(month_state)
+            await p.execute()
+
+        await clear()
         emit.register(
             Events.OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK,
             workjobs.sync_year_quarter_month_week,
         )
-        await syncjobs.sync_year_quarter_month_week()
+
+        async def get_bars_batch_mock(*args, **kwargs):
+            """聚宽的数据被序列化到文件里了，mock读出来"""
+            with open("../data/month_week.pick", "rb") as f:
+                return pickle.loads(f.read())
+
+        get_bars_batch.side_effect = get_bars_batch_mock
+
+        def count_frames():
+            """mock 计算帧间隔的方法"""
+            i = 5
+
+            def inner(*args, **kwargs):
+                nonlocal i
+                i -= 1
+                return i
+
+            return inner
+
+        email_content = ""
+
+        async def mail_notify_mock(subject, body, **kwargs):
+            nonlocal email_content
+            email_content = body
+
+        mail_notify.side_effect = mail_notify_mock
+
+        with mock.patch(
+            "omicron.models.calendar.Calendar.count_frames", side_effect=count_frames()
+        ):
+            await syncjobs.sync_year_quarter_month_week()
+            # 检查redis里的周是否是某个值
+            self.assertEqual(
+                await cache.sys.get(constants.BAR_SYNC_WEEK_TAIl), "2005-01-07"
+            )
+            self.assertEqual(
+                await cache.sys.get(constants.BAR_SYNC_MONTH_TAIl), "2005-01-31"
+            )
+
+        # 测试上游返回None值
+        get_bars_batch.return_value = None
+        get_bars_batch.side_effect = None
+        # mock 写dfs的方法
+        await clear()
+        with mock.patch(
+            "omicron.models.calendar.Calendar.count_frames", side_effect=count_frames()
+        ):
+            await syncjobs.sync_year_quarter_month_week()
+            self.assertIn("Got None Data", email_content)
+
+        await cache.sys.hset(week_state, "is_running", 1)
+        await cache.sys.hset(month_state, "is_running", 1)
+
+        # 测试已经在运行了 重复启动
+        with mock.patch(
+            "omicron.models.calendar.Calendar.count_frames", side_effect=count_frames()
+        ):
+            ret = await syncjobs.sync_year_quarter_month_week()
+            self.assertFalse(ret)
+        await clear()
+
+        get_quota.return_value = 0
+        # 测试quota 不够
+        # 测试已经在运行了 重复启动
+        with mock.patch(
+            "omicron.models.calendar.Calendar.count_frames", side_effect=count_frames()
+        ):
+            ret = await syncjobs.sync_year_quarter_month_week()
+            self.assertIn(f"剩余可用quota：{get_quota.return_value}", email_content)
+        await clear()

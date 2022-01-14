@@ -21,6 +21,7 @@ from omicron.extensions.np import numpy_append_fields
 from omicron.models.stock import Stock
 
 from omega.core.constants import HIGH_LOW_LIMIT
+from omega.worker import exception
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher
 
 cfg = cfg4py.get_instance()
@@ -39,6 +40,10 @@ async def worker_exit(state, scope, error=None):
     await p.execute()
 
 
+async def push_fail_secs(secs, fail):
+    await cache.sys.lpush(fail, str(secs))
+
+
 def decorator():
     def inner(f):
         @wraps(f)
@@ -49,15 +54,14 @@ def decorator():
 
             await cache.sys.hincrby(state, "worker_count")
             try:
-                error_msg = await f(params)
-                if error_msg is not None:
-                    await worker_exit(state, scope, error_msg)
-            # 说明消费者消费时错误了
+                ret = await f(params)
+                return ret
+            except exception.WorkerException as e:
+                await worker_exit(state, scope, e.msg)
             except Exception as e:
+                # 说明消费者消费时错误了
                 logger.exception(e)
                 await worker_exit(state, scope)
-
-            return
 
         return decorated_function
 
@@ -80,7 +84,6 @@ async def fetch_bars(
             bar = numpy_append_fields(bars[code], "code", code, dtypes=[("code", "O")])
             temp.append(bar)
         return np.concatenate(temp)
-    return None
 
 
 async def fetch_min_bars(secs: List[str], end: datetime.datetime, n_bars: int):
@@ -177,6 +180,7 @@ async def get_secs(limit: int, n_bars: int, scope: str):
         yield secs
 
 
+@decorator()
 async def sync_high_low_limit(params):
     """同步涨跌停worker"""
     scope, state, end, n_bars, fail = await parse_params(params)
@@ -187,7 +191,8 @@ async def sync_high_low_limit(params):
     async for secs in get_secs(limit, 1, scope):
         bars = await get_high_low_limit(secs, end)
         if bars is None:
-            return "Got None data"
+            await push_fail_secs(secs, fail)
+            return 1
         for sec in bars:
             name = sec["code"]
             high_limit = sec["high_limit"]
@@ -206,6 +211,24 @@ async def sync_high_low_limit(params):
         # 取到到晚上12点还有多少秒
         await cache.sys.expire(HIGH_LOW_LIMIT, get_remnant_s())
     await cache.sys.hincrby(state, "done_count", total)
+    return True
+
+
+async def __sync_min_bars(params):
+    """同步分支线数据并写缓存"""
+    limit = await get_limit()
+    scope, state, end, n_bars, fail = await parse_params(params)
+    total = 0
+    tasks = []
+    async for secs in get_secs(limit, n_bars, scope):
+        bars = await fetch_min_bars(secs, end, n_bars)
+        if bars is None:
+            await push_fail_secs(secs, fail)
+            return 1
+        await Stock.batch_cache_bars(FrameType.MIN1, bars)
+        total += len(secs)
+        tasks.extend(secs)
+    return total, tasks
 
 
 @decorator()
@@ -219,15 +242,7 @@ async def sync_minute_bars(params):
 
     """
     scope, state, end, n_bars, fail = await parse_params(params)
-    limit = await get_limit()
-    total = 0
-    async for secs in get_secs(limit, n_bars, scope):
-        bars = await fetch_min_bars(secs, end, n_bars)
-        if bars is None:
-            return "Got None data"
-            # continue
-        await Stock.batch_cache_bars(FrameType.MIN1, bars)
-        total += len(secs)
+    total, tasks = await __sync_min_bars(params)
 
     await cache.sys.hincrby(state, "done_count", total)
 
@@ -246,27 +261,20 @@ async def parse_params(params):
 async def sync_day_bars(params):
     """这是下午三点收盘后的同步，仅写cache，同步分钟线和日线"""
     scope, state, end, n_bars, fail = await parse_params(params)
-    total = 0
-    tasks = []
     limit = await get_limit()
 
-    async for secs in get_secs(limit, n_bars, scope):
-        min_bars = await fetch_min_bars(secs, end, n_bars)
-        if min_bars is None:
-            continue
-        await Stock.batch_cache_bars(FrameType.MIN1, min_bars)
-        total += len(secs)
+    total, tasks = await __sync_min_bars(params)
 
-        # 写cache
     for i in range(0, len(tasks), limit):
         temp = tasks[i : i + limit]
         bars = await fetch_day_bars(temp, end)
         if bars is None:
-            continue
+            return 1
         await Stock.batch_cache_bars(FrameType.DAY, bars)
         total += len(temp)
 
     await cache.sys.hincrby(state, "done_count", total // 2)
+    return True
 
 
 async def checksum(value1, value2):
@@ -293,6 +301,19 @@ async def handle_dfs_data(bars1, bars2, queue_name):
         return False
 
 
+async def persistence_daily_calibration(bars1, bars2, secs, fail, queue):
+    # 将数据持久化
+    if bars1 is None or bars2 is None:
+        await push_fail_secs(secs, fail)
+        raise exception.GotNoneData()
+    # 校验通过，持久化
+    if not await handle_dfs_data(bars1, bars2, queue):
+        await push_fail_secs(secs, fail)
+        raise exception.ChecksumFail()
+    await Stock.persist_bars(FrameType.MIN1, bars1)
+    return len(secs)
+
+
 async def __sync_daily_calibration(
     scope: str, queue_min: str, queue_day: str, params: dict
 ):
@@ -315,71 +336,18 @@ async def __sync_daily_calibration(
         tasks.extend(secs)
         min_bars1 = await fetch_min_bars(secs, end, n_bars)
         min_bars2 = await fetch_min_bars(secs, end, n_bars)
-        if min_bars1 is None or min_bars2 is None:
-            await cache.sys.lpush(
-                fail,
-                str(
-                    {
-                        "code": secs,
-                        "reason": "got none data",
-                        "frame_type": "1m",
-                        "params": params,
-                    }
-                ),
-            )
-            continue
-        # 校验通过，持久化
-        if not await handle_dfs_data(min_bars1, min_bars2, queue_min):
-            await cache.sys.lpush(
-                fail,
-                str(
-                    {
-                        "code": secs,
-                        "reason": "checksum fail",
-                        "frame_type": "1m",
-                        "params": params,
-                    }
-                ),
-            )
-            continue
-        # todo 写dfs
-        await Stock.persist_bars(FrameType.MIN1, min_bars1)
-        total += len(secs)
+        total += await persistence_daily_calibration(
+            min_bars1, min_bars2, secs, fail, queue_min
+        )
 
     for i in range(0, len(tasks), limit):
         temp = tasks[i : i + limit]
         bars1 = await fetch_day_bars(temp, end)
         bars2 = await fetch_day_bars(temp, end)
-        if bars1 is None or bars2 is None:
-            await cache.sys.lpush(
-                fail,
-                str(
-                    {
-                        "code": temp,
-                        "reason": "got none data",
-                        "frame_type": "1d",
-                        "params": params,
-                    }
-                ),
-            )
+        total += await persistence_daily_calibration(
+            bars1, bars2, temp, fail, queue_day
+        )
 
-            continue
-        if not await handle_dfs_data(bars1, bars2, queue_day):
-            await cache.sys.lpush(
-                fail,
-                str(
-                    {
-                        "code": temp,
-                        "reason": "checksum fail",
-                        "frame_type": "1m",
-                        "params": params,
-                    }
-                ),
-            )
-            continue
-
-        await Stock.persist_bars(FrameType.DAY, bars1)
-        total += len(temp)
     return total // 2
 
 
@@ -403,6 +371,27 @@ async def sync_daily_calibration(params):
     await cache.sys.hincrby(state, "done_count", total)
 
 
+async def __sync_year_quarter_month_week(params, queue, data):
+    scope, state, end, n_bars, fail = await parse_params(params)
+    frame_type = params.get("frame_type")
+
+    limit = await get_limit()
+    total = 0
+    async for secs in get_secs(limit, n_bars, queue):
+        bars1 = await fetch_bars(secs, end, n_bars, frame_type)
+        bars2 = await fetch_bars(secs, end, n_bars, frame_type)
+        if bars1 is None or bars2 is None:
+            await push_fail_secs(secs, fail)
+            raise exception.GotNoneData()
+        # 校验通过，持久化
+        if not await handle_dfs_data(bars1, bars2, data):
+            await push_fail_secs(secs, fail)
+            raise exception.ChecksumFail()
+        await Stock.persist_bars(frame_type, bars1)
+        total += len(secs)
+    return total
+
+
 @decorator()
 async def sync_year_quarter_month_week(params):
     scope, state, end, n_bars, fail = await parse_params(params)
@@ -410,75 +399,8 @@ async def sync_year_quarter_month_week(params):
     index_queue = params.get("index_queue")
     stock_data = params.get("stock_data")
     index_data = params.get("index_data")
-    frame_type = params.get("frame_type")
-    limit = await get_limit()
     total = 0
-    tasks = []
-    async for secs in get_secs(limit, n_bars, stock_queue):
-        tasks.extend(secs)
-        stock_bars1 = await fetch_bars(secs, end, n_bars, frame_type)
-        stock_bars2 = await fetch_bars(secs, end, n_bars, frame_type)
-        if stock_bars1 is None or stock_bars2 is None:
-            await cache.sys.lpush(
-                fail,
-                str(
-                    {
-                        "code": secs,
-                        "reason": "got none data",
-                        "frame_type": frame_type.value,
-                        "params": params,
-                    }
-                ),
-            )
-            continue
-        # 校验通过，持久化
-        if not await handle_dfs_data(stock_bars1, stock_bars2, stock_data):
-            await cache.sys.lpush(
-                fail,
-                str(
-                    {
-                        "code": secs,
-                        "reason": "checksum fail",
-                        "frame_type": frame_type.value,
-                        "params": params,
-                    }
-                ),
-            )
-            continue
-        await Stock.persist_bars(frame_type, stock_bars1)
-        total += len(secs)
+    total += await __sync_year_quarter_month_week(params, stock_queue, stock_data)
+    total += await __sync_year_quarter_month_week(params, index_queue, index_data)
 
-    async for secs in get_secs(limit, n_bars, index_queue):
-        tasks.extend(secs)
-        index_bars1 = await fetch_bars(secs, end, n_bars, frame_type)
-        index_bars2 = await fetch_bars(secs, end, n_bars, frame_type)
-        if index_bars1 is None or index_bars2 is None:
-            await cache.sys.lpush(
-                fail,
-                str(
-                    {
-                        "code": secs,
-                        "reason": "got none data",
-                        "frame_type": FrameType.WEEK.value,
-                        "params": params,
-                    }
-                ),
-            )
-            continue
-        # 校验通过，持久化
-        if not await handle_dfs_data(index_bars1, index_bars2, index_data):
-            await cache.sys.lpush(
-                fail,
-                str(
-                    {
-                        "code": secs,
-                        "reason": "checksum fail",
-                        "frame_type": FrameType.WEEK.value,
-                        "params": params,
-                    }
-                ),
-            )
-            continue
-        await Stock.persist_bars(frame_type, index_bars1)
-        total += len(secs)
     await cache.sys.hincrby(state, "done_count", total)

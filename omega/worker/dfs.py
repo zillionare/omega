@@ -20,24 +20,6 @@ cfg: Config = cfg4py.get_instance()
 logger = logging.getLogger(__name__)
 
 
-class Storage:
-    __instance = None
-
-    def __new__(cls, *args, **kwargs):
-        if cls.__instance is not None:
-            return cls.__instance
-
-        elif cfg.dfs.engine == "minio":
-            cls.__instance = MinioStorage()
-        else:
-            return None
-        return cls.__instance
-
-    @classmethod
-    def reset(cls):
-        cls.__instance = None
-
-
 # 用来和DFS存储系统进行交互的封装
 class AbstractStorage(ABC):
     """该类是用来和minio这种dfs存储系统进行交互的抽象类，如果需要对接不同的dfs，需要继承该类，并实现对应的方法"""
@@ -106,6 +88,29 @@ class AbstractStorage(ABC):
         Returns: np.array:
 
         """
+
+
+class TempStorage:
+    async def write(self, *args, **kwargs):
+        pass
+
+
+class Storage:
+    __instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if cls.__instance is not None:
+            return cls.__instance
+
+        elif cfg.dfs.engine == "minio":
+            cls.__instance = MinioStorage()
+        else:
+            return None
+        return cls.__instance
+
+    @classmethod
+    def reset(cls):
+        cls.__instance = None
 
 
 class MinioStorage(AbstractStorage):

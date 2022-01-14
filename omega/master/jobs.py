@@ -40,15 +40,14 @@ def decorator():
         async def decorated_function():
             """装饰所有生产者"""
             try:
-                await f()
-            # 说明消费者消费时错误了
+                ret = await f()
+                return ret
             except Exception as e:
                 logger.exception(e)
                 # 发送邮件报告错误
                 subject = f"执行生产者{f.__name__}时发生异常"
                 body = f"详细信息：\n{traceback.format_exc()}"
                 await mail_notify(subject, body, html=True)
-            return
 
         return decorated_function
 
@@ -109,7 +108,6 @@ class Task:
         if is_running is not None:
             msg = f"检测到{self.state}下有正在运行的任务，本次任务不执行"
             logger.info(msg)
-            print(msg)
             return True
 
     @classmethod
@@ -142,11 +140,17 @@ class Task:
         subject = f"执行{self.state}时异常！"
         body = error
         body += "\n\n================================================\n\n"
-        body += str(self.params)
+        body += "消费者得到的参数是：" + str(self.params)
         body += "\n\n================================================\n\n"
         quota = await aq.get_quota()
         body += f"剩余可用quota：{quota}"
 
+        p = cache.sys.pipeline()
+        p.lrange(self.fail, 0, -1)
+        p.delete(self.fail)
+        fails, _ = await p.execute()
+        if fails:
+            body += "\n执行这些股票数据时发生错误：" + str(fails)
         await mail_notify(subject, body, html=True)
 
     async def run(self):
@@ -161,7 +165,6 @@ class Task:
         quota = await aq.get_quota()
         need = count * self.coefficient
         if quota < need:
-            print("quota不够，发送邮件")
             msg = f"剩余quota不够本次同步，剩余：{quota}, 至少需要{need}才可以同步，"
             await self.send_email(msg)
             return
@@ -186,7 +189,9 @@ class Task:
                 {"stock_queue": self.stock_queue, "index_queue": self.index_queue}
             )
         await p.execute()
-        self.params.update({"__scope": self.scope, "__state": self.state})
+        self.params.update(
+            {"__scope": self.scope, "__state": self.state, "__fail": self.fail}
+        )
         await emit.emit(self.channel, self.params)
         ret = await self.check_done(count)
         await self.delete_state()
@@ -214,18 +219,17 @@ class Task:
                         is_running, done_count, error, worker_count = await p.execute()
                         if worker_count is None:
                             # 说明消费者还没收到消息，等待
-                            await asyncio.sleep(1)
+                            await asyncio.sleep(0.5)
 
                         if not is_running:
                             # 说明消费者异常退出了， 发送邮件
-                            print("发送邮件退出")
                             await self.send_email(error)
                             return False
                         # done_count = await cache.sys.hget(self.state, "done_count")
                         # todo 检查消费者状态，如果没有is_running，并且任务完成数量不对，说明消费者移除退出了，错误信息在 error 这个key中
                         # 把error 和 fail 读出来之后 发送邮件，然后master退出，等待下一次执行
                         if done_count is None or int(done_count) != count:
-                            await asyncio.sleep(1)
+                            await asyncio.sleep(0.5)
                         else:
                             print(f"{self.scope}耗时：{time.time() - s}")
                             return
@@ -586,6 +590,7 @@ async def sync_high_low_limit():
     end = get_now().replace(hour=15, minute=0, second=0, microsecond=0)
     if not cal.is_trade_day(end):
         print("非交易日，不同步")
+        return False
     params = {"end": end}
     task = Task(Events.OMEGA_DO_SYNC_HIGH_LOW_LIMIT, "high_low_limit", params, timeout)
     await task.set_coefficient(1)
@@ -618,15 +623,12 @@ async def __sync_year_quarter_month_week(tail_key, frame_type):
         tail = datetime.datetime.strptime(tail, "%Y-%m-%d")
         tail = cal.shift(tail, 1, frame_type)
     # 判断week_tail到现在有没有空洞
-    if (
-        cal.count_frames(
-            tail,
-            now.replace(hour=0, minute=0, second=0, microsecond=0),
-            frame_type,
-        )
-        - 1
-        > 1
-    ):
+    count_frame = cal.count_frames(
+        tail,
+        now.replace(hour=0, minute=0, second=0, microsecond=0),
+        frame_type,
+    )
+    if count_frame - 1 > 1:
         queue_name = frame_type.value
         stock_queue = f"{queue_name}.stock"
         index_queue = f"{queue_name}.index"
@@ -658,7 +660,8 @@ async def __sync_year_quarter_month_week(tail_key, frame_type):
         await write_dfs(index_data, frame_type, "index", tail)
         await delete_year_quarter_month_week_queue(stock_data, index_data)
         await cache.sys.set(tail_key, tail.strftime("%Y-%m-%d"))
-    return True
+        return True
+    return False
 
 
 @decorator()
@@ -668,11 +671,11 @@ async def sync_year_quarter_month_week():
     if not await __sync_year_quarter_month_week(
         constants.BAR_SYNC_WEEK_TAIl, FrameType.WEEK
     ):
-        return
+        return False
     if not await __sync_year_quarter_month_week(
         constants.BAR_SYNC_MONTH_TAIl, FrameType.MONTH
     ):
-        return
+        return False
     # if not await __sync_year_quarter_month_week(
     #         constants.BAR_SYNC_QUARTER_TAIl, FrameType.QUARTER
     # ):
