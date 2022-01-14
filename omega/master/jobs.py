@@ -6,6 +6,8 @@ import datetime
 import logging
 import pickle
 import time
+import traceback
+from functools import wraps
 
 import arrow
 import async_timeout
@@ -16,6 +18,7 @@ from omicron import cache
 from omicron.core.types import FrameType, SecurityType
 from omicron.models.calendar import Calendar as cal
 from omicron.models.stock import Stock
+from omicron.notify.mail import mail_notify
 from pyemit import emit
 
 from omega.core import constants
@@ -31,6 +34,27 @@ def get_now():
     return datetime.datetime.now()
 
 
+def decorator():
+    def inner(f):
+        @wraps(f)
+        async def decorated_function():
+            """装饰所有生产者"""
+            try:
+                await f()
+            # 说明消费者消费时错误了
+            except Exception as e:
+                logger.exception(e)
+                # 发送邮件报告错误
+                subject = f"执行生产者{f.__name__}时发生异常"
+                body = f"详细信息：\n{traceback.format_exc()}"
+                await mail_notify(subject, body, html=True)
+            return
+
+        return decorated_function
+
+    return inner
+
+
 class Task:
     def __init__(
         self,
@@ -40,6 +64,7 @@ class Task:
         timeout: int = 60,
         stock_queue: str = None,
         index_queue: str = None,
+        coefficient: int = 240,
     ):
         """
         Args:
@@ -49,6 +74,7 @@ class Task:
             timeout: run需要等待的超时时间
             stock_queue: 校验同步的股票队列
             index_queue: 校验同步的指数队列
+            coefficient: 系数 用来计算quota够不够  如果quota < 任务总数*coefficient 则不同步 并发送邮件报警
         """
         self.channel = channel
         self.task_queue_name = task_queue_name
@@ -60,6 +86,10 @@ class Task:
         self.__index = []
         self.stock_queue = stock_queue
         self.index_queue = index_queue
+        self.coefficient = coefficient
+
+    async def set_coefficient(self, coefficient):
+        self.coefficient = coefficient
 
     @classmethod
     def get_queue_name(cls, task_queue_name):
@@ -108,34 +138,59 @@ class Task:
             await self.generate_task()
         return self.__task_list
 
+    async def send_email(self, error):
+        subject = f"执行{self.state}时异常！"
+        body = error
+        body += "\n\n================================================\n\n"
+        body += str(self.params)
+        body += "\n\n================================================\n\n"
+        quota = await aq.get_quota()
+        body += f"剩余可用quota：{quota}"
+
+        await mail_notify(subject, body, html=True)
+
     async def run(self):
         """分配任务并发送emit通知worker开始执行，然后阻塞等待"""
         if await self.is_running:
             return False
+        tasks = await self.tasks()
+        count = len(tasks)
+        if not count:
+            return False
+        # 检查quota，通过 task的数量 * 一个系数
+        quota = await aq.get_quota()
+        need = count * self.coefficient
+        if quota < need:
+            print("quota不够，发送邮件")
+            msg = f"剩余quota不够本次同步，剩余：{quota}, 至少需要{need}才可以同步，"
+            await self.send_email(msg)
+            return
         p = cache.sys.pipeline()
         p.hset(self.state, "is_running", 1)
         p.expire(self.state, self.timeout * 5)
         await p.execute()
-        tasks = await self.tasks()
-        count = len(tasks)
         p = cache.sys.pipeline()
         p.hmset(self.state, "task_count", count)
+
         if self.stock_queue is None or self.index_queue is None:
             p.delete(self.scope)
             p.lpush(self.scope, *tasks)
         else:
             p.delete(self.stock_queue)
             p.delete(self.index_queue)
-            p.lpush(self.stock_queue, *self.__stock)
-            p.lpush(self.index_queue, *self.__index)
+            if self.__stock:
+                p.lpush(self.stock_queue, *self.__stock)
+            if self.__index:
+                p.lpush(self.index_queue, *self.__index)
             self.params.update(
                 {"stock_queue": self.stock_queue, "index_queue": self.index_queue}
             )
         await p.execute()
         self.params.update({"__scope": self.scope, "__state": self.state})
         await emit.emit(self.channel, self.params)
-        await self.check_done(count)
+        ret = await self.check_done(count)
         await self.delete_state()
+        return ret
 
     async def check_done(self, count: int):
         """
@@ -151,7 +206,24 @@ class Task:
             try:
                 async with async_timeout.timeout(self.timeout):
                     while True:
-                        done_count = await cache.sys.hget(self.state, "done_count")
+                        p = cache.sys.pipeline()
+                        p.hget(self.state, "is_running")
+                        p.hget(self.state, "done_count")
+                        p.hget(self.state, "error")
+                        p.hget(self.state, "worker_count")
+                        is_running, done_count, error, worker_count = await p.execute()
+                        if worker_count is None:
+                            # 说明消费者还没收到消息，等待
+                            await asyncio.sleep(1)
+
+                        if not is_running:
+                            # 说明消费者异常退出了， 发送邮件
+                            print("发送邮件退出")
+                            await self.send_email(error)
+                            return False
+                        # done_count = await cache.sys.hget(self.state, "done_count")
+                        # todo 检查消费者状态，如果没有is_running，并且任务完成数量不对，说明消费者移除退出了，错误信息在 error 这个key中
+                        # 把error 和 fail 读出来之后 发送邮件，然后master退出，等待下一次执行
                         if done_count is None or int(done_count) != count:
                             await asyncio.sleep(1)
                         else:
@@ -164,8 +236,10 @@ class Task:
                 p.delete(self.fail)
                 fails, _ = await p.execute()
                 if fails:
+                    msg = f"超时了，失败队列{fails}"
+                    await self.send_email(msg)
                     print(fails)
-                print("超时了, 继续等待，并发送报警邮件")
+                # print("超时了, 继续等待，并发送报警邮件")
 
 
 async def _start_job_timer(job_name: str):
@@ -195,6 +269,7 @@ async def _stop_job_timer(job_name: str) -> int:
     return elapsed
 
 
+@decorator()
 async def sync_calendar():
     """从上游服务器获取所有交易日，并计算出周线帧和月线帧
 
@@ -232,6 +307,7 @@ async def sync_calendar():
     logger.info("trade_days is updated to %s", trade_days[-1])
 
 
+@decorator()
 async def sync_security_list():
     """更新证券列表
 
@@ -261,8 +337,23 @@ async def delete_daily_calibration_queue(stock_min, index_min, stock_day, index_
     await p.execute()
 
 
+async def resample_bars(bars, frame_type: FrameType, dfs, prefix, dt):
+    """
+    重采样
+    分钟线-> 5 15 30 60
+    """
+
+    bars_min5 = Stock.resample(bars, FrameType.MIN1, frame_type)
+    bars_min5_binary = pickle.dumps(bars_min5, protocol=cfg.pickle.ver)
+    await dfs.write(bars_min5_binary, prefix, dt, frame_type)
+
+
 async def write_dfs(
-    queue_name: str, frame_type: FrameType, prefix: str, dt: datetime.datetime
+    queue_name: str,
+    frame_type: FrameType,
+    prefix: str,
+    dt: datetime.datetime,
+    resample: bool = False,
 ):
     """
     Args:
@@ -270,7 +361,7 @@ async def write_dfs(
         frame_type: 帧类型，对应 1d, 1m
         prefix: dfs中的前缀 stock, index
         dt: 日期
-
+        resample: 是否需要重采样  只重采样分钟线 到 5 15 30 60
     Returns:
 
     """
@@ -281,12 +372,23 @@ async def write_dfs(
     p.lrange(queue_name, 0, -1, encoding=None)
     p.delete(queue_name)
     data, _ = await p.execute()
-
+    if not data:
+        return
     bars = [pickle.loads(i) for i in data]
     # data = pickle.loads(data)
     bars = np.concatenate(bars)
     binary = pickle.dumps(bars, protocol=cfg.pickle.ver)
     await dfs.write(binary, prefix, dt, frame_type)
+    if resample and frame_type == FrameType.MIN1:
+        for ftype in (
+            FrameType.MIN5,
+            FrameType.MIN15,
+            FrameType.MIN30,
+            FrameType.MIN60,
+        ):
+            resampled = Stock.resample(bars, FrameType.MIN1, ftype)
+            resampled_binary = pickle.dumps(resampled, protocol=cfg.pickle.ver)
+            await dfs.write(resampled_binary, prefix, dt, frame_type)
 
 
 async def __daily_calibration_sync(
@@ -331,25 +433,20 @@ async def __daily_calibration_sync(
         stock_queue=stock_queue,
         index_queue=index_queue,
     )
-    # 检查head和tail
-    # 检查tail和最近一个交易日有没有空洞，如果有空洞，先同步空洞
-    total = len(await task.tasks())
-    quota = await aq.get_quota()
-    # 检查quota够不够，如果不够则return
-    if quota * 0.75 < total * 240 * 4:
-        print("quota不够，返回")
-        return
+
+    await task.set_coefficient(240 * 2 + 4)
+
     await delete_daily_calibration_queue(stock_min, index_min, stock_day, index_day)
     ret = await task.run()
     if ret is not None:
         return
 
     # 读出来 写dfs
-    await write_dfs(stock_min, FrameType.MIN1, "stock", end)
+    await write_dfs(stock_min, FrameType.MIN1, "stock", end, resample=True)
     await write_dfs(stock_day, FrameType.DAY, "stock", end)
-    # todo 读取指数数据
-    # await write_dfs(index_min, FrameType.MIN1, "index", end)
-    # await write_dfs(index_day, FrameType.DAY, "index", end)
+
+    await write_dfs(index_min, FrameType.MIN1, "index", end, resample=True)
+    await write_dfs(index_day, FrameType.DAY, "index", end)
     # 说明这一天的搞完了，需要从redis读出所有的bar，然后一起写入dfs
     if head is not None:
         await cache.sys.set(constants.BAR_SYNC_ARCHIVE_HEAD, head.strftime("%Y-%m-%d"))
@@ -392,7 +489,9 @@ async def daily_calibration_sync():
             head = None
 
         else:
-            tread_date = head = cal.day_shift(head_date, -1)
+            tread_date = head = datetime.datetime.combine(
+                cal.day_shift(head_date, -1), datetime.time(0, 0)
+            )
             tail = None
     # 检查时间是否小于于 2005年，大于则说明同步完成了
     if cal.date2int(tread_date) < cal.day_frames[0]:
@@ -414,6 +513,7 @@ async def daily_calibration_sync():
         await __daily_calibration_sync(tread_date, head=head, tail=tail)
 
 
+@decorator()
 async def sync_day_bars():
     """
     收盘之后同步今天的数据, 下午三点的同步
@@ -426,9 +526,12 @@ async def sync_day_bars():
     queue_name = "day"
 
     task = Task(Events.OMEGA_DO_SYNC_DAY, queue_name, params, timeout=60 * 60 * 2)
+    await task.set_coefficient(240 * 2 + 4)
+
     await task.run()
 
 
+@decorator()
 async def sync_minute_bars():
     """盘中同步每分钟的数据
     1. 从redis拿到上一次同步的分钟数据
@@ -467,6 +570,7 @@ async def sync_minute_bars():
 
     params = {"start": tail, "end": end, "n_bars": n_bars}
     task = Task(Events.OMEGA_DO_SYNC_MIN, queue_name, params)
+
     flag = await task.run()
     if flag is not None:
         # 说明正常执行完的
@@ -475,6 +579,7 @@ async def sync_minute_bars():
         )
 
 
+@decorator()
 async def sync_high_low_limit():
     """每天9点半之后同步一次今日涨跌停并写入redis"""
     timeout = 60 * 10
@@ -483,6 +588,7 @@ async def sync_high_low_limit():
         print("非交易日，不同步")
     params = {"end": end}
     task = Task(Events.OMEGA_DO_SYNC_HIGH_LOW_LIMIT, "high_low_limit", params, timeout)
+    await task.set_coefficient(1)
     await task.run()
 
 
@@ -497,11 +603,17 @@ async def delete_year_quarter_month_week_queue(stock, index):
 
 
 async def __sync_year_quarter_month_week(tail_key, frame_type):
+    year_quarter_month_week_calendar = {
+        FrameType.WEEK: cal.int2date(cal.week_frames[0]),
+        FrameType.MONTH: cal.int2date(cal.month_frames[0]),
+        FrameType.QUARTER: cal.int2date(cal.quater_frames[0]),
+        FrameType.YEAR: cal.int2date(cal.year_frames[0]),
+    }
+
     tail = await cache.sys.get(tail_key)
     now = get_now()
     if not tail:
-        # 如果么有end,则取今天的9点31分
-        tail = cal.int2date(cal.week_frames[0])
+        tail = year_quarter_month_week_calendar.get(frame_type)
     else:
         tail = datetime.datetime.strptime(tail, "%Y-%m-%d")
         tail = cal.shift(tail, 1, frame_type)
@@ -535,24 +647,21 @@ async def __sync_year_quarter_month_week(tail_key, frame_type):
             stock_queue=stock_queue,
             index_queue=index_queue,
         )
-        total = len(await task.tasks())
-        quota = await aq.get_quota()
-        # 检查quota够不够，如果不够则return
-        if quota - 999852 < total * 4:
-            print("quota不够，返回")
-            return False
+        # 设置系数
+        await task.set_coefficient(2)
         await delete_year_quarter_month_week_queue(stock_data, index_data)
         ret = await task.run()
         if ret is not None:
             await delete_year_quarter_month_week_queue(stock_data, index_data)
             return False
         await write_dfs(stock_data, frame_type, "stock", tail)
-        # await write_dfs(index_week, FrameType.WEEK, "index", week_tail)
+        await write_dfs(index_data, frame_type, "index", tail)
         await delete_year_quarter_month_week_queue(stock_data, index_data)
         await cache.sys.set(tail_key, tail.strftime("%Y-%m-%d"))
     return True
 
 
+@decorator()
 async def sync_year_quarter_month_week():
     """同步年月日周"""
     # 检查周线 tail
@@ -564,11 +673,14 @@ async def sync_year_quarter_month_week():
         constants.BAR_SYNC_MONTH_TAIl, FrameType.MONTH
     ):
         return
-    # await __sync_year_quarter_month_week(constants.BAR_SYNC_QUARTER_TAIl, FrameType.QUARTER)
-    if not await __sync_year_quarter_month_week(
-        constants.BAR_SYNC_YEAR_TAIl, FrameType.YEAR
-    ):
-        return
+    # if not await __sync_year_quarter_month_week(
+    #         constants.BAR_SYNC_QUARTER_TAIl, FrameType.QUARTER
+    # ):
+    #     return
+    # if not await __sync_year_quarter_month_week(
+    #         constants.BAR_SYNC_YEAR_TAIl, FrameType.YEAR
+    # ):
+    #     return
     await sync_year_quarter_month_week()
 
 

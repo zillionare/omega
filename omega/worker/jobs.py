@@ -8,6 +8,8 @@ import json
 import logging
 import pickle
 import time
+import traceback
+from functools import wraps
 from typing import List
 
 import cfg4py
@@ -24,6 +26,42 @@ from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher
 cfg = cfg4py.get_instance()
 
 logger = logging.getLogger(__name__)
+
+
+async def worker_exit(state, scope, error=None):
+    if error is None:
+        error = traceback.format_exc()
+    # 删除is_running 并写上错误堆栈信息
+    p = cache.sys.pipeline()
+    p.hdel(state, "is_running")
+    p.hmset(state, "error", error)
+    p.delete(scope)  # 删除任务队列，让其他没退出的消费者也退出，错误上报至master
+    await p.execute()
+
+
+def decorator():
+    def inner(f):
+        @wraps(f)
+        async def decorated_function(params):
+            """装饰所有worker，统一处理错误信息"""
+            # 执行之前，将状态中的worker_count + 1，以确保生产者能知道有多少个worker收到了消息
+            scope, state, end, n_bars, fail = await parse_params(params)
+
+            await cache.sys.hincrby(state, "worker_count")
+            try:
+                error_msg = await f(params)
+                if error_msg is not None:
+                    await worker_exit(state, scope, error_msg)
+            # 说明消费者消费时错误了
+            except Exception as e:
+                logger.exception(e)
+                await worker_exit(state, scope)
+
+            return
+
+        return decorated_function
+
+    return inner
 
 
 async def get_limit():
@@ -110,7 +148,7 @@ async def fetch_day_bars(secs: List[str], end: datetime.datetime):
         bar = numpy_append_fields(
             bars[name],
             ("high_limit", "low_limit", "code"),
-            [sec[2], sec[3], name],
+            [sec["high_limit"], sec["low_limit"], name],
             dtypes,
         )
         result.append(bar)
@@ -149,7 +187,7 @@ async def sync_high_low_limit(params):
     async for secs in get_secs(limit, 1, scope):
         bars = await get_high_low_limit(secs, end)
         if bars is None:
-            continue
+            return "Got None data"
         for sec in bars:
             name = sec["code"]
             high_limit = sec["high_limit"]
@@ -170,6 +208,7 @@ async def sync_high_low_limit(params):
     await cache.sys.hincrby(state, "done_count", total)
 
 
+@decorator()
 async def sync_minute_bars(params):
     """
     盘中同步分钟
@@ -185,7 +224,8 @@ async def sync_minute_bars(params):
     async for secs in get_secs(limit, n_bars, scope):
         bars = await fetch_min_bars(secs, end, n_bars)
         if bars is None:
-            continue
+            return "Got None data"
+            # continue
         await Stock.batch_cache_bars(FrameType.MIN1, bars)
         total += len(secs)
 
@@ -202,6 +242,7 @@ async def parse_params(params):
     )
 
 
+@decorator()
 async def sync_day_bars(params):
     """这是下午三点收盘后的同步，仅写cache，同步分钟线和日线"""
     scope, state, end, n_bars, fail = await parse_params(params)
@@ -342,6 +383,7 @@ async def __sync_daily_calibration(
     return total // 2
 
 
+@decorator()
 async def sync_daily_calibration(params):
     """凌晨2点的数据校准，
     同步分钟线 持久化
@@ -358,9 +400,10 @@ async def sync_daily_calibration(params):
     total += await __sync_daily_calibration(stock_queue, stock_min, stock_day, params)
     total += await __sync_daily_calibration(index_queue, index_min, index_day, params)
 
-    await cache.sys.hincrby(state, "done_count", total // 2)
+    await cache.sys.hincrby(state, "done_count", total)
 
 
+@decorator()
 async def sync_year_quarter_month_week(params):
     scope, state, end, n_bars, fail = await parse_params(params)
     stock_queue = params.get("stock_queue")
@@ -439,14 +482,3 @@ async def sync_year_quarter_month_week(params):
         await Stock.persist_bars(frame_type, index_bars1)
         total += len(secs)
     await cache.sys.hincrby(state, "done_count", total)
-
-
-async def resample_bars():
-    """
-    重采样
-    分钟线->日线
-    日线 ->周线 根据当前时间和cal里面的ticks中的周frame做对比，
-    日线 ->月线
-
-    """
-    pass

@@ -68,6 +68,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
 
     @mock.patch("omega.master.jobs.get_now")
     async def test_daily_calibration_sync(self, get_now):
+        await cache.sys.delete("master.task.daily_calibration.state")
         get_now.return_value = datetime.datetime(2022, 1, 11, 16)
         emit.register(
             Events.OMEGA_DO_SYNC_DAILY_CALIBRATION, workjobs.sync_daily_calibration

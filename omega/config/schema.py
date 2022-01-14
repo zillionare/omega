@@ -93,3 +93,10 @@ class Config(object):
         token: Optional[str] = None
 
         org: Optional[str] = None
+
+    class notify:
+        mail_from: Optional[str] = None
+
+        mail_to: Optional[list] = None
+
+        mail_server: Optional[str] = None
