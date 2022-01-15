@@ -17,7 +17,13 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from omicron import cache
 from omicron.core.timeframe import tf
 from pyemit import emit
-from jobs import trigger_bars_sync, load_sync_params, load_bars_sync_jobs, trigger_single_worker_sync
+from jobs import (
+    trigger_bars_sync,
+    load_sync_params,
+    load_bars_sync_jobs,
+    trigger_single_worker_sync,
+    load_funds_sync_jobs,
+)
 
 from omega.config import get_config_dir
 from omega.logreceivers.redis import RedisLogReceiver
@@ -30,6 +36,7 @@ receiver: RedisLogReceiver = None
 
 class WorkerState:
     """用来记录worker的状态"""
+
     all = 0
     normal = 0
     error = 0
@@ -95,8 +102,17 @@ async def init():  # noqa
         hour=h,
         minute=m,
     )
+    scheduler.add_job(
+        trigger_single_worker_sync,
+        "cron",
+        hour=h,
+        minute=m,
+        args=("funds",),
+        name="sync_funds",
+    )
 
     load_bars_sync_jobs(scheduler)
+    load_funds_sync_jobs(scheduler)
 
     # sync bars at startup
     last_sync = await cache.sys.get("master.bars_sync.stop")

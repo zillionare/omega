@@ -123,13 +123,13 @@ async def trigger_bars_sync(sync_params: dict = None, force=False):
 
 
 def parse_sync_params(
-        frame: Union[str, Frame],
-        cat: List[str] = None,
-        start: Union[str, datetime.date] = None,
-        stop: Union[str, Frame] = None,
-        delay: int = 0,
-        include: str = "",
-        exclude: str = "",
+    frame: Union[str, Frame],
+    cat: List[str] = None,
+    start: Union[str, datetime.date] = None,
+    stop: Union[str, Frame] = None,
+    delay: int = 0,
+    include: str = "",
+    exclude: str = "",
 ) -> Tuple:
     """按照[使用手册](usage.md#22-如何同步K线数据)中的规则，解析和补全同步参数。
 
@@ -201,10 +201,10 @@ def parse_sync_params(
 
 
 async def sync_bars_for_security(
-        code: str,
-        frame_type: FrameType,
-        start: Union[datetime.date, datetime.datetime],
-        stop: Union[None, datetime.date, datetime.datetime],
+    code: str,
+    frame_type: FrameType,
+    start: Union[datetime.date, datetime.datetime],
+    stop: Union[None, datetime.date, datetime.datetime],
 ):
     counters = 0
 
@@ -279,7 +279,6 @@ async def sync_bars_for_security(
                     )
 
 
-
 async def sync_calendar():
     """从上游服务器获取所有交易日，并计算出周线帧和月线帧
 
@@ -344,7 +343,8 @@ async def reset_tail(codes: [], frame_type: FrameType, days=-1):
         FrameType.MIN5,
         FrameType.MIN15,
         FrameType.MIN30,
-        FrameType.MIN60]:
+        FrameType.MIN60,
+    ]:
         date = datetime.datetime(_day.year, _day.month, _day.day, 15)
         tail = tf.time2int(date)
     elif frame_type == FrameType.DAY:
@@ -370,9 +370,9 @@ async def reset_tail(codes: [], frame_type: FrameType, days=-1):
         _tail = int(resp)
         print(_tail)
         if _tail > tail:  # 只有数据库里的时间大于tail 才可以
-            await cache.security.hset(key, 'tail', tail)
+            await cache.security.hset(key, "tail", tail)
 
-    return date.strftime('%Y-%m-%d')
+    return date.strftime("%Y-%m-%d")
 
 
 async def closing_quotation_sync_bars(all_params):
@@ -630,7 +630,9 @@ async def sync_minute_bars():
     Returns:
     """
 
-    is_running = int(await cache.sys.hget("master.bars_sync.state.minute", "is_running"))
+    is_running = int(
+        await cache.sys.hget("master.bars_sync.state.minute", "is_running")
+    )
     now = datetime.datetime.now()
     start = now.strftime("%Y-%m-%d %H:%M:00")
     if is_running:
@@ -638,12 +640,16 @@ async def sync_minute_bars():
         print(f"检测到有正在执行的分钟同步任务，本次不执行：{start}")
         return
     await cache.sys.hset("master.bars_sync.state.minute", "is_running", 1)
+
     async def check_done():
         while True:
             try:
                 async with async_timeout.timeout(60):
                     while True:
-                        if await cache.sys.llen("master.bars_sync.done.minute") != count:
+                        if (
+                            await cache.sys.llen("master.bars_sync.done.minute")
+                            != count
+                        ):
                             await asyncio.sleep(1)
                         else:
                             await cache.sys.delete("master.bars_sync.done.minute")
@@ -666,8 +672,67 @@ async def sync_minute_bars():
     await p.execute()
     await emit.emit(Events.OMEGA_DO_SYNC_MIN, {"start": start, "end": end})
     await check_done()
-    await cache.sys.hmset("master.bars_sync.state.minute",
-                          "is_running", 0,
-                          "end", start,
-                          "task_count", 0)
+    await cache.sys.hmset(
+        "master.bars_sync.state.minute", "is_running", 0, "end", start, "task_count", 0
+    )
 
+
+def load_funds_sync_jobs(scheduler):
+    scheduler.add_job(
+        sync_fund_net_value,
+        "cron",
+        hour=20,
+        minute="0",
+        args=(),
+        name="sync_fund_net_value",
+    )
+    scheduler.add_job(
+        sync_fund_share_daily,
+        "cron",
+        hour=20,
+        minute="0",
+        args=(),
+        name="sync_fund_share_daily",
+    )
+    scheduler.add_job(
+        sync_fund_portfolio_stock,
+        "cron",
+        hour=18,
+        minute="22",
+        args=(),
+        name="sync_fund_portfolio_stock",
+    )
+
+
+async def sync_funds():
+    """更新基金列表"""
+    secs = await aq.get_fund_list()
+    logger.info("%s secs are fetched and saved.", len(secs))
+    return secs
+
+
+async def sync_fund_net_value(day: datetime.date = None, ndays: int = 8):
+    """更新基金净值数据"""
+    now = day or datetime.datetime.now().date()
+    n = 0
+    while n < ndays:
+        await aq.get_fund_net_value(day=now - datetime.timedelta(days=n))
+        n += 1
+
+
+async def sync_fund_share_daily(day: datetime.date = None, ndays: int = 8):
+    """更新基金份额数据"""
+    now = day or datetime.datetime.now().date()
+    n = 0
+    while n < ndays:
+        await aq.get_fund_share_daily(day=now - datetime.timedelta(days=n))
+        n += 1
+
+
+async def sync_fund_portfolio_stock(day: datetime.date = None, ndays: int = 8):
+    """更新基金十大持仓股数据"""
+    now = day or datetime.datetime.now().date()
+    n = 0
+    while n < ndays:
+        await aq.get_fund_portfolio_stock(pub_date=now - datetime.timedelta(days=n))
+        n += 1
