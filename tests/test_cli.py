@@ -88,7 +88,6 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
         await cli.status()
         await cli.stop("jobs")
 
-
     def test_load_factory_settings(self):
         settings = cli.load_factory_settings()
         self.assertTrue(len(settings) > 0)

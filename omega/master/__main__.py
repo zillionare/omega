@@ -4,5 +4,5 @@ import fire
 
 from .app import start
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     fire.Fire({"start": start})
