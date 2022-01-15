@@ -231,3 +231,20 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             ret = await syncjobs.sync_year_quarter_month_week()
             self.assertIn(f"剩余可用quota：{get_quota.return_value}", email_content)
         await clear()
+
+    async def test_sync_minute_bars(self):
+        await cache.sys.hset("master.bars_sync.state.minute", "is_running", 0)
+        await syncjobs.sync_minute_bars()
+
+    async def test_sync_funds(self):
+        secs = await syncjobs.sync_funds()
+        self.assertTrue(len(secs))
+
+    async def test_sync_fund_net_value(self):
+        await syncjobs.sync_fund_net_value()
+
+    async def test_sync_fund_share_daily(self):
+        await syncjobs.sync_fund_share_daily()
+
+    async def test_sync_fund_portfolio_stock(self):
+        await syncjobs.sync_fund_portfolio_stock()

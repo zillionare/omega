@@ -685,6 +685,41 @@ async def sync_year_quarter_month_week():
     # ):
     #     return
     await sync_year_quarter_month_week()
+    
+
+@decorator()
+async def sync_funds():
+    """更新基金列表"""
+    secs = await aq.get_fund_list()
+    logger.info("%s secs are fetched and saved.", len(secs))
+    return secs
+
+@decorator()
+async def sync_fund_net_value(day: datetime.date = None, ndays: int = 8):
+    """更新基金净值数据"""
+    now = day or datetime.datetime.now().date()
+    n = 0
+    while n < ndays:
+        await aq.get_fund_net_value(day=now - datetime.timedelta(days=n))
+        n += 1
+
+@decorator()
+async def sync_fund_share_daily(day: datetime.date = None, ndays: int = 8):
+    """更新基金份额数据"""
+    now = day or datetime.datetime.now().date()
+    n = 0
+    while n < ndays:
+        await aq.get_fund_share_daily(day=now - datetime.timedelta(days=n))
+        n += 1
+
+@decorator()
+async def sync_fund_portfolio_stock(day: datetime.date = None, ndays: int = 8):
+    """更新基金十大持仓股数据"""
+    now = day or datetime.datetime.now().date()
+    n = 0
+    while n < ndays:
+        await aq.get_fund_portfolio_stock(pub_date=now - datetime.timedelta(days=n))
+        n += 1
 
 
 async def load_cron_task(scheduler):
@@ -769,4 +804,28 @@ async def load_cron_task(scheduler):
         hour=9,
         minute=31,
         name="sync_high_low_limit",
+    )
+    scheduler.add_job(
+        sync_fund_net_value,
+        "cron",
+        hour=20,
+        minute="0",
+        args=(),
+        name="sync_fund_net_value",
+    )
+    scheduler.add_job(
+        sync_fund_share_daily,
+        "cron",
+        hour=20,
+        minute="0",
+        args=(),
+        name="sync_fund_share_daily",
+    )
+    scheduler.add_job(
+        sync_fund_portfolio_stock,
+        "cron",
+        hour=18,
+        minute="22",
+        args=(),
+        name="sync_fund_portfolio_stock",
     )
