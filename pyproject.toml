@@ -80,6 +80,7 @@ twine  = { version = "^3.3.0", optional = true}
 idna = "2.5"
 mkdocs-autorefs = {version = "0.1.1", optional = true}
 livereload = {version = "^2.6.3", optional = true}
+minio = "^7.1.2"
 [tool.poetry.extras]
 test = [
     "pytest",

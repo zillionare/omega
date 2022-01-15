@@ -27,7 +27,6 @@ cfg = cfg4py.get_instance()
 
 class AbstractQuotesFetcher(QuotesFetcher):
     _instances = []
-    quota = 4000
 
     @classmethod
     async def create_instance(cls, module_name, **kwargs):

@@ -22,7 +22,18 @@ logger = logging.getLogger(__name__)
 
 # 用来和DFS存储系统进行交互的封装
 class AbstractStorage(ABC):
-    """该类是用来和minio这种dfs存储系统进行交互的抽象类，如果需要对接不同的dfs，需要继承该类，并实现对应的方法"""
+    """该类是用来和minio这种dfs存储系统进行交互的抽象类，如果需要对接不同的dfs，需要继承该类，并实现对应的方法
+    在yaml中的配置如下
+    dfs:
+      engine: minio
+      minio:
+        host: ${MINIO_HOST}
+        port: ${MINIO_PORT}
+        access: ${MINIO_ACCESS}
+        secret: ${MINIO_SECRET}
+        secure: false
+        bucket: zillionare
+    """
 
     client = None
 
@@ -115,7 +126,6 @@ class Storage:
 
 class MinioStorage(AbstractStorage):
     def __init__(self, bucket=None):
-        print("MinioStorage __ init")
         """初始化minio连接，检查bucket 是否存在"""
         self.client = Minio(
             endpoint=f"{cfg.dfs.minio.host}:{cfg.dfs.minio.port}",

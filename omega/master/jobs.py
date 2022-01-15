@@ -56,6 +56,7 @@ def abnormal_master_report():
                 # 发送邮件报告错误
                 subject = f"执行生产者{f.__name__}时发生异常"
                 body = f"详细信息：\n{traceback.format_exc()}"
+                traceback.print_exc()
                 await mail_notify(subject, body, html=True)
 
         return decorated_function
@@ -132,14 +133,14 @@ class Task:
         if include:
             include = list(filter(lambda x: x, cfg.omega.sync.bars.include.split(" ")))
             codes.extend(include)
-        return codes
+        return list(set(codes))
 
     async def generate_task(self):
         stock = await self.__generate_task(SecurityType.STOCK.value)
         index = await self.__generate_task(SecurityType.INDEX.value)
         self.__stock = stock
         self.__index = index
-        self.__task_list = list(stock + index)
+        self.__task_list = list(set(stock + index))
 
     async def tasks(self):
         if not self.__task_list:
@@ -188,9 +189,9 @@ class Task:
         else:
             p.delete(self.stock_queue)
             p.delete(self.index_queue)
-            if self.__stock:
+            if self.__stock:  # pragma: no cover
                 p.lpush(self.stock_queue, *self.__stock)
-            if self.__index:
+            if self.__index:  # pragma: no cover
                 p.lpush(self.index_queue, *self.__index)
             self.params.update(
                 {"stock_queue": self.stock_queue, "index_queue": self.index_queue}
@@ -236,23 +237,22 @@ class Task:
                         if worker_count is None:
                             # 说明消费者还没收到消息，等待
                             await asyncio.sleep(0.5)
-
+                            continue
                         if not is_running:
                             # 说明消费者异常退出了， 发送邮件
                             await self.send_email(error)
                             return False
                         # done_count = await cache.sys.hget(self.state, "done_count")
-                        # todo 检查消费者状态，如果没有is_running，并且任务完成数量不对，说明消费者移除退出了，错误信息在 error 这个key中
+                        # 检查消费者状态，如果没有is_running，并且任务完成数量不对，说明消费者移除退出了，错误信息在 error 这个key中
                         # 把error 和 fail 读出来之后 发送邮件，然后master退出，等待下一次执行
                         if done_count is None or int(done_count) != count:
                             await asyncio.sleep(0.5)
                         else:
                             print(f"{self.scope}耗时：{time.time() - s}")
                             return True
-            except asyncio.exceptions.TimeoutError:
-                # 从失败列表里把所有数据拉出来，
-                # msg = f"超时了，超时时间是：{self.timeout}"
+            except asyncio.exceptions.TimeoutError:  # pragma: no cover
                 await self.send_email()
+                return False
 
 
 async def _start_job_timer(job_name: str):
@@ -565,11 +565,6 @@ async def sync_minute_bars():
             tail = first
 
     n_bars = cal.count_frames(tail, end, FrameType.MIN1)  # 获取到一共有多少根k线
-    if n_bars < 1:
-        msg = "k线数量小于1 不同步"
-        logger.info(msg)
-        print(msg)
-        return
 
     params = {"start": tail, "end": end, "n_bars": n_bars}
     task = Task(Events.OMEGA_DO_SYNC_MIN, queue_name, params, timeout=get_timeout())
@@ -733,7 +728,6 @@ async def load_cron_task(scheduler):
         "cron",
         hour=h,
         minute=m,
-        args=("calendar",),
         name="sync_calendar",
     )
     scheduler.add_job(
@@ -743,15 +737,7 @@ async def load_cron_task(scheduler):
         hour=h,
         minute=m,
     )
-    # 盘中的实时同步
-    scheduler.add_job(
-        sync_calendar,
-        "cron",
-        hour=h,
-        minute=m,
-        args=("calendar",),
-        name="sync_calendar",
-    )
+
     scheduler.add_job(
         sync_minute_bars,
         "cron",

@@ -5711,7 +5711,8 @@ async def init_test_env():
     formatter = logging.Formatter(fmt=fmt)
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-
+    cfg.omega.sync.bars.exclude = "000002.XSHE"
+    # cfg.omega.sync.bars.include = "000001.XSHE"
     redis = await aioredis.create_redis(cfg.redis.dsn, db=1)
 
     try:

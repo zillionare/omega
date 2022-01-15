@@ -79,6 +79,7 @@ influxdb:
   url: http://192.168.100.111:8086
   token: Gui_t2RaMJ44bTyPHWs1cLIuJDyyUjldvq52HzlLXcz3z5jyCdPIgrGZIJAh4gZXhny9JGveOzi1r72WgtJ-xg==
   org: my-org
+  bucket_name: zillionare
 
 notify:
     mail_from: shaohu.chen@qq.com

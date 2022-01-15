@@ -94,6 +94,8 @@ class Config(object):
 
         org: Optional[str] = None
 
+        bucket_name: Optional[str] = None
+
     class notify:
         mail_from: Optional[str] = None
 

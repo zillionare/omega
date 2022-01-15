@@ -6,7 +6,8 @@ from unittest import mock
 import numpy as np
 import cfg4py
 import omicron
-from omicron import cache
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from omicron.dal.cache import cache
 from pyemit import emit
 import pickle
 import omega.master.jobs as syncjobs
@@ -50,6 +51,18 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         elapsed = await syncjobs._stop_job_timer("unittest")
         self.assertTrue(5 <= elapsed <= 7)
 
+    # @mock.patch("omega.master.jobs.mail_notify")
+    # @mock.patch("omega.master.jobs.cal.save_calendar")
+    # # @mock.patch("omicron.dal.cache.save_calendar")
+    # @mock.patch("jqadaptor.fetcher.Fetcher.get_all_trade_days")
+    # async def test_sync_calendar(self, get_all_trade_days, *args):
+    #     # all_trade_days.npy
+    #     async def get_all_trade_days_mock():
+    #         return np.load(f"{test_dir()}/data/all_trade_days.npy", allow_pickle=True)
+    #
+    #     get_all_trade_days.side_effect = get_all_trade_days_mock
+    #     await syncjobs.sync_calendar()
+
     @mock.patch("omega.master.jobs.mail_notify")
     async def test_sync_security_list(self, *args):
         await cache.security.delete("securities")
@@ -57,19 +70,20 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         secs = Stock.choose()
         self.assertTrue(len(secs) > 0)
 
+    @mock.patch("omega.master.jobs.get_timeout", return_value=5)
     @mock.patch("omega.master.jobs.mail_notify")
     @mock.patch("omicron.models.stock.Stock.batch_cache_bars")
-    @mock.patch(
-        "omega.master.jobs.get_now", return_value=datetime.datetime(2022, 1, 11, 16)
-    )
     @mock.patch(
         "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher.get_quota",
         return_value=1000000,
     )
     @mock.patch(
+        "omega.master.jobs.get_now", return_value=datetime.datetime(2022, 1, 11, 16)
+    )
+    @mock.patch(
         "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher.get_bars_batch"
     )
-    async def test_sync_minute_bars(self, get_bars_batch, *args):
+    async def test_sync_minute_bars(self, get_bars_batch, get_now, *args):
         async def clear():
             state = f"{constants.TASK_PREFIX}.minute.state"
             await cache.sys.delete(state)
@@ -84,6 +98,9 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                 return pickle.loads(f.read())
 
         get_bars_batch.side_effect = get_bars_batch_mock
+        await cache.sys.hset(
+            constants.BAR_SYNC_STATE_MINUTE, "tail", "2022-01-10 15:00:00"
+        )
 
         emit.register(Events.OMEGA_DO_SYNC_MIN, workjobs.sync_minute_bars)
         ret = await syncjobs.sync_minute_bars()
@@ -92,7 +109,15 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             await cache.sys.hget(constants.BAR_SYNC_STATE_MINUTE, "tail"),
             "2022-01-11 15:00:00",
         )
+        await clear()
 
+        # 非交易日
+        await clear()
+        get_now.return_value = datetime.datetime(2022, 1, 9)
+        ret = await syncjobs.sync_minute_bars()
+        self.assertFalse(ret)
+
+    @mock.patch("omega.master.jobs.get_timeout", return_value=5)
     @mock.patch("omicron.models.stock.Stock.batch_cache_bars")
     @mock.patch(
         "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher.get_quota",
@@ -131,6 +156,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         ret = await syncjobs.sync_day_bars()
         self.assertTrue(ret)
 
+    @mock.patch("omega.master.jobs.get_timeout", return_value=5)
     @mock.patch("omicron.models.stock.Stock.persist_bars")
     @mock.patch("omega.master.jobs.Storage", side_effect=TempStorage)
     @mock.patch(
@@ -232,6 +258,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                 ret = await syncjobs.daily_calibration_sync()
                 self.assertIn(f"剩余可用quota：{get_quota.return_value}", email_content)
 
+    @mock.patch("omega.master.jobs.get_timeout", return_value=5)
     @mock.patch(
         "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher.get_quota",
         return_value=1000000,
@@ -294,12 +321,12 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         ret = await syncjobs.sync_high_low_limit()
         self.assertFalse(ret)
 
+    @mock.patch("omega.master.jobs.get_timeout", return_value=5)
     @mock.patch("omicron.models.stock.Stock.persist_bars")
     @mock.patch(
         "omega.master.jobs.get_now", return_value=datetime.datetime(2022, 1, 11, 16)
     )
     @mock.patch("omega.master.jobs.Storage", side_effect=TempStorage)
-    @mock.patch("omega.master.jobs.get_timeout")
     @mock.patch(
         "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher.get_quota",
         return_value=1000000,
@@ -309,9 +336,8 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher.get_bars_batch"
     )
     async def test_sync_year_quarter_month_week(
-        self, get_bars_batch, mail_notify, get_quota, get_timeout, *args
+        self, get_bars_batch, mail_notify, get_quota, *args
     ):
-        get_timeout.return_value = 5
         week_state = f"{constants.TASK_PREFIX}.{FrameType.WEEK.value}.state"
         month_state = f"{constants.TASK_PREFIX}.{FrameType.MONTH.value}.state"
 
@@ -400,6 +426,57 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         await clear()
         # 测试超时
         get_quota.return_value = 100000
+
+    async def test_load_cron_task(self):
+        scheduler = AsyncIOScheduler(timezone=cfg.tz)
+
+        await syncjobs.load_cron_task(scheduler)
+        base = {
+            "sync_calendar",
+            "1m:10:*",
+            "sync_fund_share_daily",
+            "daily_calibration_sync",
+            "sync_high_low_limit",
+            "1m:13-14:*",
+            "sync_fund_net_value",
+            "sync_fund_portfolio_stock",
+            "sync_day_bars",
+            "1m:11:0-30",
+            "sync_security_list",
+            "1m:15:00",
+            "1m:9:31-59",
+        }
+        self.assertSetEqual(base, set([job.name for job in scheduler.get_jobs()]))
+
+    @mock.patch("omega.master.jobs.get_timeout", return_value=5)
+    @mock.patch(
+        "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher.get_quota",
+        return_value=1000000,
+    )
+    @mock.patch("omega.master.jobs.mail_notify")
+    @mock.patch("omicron.models.stock.Stock.choose", return_value=[])
+    async def test_task(self, *args):
+        queue_name = "test"
+        state = f"{constants.TASK_PREFIX}.{queue_name}.state"
+
+        async def tasks():
+            return []
+
+        await cache.sys.delete(state)
+        params = {}
+        task = syncjobs.Task(
+            Events.OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK, queue_name, params, 10
+        )
+        task.tasks = tasks
+        ret = await task.run()
+        self.assertFalse(ret)
+        # 测试获取当前时间
+
+        self.assertIsInstance(syncjobs.get_now(), datetime.datetime)
+        self.assertIsInstance(syncjobs.get_first_day_frame(), np.int64)
+
+        # 测试超时时发送邮件
+        await task.send_email()
 
     @mock.patch("omega.master.jobs.mail_notify")
     async def test_sync_funds(self, *args):
