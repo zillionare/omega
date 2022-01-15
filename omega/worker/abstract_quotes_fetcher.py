@@ -5,7 +5,8 @@
 import datetime
 import importlib
 import logging
-from typing import List, Union, Optional
+import random
+from typing import List, Optional, Union
 
 import arrow
 import cfg4py
@@ -14,9 +15,7 @@ from numpy.lib import recfunctions as rfn
 from omicron.core.types import Frame, FrameType
 from omicron.models.calendar import Calendar as cal
 from omicron.models.stock import Stock
-from omicron.models.funds import Funds, FundPortfolioStock,FundNetValue, FundShareDaily
-import random
-
+from omicron.models.funds import FundPortfolioStock, Funds, FundShareDaily, FundNetValue
 from scipy import rand
 
 from omega.worker.quotes_fetcher import QuotesFetcher
@@ -28,6 +27,7 @@ cfg = cfg4py.get_instance()
 
 class AbstractQuotesFetcher(QuotesFetcher):
     _instances = []
+    quota = 4000
 
     @classmethod
     async def create_instance(cls, module_name, **kwargs):
@@ -48,7 +48,7 @@ class AbstractQuotesFetcher(QuotesFetcher):
         if len(cls._instances) == 0:
             raise IndexError("No fetchers available")
 
-        i = random.randint(0, len(cls._instances - 1))
+        i = random.randint(0, len(cls._instances) - 1)
 
         return cls._instances[i]
 
@@ -89,12 +89,10 @@ class AbstractQuotesFetcher(QuotesFetcher):
         end: Frame,
         n_bars: int,
         frame_type: FrameType,
-        unclosed =True,
+        unclosed=True,
     ) -> np.ndarray:
         # todo: 接口也可能要改，以区分盘中实时同步分钟线和校准同步分钟线、日线情况
         raise NotImplementedError
-
-
 
     @classmethod
     async def get_all_trade_days(cls):
@@ -103,57 +101,29 @@ class AbstractQuotesFetcher(QuotesFetcher):
         return days
 
     @classmethod
-    async def get_valuation(
-        cls,
-        code: Union[str, List[str]],
-        day: datetime.date,
-        fields: List[str] = None,
-        n: int = 1,
+    async def get_high_limit_price(
+        cls, sec: Union[List, str], dt: Union[str, datetime.datetime, datetime.date]
     ) -> np.ndarray:
-
-        valuation = await cls.get_instance().get_valuation(code, day, n)
-
-        await Valuation.save(valuation)
-
-        if fields is None:
-            return valuation
-
-        if isinstance(fields, str):
-            fields = [fields]
-
-        mapping = dict(valuation.dtype.descr)
-        fields = [(name, mapping[name]) for name in fields]
-        return rfn.require_fields(valuation, fields)
-
-    @classmethod
-    async def get_price(
-        cls,
-        sec: Union[List, str],
-        end_date: Union[str, datetime.datetime],
-        n_bars: Optional[int],
-        start_date: Optional[Union[str, datetime.datetime]] = None,
-    ) -> np.ndarray:
-        fields = ['open', 'close', 'high', 'low', 'volume', 'money', 'high_limit', 'low_limit', 'pre_close', 'avg', 'factor']
         params = {
-            "security": sec,
-            "end_date": end_date,
-            "fields": fields,
-            "fq": None,
-            "fill_paused": False,
-            "frequency": FrameType.MIN1.value,
+            "sec": sec,
+            "dt": dt,
         }
-        if start_date:
-            params.update({"start_date": start_date})
-        if n_bars is not None:
-            params.update({"count": start_date})
-        if "start_date" in params and "count" in params:
-            raise ValueError("start_date and count cannot appear at the same time")
-
-        bars = await cls.get_instance().get_price(**params)
+        bars = await cls.get_instance().get_high_limit_price(**params)
 
         if len(bars) == 0:
-            return
-    
+            return None
+        return bars
+
+    @classmethod
+    async def get_quota(cls):
+        quota = await cls.get_instance().get_query_count()
+        return quota.get("spare")
+
+    @classmethod
+    async def get_quota(cls):
+        quota = await cls.get_instance().get_query_count()
+        return quota.get("spare")
+
     @classmethod
     async def get_fund_list(
         cls, code: Union[str, List[str]] = None, fields: List[str] = None
@@ -240,8 +210,3 @@ class AbstractQuotesFetcher(QuotesFetcher):
         mapping = dict(fund_net_values.dtype.descr)
         fields = [(name, mapping[name]) for name in fields]
         return rfn.require_fields(fund_net_values, fields)
-
-    @classmethod
-    async def get_quota(cls):
-        quota = await cls.get_instance().get_query_count()
-        return quota.get("spare")

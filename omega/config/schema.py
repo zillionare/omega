@@ -66,7 +66,8 @@ class Config(object):
 
             calendar: Optional[str] = None
 
-            bars: Optional[list] = None
+            class bars:
+                cat: Optional[list] = None
 
     quotes_fetchers: Optional[list] = None
 
@@ -85,3 +86,17 @@ class Config(object):
             secure: Optional[bool] = None
 
             bucket: Optional[str] = None
+
+    class influxdb:
+        url: Optional[str] = None
+
+        token: Optional[str] = None
+
+        org: Optional[str] = None
+
+    class notify:
+        mail_from: Optional[str] = None
+
+        mail_to: Optional[list] = None
+
+        mail_server: Optional[str] = None

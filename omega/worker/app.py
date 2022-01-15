@@ -16,10 +16,12 @@ import fire
 import omicron
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from pyemit import emit
+
 from omega.config import get_config_dir
 from omega.core.events import Events
+from omega.worker import jobs
+from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher
 
-from jobs import sync_bars
 cfg = cfg4py.get_instance()
 
 logger = logging.getLogger(__name__)
@@ -39,8 +41,15 @@ class Omega(object):
 
         cfg4py.init(get_config_dir(), False)
         cfg4py.update_config(self.inherit_cfg)
+
+        await AbstractQuotesFetcher.create_instance(self.fetcher_impl, **self.params)
         # listen on omega events
-        emit.register(Events.OMEGA_DO_SYNC_MIN, sync_bars)
+        emit.register(Events.OMEGA_DO_SYNC_HIGH_LOW_LIMIT, jobs.sync_high_low_limit)
+        emit.register(
+            Events.OMEGA_DO_SYNC_DAILY_CALIBRATION, jobs.sync_daily_calibration
+        )
+        emit.register(Events.OMEGA_DO_SYNC_DAY, jobs.sync_day_bars)
+        emit.register(Events.OMEGA_DO_SYNC_MIN, jobs.sync_minute_bars)
 
         await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
         # await self.heart_beat()
@@ -55,10 +64,14 @@ class Omega(object):
         logger.debug("send heartbeat from omega worker: %s", pid)
         await omicron.cache.sys.hmset(
             key,
-            "impl", self.fetcher_impl,
-            "gid", self.gid,
-            "pid", pid,
-            "heartbeat", time.time(),
+            "impl",
+            self.fetcher_impl,
+            "gid",
+            self.gid,
+            "pid",
+            pid,
+            "heartbeat",
+            time.time(),
         )
 
 
