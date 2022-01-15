@@ -18,6 +18,7 @@ from omega.worker.dfs import TempStorage
 from tests import init_test_env
 from omega.core.constants import HIGH_LOW_LIMIT
 from omicron.core.types import FrameType
+from omicron.models.stock import Stock
 from tests import test_dir
 
 logger = logging.getLogger(__name__)
@@ -53,13 +54,17 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
     async def test_sync_security_list(self, *args):
         await cache.security.delete("securities")
         await syncjobs.sync_security_list()
-        secs = await cache.get_securities()
+        secs = Stock.choose()
         self.assertTrue(len(secs) > 0)
 
     @mock.patch("omega.master.jobs.mail_notify")
     @mock.patch("omicron.models.stock.Stock.batch_cache_bars")
     @mock.patch(
         "omega.master.jobs.get_now", return_value=datetime.datetime(2022, 1, 11, 16)
+    )
+    @mock.patch(
+        "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher.get_quota",
+        return_value=1000000,
     )
     @mock.patch(
         "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher.get_bars_batch"
@@ -397,18 +402,18 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         get_quota.return_value = 100000
 
     @mock.patch("omega.master.jobs.mail_notify")
-    async def test_sync_funds(self):
+    async def test_sync_funds(self, *args):
         secs = await syncjobs.sync_funds()
         self.assertTrue(len(secs))
 
     @mock.patch("omega.master.jobs.mail_notify")
-    async def test_sync_fund_net_value(self):
+    async def test_sync_fund_net_value(self, *args):
         await syncjobs.sync_fund_net_value()
 
     @mock.patch("omega.master.jobs.mail_notify")
-    async def test_sync_fund_share_daily(self):
+    async def test_sync_fund_share_daily(self, *args):
         await syncjobs.sync_fund_share_daily()
 
     @mock.patch("omega.master.jobs.mail_notify")
-    async def test_sync_fund_portfolio_stock(self):
+    async def test_sync_fund_portfolio_stock(self, *args):
         await syncjobs.sync_fund_portfolio_stock()

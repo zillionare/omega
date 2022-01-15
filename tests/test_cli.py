@@ -17,7 +17,7 @@ from tests import init_test_env, start_archive_server, start_omega
 
 class TestCLI(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
-        self.cfg = init_test_env()
+        self.cfg = await init_test_env()
 
         # disable catch up sync, since test_cli, jobs will be launched many times and cache might by empty
         redis = await aioredis.create_redis(self.cfg.redis.dsn)
@@ -87,7 +87,6 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
         await cli.start("jobs")
         await cli.status()
         await cli.stop("jobs")
-
 
     def test_load_factory_settings(self):
         settings = cli.load_factory_settings()
@@ -276,18 +275,6 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
                     # setup has started servers
                     print("stopping omega servers")
                     await cli.stop()
-
-    async def test_download_archive(self):
-        try:
-            self.archive_server = await start_archive_server()
-            self.omega = await start_omega()
-            with mock.patch("builtins.input", return_value="1"):
-                await cli.download_archive()
-        finally:
-            if self.archive_server:
-                self.archive_server.kill()
-            if self.omega:
-                self.omega.kill()
 
     async def test_bin_cut(self):
         arr = [1, 2, 3, 4, 5]

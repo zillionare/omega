@@ -43,7 +43,7 @@ def get_first_day_frame():
     return cal.day_frames[0]
 
 
-def decorator():
+def abnormal_master_report():
     def inner(f):
         @wraps(f)
         async def decorated_function():
@@ -282,7 +282,7 @@ async def _stop_job_timer(job_name: str) -> int:
     return elapsed
 
 
-@decorator()
+@abnormal_master_report()
 async def sync_calendar():
     """从上游服务器获取所有交易日，并计算出周线帧和月线帧
 
@@ -320,7 +320,7 @@ async def sync_calendar():
     logger.info("trade_days is updated to %s", trade_days[-1])
 
 
-@decorator()
+@abnormal_master_report()
 async def sync_security_list():
     """更新证券列表
 
@@ -514,7 +514,7 @@ async def daily_calibration_sync():
     return await __daily_calibration_sync(tread_date, head=head, tail=tail)
 
 
-@decorator()
+@abnormal_master_report()
 async def sync_day_bars():
     """
     收盘之后同步今天的数据, 下午三点的同步
@@ -534,7 +534,7 @@ async def sync_day_bars():
     return await task.run()
 
 
-@decorator()
+@abnormal_master_report()
 async def sync_minute_bars():
     """盘中同步每分钟的数据
     1. 从redis拿到上一次同步的分钟数据
@@ -583,7 +583,7 @@ async def sync_minute_bars():
     return flag
 
 
-@decorator()
+@abnormal_master_report()
 async def sync_high_low_limit():
     """每天9点半之后同步一次今日涨跌停并写入redis"""
     timeout = get_timeout(60 * 10)
@@ -665,7 +665,7 @@ async def __sync_year_quarter_month_week(tail_key, frame_type):
     return False
 
 
-@decorator()
+@abnormal_master_report()
 async def sync_year_quarter_month_week():
     """同步年月日周"""
     # 检查周线 tail
@@ -688,7 +688,7 @@ async def sync_year_quarter_month_week():
     await sync_year_quarter_month_week()
 
 
-@decorator()
+@abnormal_master_report()
 async def sync_funds():
     """更新基金列表"""
     secs = await aq.get_fund_list()
@@ -696,7 +696,7 @@ async def sync_funds():
     return secs
 
 
-@decorator()
+@abnormal_master_report()
 async def sync_fund_net_value(day: datetime.date = None, ndays: int = 8):
     """更新基金净值数据"""
     now = day or datetime.datetime.now().date()
@@ -706,7 +706,7 @@ async def sync_fund_net_value(day: datetime.date = None, ndays: int = 8):
         n += 1
 
 
-@decorator()
+@abnormal_master_report()
 async def sync_fund_share_daily(day: datetime.date = None, ndays: int = 8):
     """更新基金份额数据"""
     now = day or datetime.datetime.now().date()
@@ -716,7 +716,7 @@ async def sync_fund_share_daily(day: datetime.date = None, ndays: int = 8):
         n += 1
 
 
-@decorator()
+@abnormal_master_report()
 async def sync_fund_portfolio_stock(day: datetime.date = None, ndays: int = 8):
     """更新基金十大持仓股数据"""
     now = day or datetime.datetime.now().date()

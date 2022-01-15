@@ -24,7 +24,7 @@ class TestAbstractQuotesFetcher(unittest.IsolatedAsyncioTestCase):
         await init_test_env()
 
         await self.create_quotes_fetcher()
-        await omicron.init(aq)
+        await omicron.init()
 
     async def asyncTearDown(self) -> None:
         await omicron.close()
