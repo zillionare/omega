@@ -245,3 +245,52 @@ class TestAbstractQuotesFetcher(unittest.IsolatedAsyncioTestCase):
         n = cal.count_frames(start, stop, frame_type)
         bars = await aq.get_bars(code, stop, n, frame_type)
         print(bars)
+
+    async def test_get_fund_list(self):
+        code = ["512690"]
+        vals = await aq.get_fund_list(code=code)
+        self.assertEqual(len(code), len(vals))
+
+        vals = await aq.get_fund_list()
+        self.assertTrue(len(vals))
+
+        vals = await aq.get_fund_list(code=code, fields="code")
+        self.assertEqual(len(code), len(vals))
+        self.assertSequenceEqual(vals.dtype.names, ["code"])
+
+        code = ["233333"]
+        vals = await aq.get_fund_list(code=code)
+        self.assertFalse(len(vals))
+
+    async def test_get_fund_net_value(self):
+        code = ["512690"]
+        vals = await aq.get_fund_list(code=code)
+        self.assertEqual(len(code), len(vals))
+        vals = await aq.get_fund_list(code=code, fields="code")
+        self.assertEqual(len(code), len(vals))
+        self.assertSequenceEqual(vals.dtype.names, ["code"])
+        vals = await aq.get_fund_net_value(day=arrow.get("2021-01-09").date())
+        self.assertTrue(len(vals))
+
+    async def test_get_fund_share_daily(self):
+        code = ["512690"]
+        day = arrow.get("2021-10-26").date()
+        vals = await aq.get_fund_share_daily(code, day=day)
+        self.assertTrue(len(vals))
+        vals = await aq.get_fund_share_daily(code, day=day, fields="code")
+        self.assertTrue(len(vals))
+        self.assertSequenceEqual(vals.dtype.names, ["code"])
+
+    async def test_get_fund_portfolio_stock(self):
+        vals = await aq.get_fund_portfolio_stock(pub_date="2021-12-21")
+        self.assertEqual(len(vals), 0)
+
+        vals = await aq.get_fund_portfolio_stock(pub_date="2021-01-22")
+        self.assertTrue(len(vals))
+
+        vals = await aq.get_fund_portfolio_stock(code=["150016"])
+        self.assertTrue(len(vals))
+
+        vals = await aq.get_fund_portfolio_stock(code=["150016"], fields="code")
+        self.assertTrue(len(vals))
+        self.assertSequenceEqual(vals.dtype.names, ["code"])
