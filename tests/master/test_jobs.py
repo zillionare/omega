@@ -1,14 +1,9 @@
 import asyncio
 import datetime
 import logging
-import os
-import time
 import unittest
-from pathlib import Path
-from typing import List
 from unittest import mock
 import numpy as np
-import arrow
 import cfg4py
 import omicron
 from omicron import cache
@@ -23,7 +18,7 @@ from omega.worker.dfs import TempStorage
 from tests import init_test_env
 from omega.core.constants import HIGH_LOW_LIMIT
 from omicron.core.types import FrameType
-from omicron.models.calendar import Calendar
+from tests import test_dir
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
@@ -80,7 +75,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         async def get_bars_batch_mock(*args, **kwargs):
             """聚宽的数据被序列化到文件里了，mock读出来  根据帧类型mock"""
             frame_type = kwargs["frame_type"]
-            with open(f"../data/{frame_type.value}.pick", "rb") as f:
+            with open(f"{test_dir()}/data/{frame_type.value}.pick", "rb") as f:
                 return pickle.loads(f.read())
 
         get_bars_batch.side_effect = get_bars_batch_mock
@@ -123,7 +118,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         async def get_bars_batch_mock(*args, **kwargs):
             """聚宽的数据被序列化到文件里了，mock读出来  根据帧类型mock"""
             frame_type = kwargs["frame_type"]
-            with open(f"../data/{frame_type.value}.pick", "rb") as f:
+            with open(f"{test_dir()}/data/{frame_type.value}.pick", "rb") as f:
                 return pickle.loads(f.read())
 
         get_bars_batch.side_effect = get_bars_batch_mock
@@ -159,8 +154,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         async def get_bars_batch_mock(*args, **kwargs):
             """聚宽的数据被序列化到文件里了，mock读出来  根据帧类型mock"""
             frame_type = kwargs["frame_type"]
-            print(frame_type)
-            with open(f"../data/{frame_type.value}.pick", "rb") as f:
+            with open(f"{test_dir()}/data/{frame_type.value}.pick", "rb") as f:
                 return pickle.loads(f.read())
 
         get_bars_batch.side_effect = get_bars_batch_mock
@@ -248,7 +242,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         self, get_high_limit_price, mail_notify, get_now, get_quota, *args
     ):
         async def get_high_limit_price_mock(*args, **kwargs):
-            return np.load("../data/high_low_limit.npy", allow_pickle=True)
+            return np.load(f"{test_dir()}/data/high_low_limit.npy", allow_pickle=True)
 
         get_high_limit_price.side_effect = get_high_limit_price_mock
         await cache.sys.delete("master.task.high_low_limit.state")
@@ -332,7 +326,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
 
         async def get_bars_batch_mock(*args, **kwargs):
             """聚宽的数据被序列化到文件里了，mock读出来"""
-            with open("../data/month_week.pick", "rb") as f:
+            with open(f"{test_dir()}/data/month_week.pick", "rb") as f:
                 return pickle.loads(f.read())
 
         get_bars_batch.side_effect = get_bars_batch_mock

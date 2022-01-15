@@ -5851,3 +5851,8 @@ def find_free_port():
         # s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         port = s.getsockname()[1]
         return port
+
+
+def test_dir():
+    home = os.path.dirname(__file__)
+    return home
