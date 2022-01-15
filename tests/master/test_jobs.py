@@ -54,32 +54,91 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         elapsed = await syncjobs._stop_job_timer("unittest")
         self.assertTrue(5 <= elapsed <= 7)
 
-    async def test_sync_security_list(self):
+    @mock.patch("omega.master.jobs.mail_notify")
+    async def test_sync_security_list(self, *args):
         await cache.security.delete("securities")
         await syncjobs.sync_security_list()
         secs = await cache.get_securities()
         self.assertTrue(len(secs) > 0)
 
-    # @mock.patch("omega.master.jobs.get_now")
-    # async def test_sync_minute_bars(self, get_now):
-    #     get_now.return_value = datetime.datetime(2022, 1, 11, 9, 32)
-    #     emit.register(Events.OMEGA_DO_SYNC_MIN, workjobs.sync_minute_bars)
-    #     await syncjobs.sync_minute_bars()
-    #
-    # @mock.patch("omega.master.jobs.get_now")
-    # async def test_sync_day_bars(self, get_now):
-    #     get_now.return_value = datetime.datetime(2022, 1, 11, 16)
-    #     emit.register(Events.OMEGA_DO_SYNC_DAY, workjobs.sync_day_bars)
-    #     await syncjobs.sync_day_bars()
+    @mock.patch("omega.master.jobs.mail_notify")
+    @mock.patch("omicron.models.stock.Stock.batch_cache_bars")
+    @mock.patch(
+        "omega.master.jobs.get_now", return_value=datetime.datetime(2022, 1, 11, 16)
+    )
+    @mock.patch(
+        "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher.get_bars_batch"
+    )
+    async def test_sync_minute_bars(self, get_bars_batch, *args):
+        async def clear():
+            state = f"{constants.TASK_PREFIX}.minute.state"
+            await cache.sys.delete(state)
+            await cache.sys.delete(constants.BAR_SYNC_STATE_MINUTE)
+
+        await clear()
+
+        async def get_bars_batch_mock(*args, **kwargs):
+            """聚宽的数据被序列化到文件里了，mock读出来  根据帧类型mock"""
+            frame_type = kwargs["frame_type"]
+            with open(f"../data/{frame_type.value}.pick", "rb") as f:
+                return pickle.loads(f.read())
+
+        get_bars_batch.side_effect = get_bars_batch_mock
+
+        emit.register(Events.OMEGA_DO_SYNC_MIN, workjobs.sync_minute_bars)
+        ret = await syncjobs.sync_minute_bars()
+        self.assertTrue(ret)
+        self.assertEqual(
+            await cache.sys.hget(constants.BAR_SYNC_STATE_MINUTE, "tail"),
+            "2022-01-11 15:00:00",
+        )
+
+    @mock.patch("omicron.models.stock.Stock.batch_cache_bars")
+    @mock.patch(
+        "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher.get_quota",
+        return_value=1000000,
+    )
+    @mock.patch("omega.master.jobs.mail_notify")
+    @mock.patch(
+        "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher.get_bars_batch"
+    )
+    @mock.patch(
+        "omega.master.jobs.get_now", return_value=datetime.datetime(2022, 1, 11, 16)
+    )
+    async def test_sync_day_bars(self, get_now, get_bars_batch, mail_notify, *args):
+        async def clear():
+            state = f"{constants.TASK_PREFIX}.day.state"
+            await cache.sys.delete(state)
+
+        await clear()
+        email_content = ""
+
+        async def mail_notify_mock(subject, body, **kwargs):
+            nonlocal email_content
+            email_content = body
+            print(body)
+
+        mail_notify.side_effect = mail_notify_mock
+
+        async def get_bars_batch_mock(*args, **kwargs):
+            """聚宽的数据被序列化到文件里了，mock读出来  根据帧类型mock"""
+            frame_type = kwargs["frame_type"]
+            with open(f"../data/{frame_type.value}.pick", "rb") as f:
+                return pickle.loads(f.read())
+
+        get_bars_batch.side_effect = get_bars_batch_mock
+        emit.register(Events.OMEGA_DO_SYNC_DAY, workjobs.sync_day_bars)
+        ret = await syncjobs.sync_day_bars()
+        self.assertTrue(ret)
 
     @mock.patch("omicron.models.stock.Stock.persist_bars")
     @mock.patch("omega.master.jobs.Storage", side_effect=TempStorage)
     @mock.patch(
         "omega.master.jobs.get_now", return_value=datetime.datetime(2022, 1, 11, 16)
     )
-    # @mock.patch(
-    #     "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher.get_bars_batch"
-    # )
+    @mock.patch(
+        "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher.get_bars_batch"
+    )
     @mock.patch("omega.master.jobs.mail_notify")
     @mock.patch(
         "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher.get_quota",
@@ -99,10 +158,12 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
 
         async def get_bars_batch_mock(*args, **kwargs):
             """聚宽的数据被序列化到文件里了，mock读出来  根据帧类型mock"""
-            with open("../data/month_week.pick", "rb") as f:
+            frame_type = kwargs["frame_type"]
+            print(frame_type)
+            with open(f"../data/{frame_type.value}.pick", "rb") as f:
                 return pickle.loads(f.read())
 
-        # get_bars_batch.side_effect = get_bars_batch_mock
+        get_bars_batch.side_effect = get_bars_batch_mock
 
         async def clear():
             p = cache.sys.pipeline()
@@ -341,19 +402,19 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         # 测试超时
         get_quota.return_value = 100000
 
-    async def test_sync_minute_bars(self):
-        await cache.sys.hset("master.bars_sync.state.minute", "is_running", 0)
-        await syncjobs.sync_minute_bars()
-
+    @mock.patch("omega.master.jobs.mail_notify")
     async def test_sync_funds(self):
         secs = await syncjobs.sync_funds()
         self.assertTrue(len(secs))
 
+    @mock.patch("omega.master.jobs.mail_notify")
     async def test_sync_fund_net_value(self):
         await syncjobs.sync_fund_net_value()
 
+    @mock.patch("omega.master.jobs.mail_notify")
     async def test_sync_fund_share_daily(self):
         await syncjobs.sync_fund_share_daily()
 
+    @mock.patch("omega.master.jobs.mail_notify")
     async def test_sync_fund_portfolio_stock(self):
         await syncjobs.sync_fund_portfolio_stock()

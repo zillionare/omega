@@ -109,6 +109,7 @@ class Task:
 
     async def delete_state(self):
         await cache.sys.delete(self.state)
+        return True
 
     @property
     async def is_running(self):
@@ -247,7 +248,7 @@ class Task:
                             await asyncio.sleep(0.5)
                         else:
                             print(f"{self.scope}耗时：{time.time() - s}")
-                            return
+                            return True
             except asyncio.exceptions.TimeoutError:
                 # 从失败列表里把所有数据拉出来，
                 # msg = f"超时了，超时时间是：{self.timeout}"
@@ -450,7 +451,7 @@ async def __daily_calibration_sync(
 
     await delete_daily_calibration_queue(stock_min, index_min, stock_day, index_day)
     ret = await task.run()
-    if ret is not None:
+    if not ret:
         return ret
 
     # 读出来 写dfs
@@ -530,7 +531,7 @@ async def sync_day_bars():
     )
     await task.set_coefficient(240 * 2 + 4)
 
-    await task.run()
+    return await task.run()
 
 
 @decorator()
@@ -550,7 +551,7 @@ async def sync_minute_bars():
 
     if not cal.is_trade_day(end):
         print("非交易日，不同步")
-        return
+        return False
 
     queue_name = "minute"
     tail = await cache.sys.hget(constants.BAR_SYNC_STATE_MINUTE, "tail")
@@ -574,11 +575,12 @@ async def sync_minute_bars():
     task = Task(Events.OMEGA_DO_SYNC_MIN, queue_name, params, timeout=get_timeout())
 
     flag = await task.run()
-    if flag is not None:
+    if flag:
         # 说明正常执行完的
         await cache.sys.hset(
             constants.BAR_SYNC_STATE_MINUTE, "tail", end.strftime("%Y-%m-%d %H:%M:00")
         )
+    return flag
 
 
 @decorator()
@@ -652,7 +654,7 @@ async def __sync_year_quarter_month_week(tail_key, frame_type):
         await task.set_coefficient(2)
         await delete_year_quarter_month_week_queue(stock_data, index_data)
         ret = await task.run()
-        if ret is not None:
+        if not ret:
             await delete_year_quarter_month_week_queue(stock_data, index_data)
             return False
         await write_dfs(stock_data, frame_type, "stock", tail)
