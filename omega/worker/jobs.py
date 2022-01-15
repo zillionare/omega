@@ -192,7 +192,7 @@ async def sync_high_low_limit(params):
         bars = await get_high_low_limit(secs, end)
         if bars is None:
             await push_fail_secs(secs, fail)
-            return 1
+            raise exception.GotNoneData()
         for sec in bars:
             name = sec["code"]
             high_limit = sec["high_limit"]

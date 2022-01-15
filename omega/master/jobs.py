@@ -34,6 +34,15 @@ def get_now():
     return datetime.datetime.now()
 
 
+def get_timeout(timeout=60):
+    return timeout
+
+
+def get_first_day_frame():
+    """获取自股市开盘以来，第一个交易日"""
+    return cal.day_frames[0]
+
+
 def decorator():
     def inner(f):
         @wraps(f)
@@ -136,21 +145,18 @@ class Task:
             await self.generate_task()
         return self.__task_list
 
-    async def send_email(self, error):
+    async def send_email(self, error=None):
         subject = f"执行{self.state}时异常！"
-        body = error
+        if error:
+            body = error
+        else:
+            body = f"超时时间是：{self.timeout}"
         body += "\n\n================================================\n\n"
         body += "消费者得到的参数是：" + str(self.params)
         body += "\n\n================================================\n\n"
         quota = await aq.get_quota()
         body += f"剩余可用quota：{quota}"
-
-        p = cache.sys.pipeline()
-        p.lrange(self.fail, 0, -1)
-        p.delete(self.fail)
-        fails, _ = await p.execute()
-        if fails:
-            body += "\n执行这些股票数据时发生错误：" + str(fails)
+        body += f"{await self.get_fail()}"
         await mail_notify(subject, body, html=True)
 
     async def run(self):
@@ -167,7 +173,7 @@ class Task:
         if quota < need:
             msg = f"剩余quota不够本次同步，剩余：{quota}, 至少需要{need}才可以同步，"
             await self.send_email(msg)
-            return
+            return False
         p = cache.sys.pipeline()
         p.hset(self.state, "is_running", 1)
         p.expire(self.state, self.timeout * 5)
@@ -196,6 +202,15 @@ class Task:
         ret = await self.check_done(count)
         await self.delete_state()
         return ret
+
+    async def get_fail(self):
+        p = cache.sys.pipeline()
+        p.lrange(self.fail, 0, -1)
+        p.delete(self.fail)
+        fails, _ = await p.execute()
+        # if fails:
+        #     body += "\n执行这些股票数据时发生错误：" + str(fails)
+        return fails
 
     async def check_done(self, count: int):
         """
@@ -235,15 +250,8 @@ class Task:
                             return
             except asyncio.exceptions.TimeoutError:
                 # 从失败列表里把所有数据拉出来，
-                p = cache.sys.pipeline()
-                p.lrange(self.fail, 0, -1)
-                p.delete(self.fail)
-                fails, _ = await p.execute()
-                if fails:
-                    msg = f"超时了，失败队列{fails}"
-                    await self.send_email(msg)
-                    print(fails)
-                # print("超时了, 继续等待，并发送报警邮件")
+                # msg = f"超时了，超时时间是：{self.timeout}"
+                await self.send_email()
 
 
 async def _start_job_timer(job_name: str):
@@ -433,7 +441,7 @@ async def __daily_calibration_sync(
         Events.OMEGA_DO_SYNC_DAILY_CALIBRATION,
         queue_name,
         params,
-        60 * 60 * 6,
+        get_timeout(60 * 60 * 6),
         stock_queue=stock_queue,
         index_queue=index_queue,
     )
@@ -443,7 +451,7 @@ async def __daily_calibration_sync(
     await delete_daily_calibration_queue(stock_min, index_min, stock_day, index_day)
     ret = await task.run()
     if ret is not None:
-        return
+        return ret
 
     # 读出来 写dfs
     await write_dfs(stock_min, FrameType.MIN1, "stock", end, resample=True)
@@ -457,7 +465,7 @@ async def __daily_calibration_sync(
     if tail is not None:
         await cache.sys.set(constants.BAR_SYNC_ARCHIVE_TAIl, tail.strftime("%Y-%m-%d"))
     await delete_daily_calibration_queue(stock_min, index_min, stock_day, index_day)
-    await daily_calibration_sync()
+    return await daily_calibration_sync()
 
 
 async def daily_calibration_sync():
@@ -480,41 +488,29 @@ async def daily_calibration_sync():
         # 说明不是首次同步，检查tail到现在有没有空洞
         tail_date = datetime.datetime.strptime(tail, "%Y-%m-%d")
         head_date = datetime.datetime.strptime(head, "%Y-%m-%d")
-        if (
-            cal.count_frames(
-                tail_date,
-                now.replace(hour=0, minute=0, second=0, microsecond=0),
-                FrameType.DAY,
-            )
-            - 1
-            > 1
-        ):
+        count_frame = cal.count_frames(
+            tail_date,
+            now.replace(hour=0, minute=0, second=0, microsecond=0),
+            FrameType.DAY,
+        )
+        if count_frame - 1 > 1:
+            # 说明有空洞
             tread_date = tail = tail_date
             head = None
 
         else:
+            # 说明没有空洞
             tread_date = head = datetime.datetime.combine(
                 cal.day_shift(head_date, -1), datetime.time(0, 0)
             )
             tail = None
     # 检查时间是否小于于 2005年，大于则说明同步完成了
-    if cal.date2int(tread_date) < cal.day_frames[0]:
+    day_frame = get_first_day_frame()
+    if cal.date2int(tread_date) < day_frame:
         print("所有数据已同步完毕")
-        return
+        return True
 
-    if not cal.is_trade_day(tread_date):
-        print("非交易日，不同步")
-        if head is not None:
-            await cache.sys.set(
-                constants.BAR_SYNC_ARCHIVE_HEAD, head.strftime("%Y-%m-%d")
-            )
-        if tail is not None:
-            await cache.sys.set(
-                constants.BAR_SYNC_ARCHIVE_TAIl, tail.strftime("%Y-%m-%d")
-            )
-        await daily_calibration_sync()
-    else:
-        await __daily_calibration_sync(tread_date, head=head, tail=tail)
+    return await __daily_calibration_sync(tread_date, head=head, tail=tail)
 
 
 @decorator()
@@ -529,7 +525,9 @@ async def sync_day_bars():
     params = {"start": start, "end": end, "n_bars": 240}
     queue_name = "day"
 
-    task = Task(Events.OMEGA_DO_SYNC_DAY, queue_name, params, timeout=60 * 60 * 2)
+    task = Task(
+        Events.OMEGA_DO_SYNC_DAY, queue_name, params, timeout=get_timeout(60 * 60 * 2)
+    )
     await task.set_coefficient(240 * 2 + 4)
 
     await task.run()
@@ -573,7 +571,7 @@ async def sync_minute_bars():
         return
 
     params = {"start": tail, "end": end, "n_bars": n_bars}
-    task = Task(Events.OMEGA_DO_SYNC_MIN, queue_name, params)
+    task = Task(Events.OMEGA_DO_SYNC_MIN, queue_name, params, timeout=get_timeout())
 
     flag = await task.run()
     if flag is not None:
@@ -586,7 +584,7 @@ async def sync_minute_bars():
 @decorator()
 async def sync_high_low_limit():
     """每天9点半之后同步一次今日涨跌停并写入redis"""
-    timeout = 60 * 10
+    timeout = get_timeout(60 * 10)
     end = get_now().replace(hour=15, minute=0, second=0, microsecond=0)
     if not cal.is_trade_day(end):
         print("非交易日，不同步")
@@ -646,6 +644,7 @@ async def __sync_year_quarter_month_week(tail_key, frame_type):
             Events.OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK,
             queue_name,
             params,
+            get_timeout(timeout=60 * 10),
             stock_queue=stock_queue,
             index_queue=index_queue,
         )
@@ -685,7 +684,7 @@ async def sync_year_quarter_month_week():
     # ):
     #     return
     await sync_year_quarter_month_week()
-    
+
 
 @decorator()
 async def sync_funds():
@@ -693,6 +692,7 @@ async def sync_funds():
     secs = await aq.get_fund_list()
     logger.info("%s secs are fetched and saved.", len(secs))
     return secs
+
 
 @decorator()
 async def sync_fund_net_value(day: datetime.date = None, ndays: int = 8):
@@ -703,6 +703,7 @@ async def sync_fund_net_value(day: datetime.date = None, ndays: int = 8):
         await aq.get_fund_net_value(day=now - datetime.timedelta(days=n))
         n += 1
 
+
 @decorator()
 async def sync_fund_share_daily(day: datetime.date = None, ndays: int = 8):
     """更新基金份额数据"""
@@ -711,6 +712,7 @@ async def sync_fund_share_daily(day: datetime.date = None, ndays: int = 8):
     while n < ndays:
         await aq.get_fund_share_daily(day=now - datetime.timedelta(days=n))
         n += 1
+
 
 @decorator()
 async def sync_fund_portfolio_stock(day: datetime.date = None, ndays: int = 8):
