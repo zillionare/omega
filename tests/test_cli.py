@@ -275,16 +275,3 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
                     # setup has started servers
                     print("stopping omega servers")
                     await cli.stop()
-
-    async def test_bin_cut(self):
-        arr = [1, 2, 3, 4, 5]
-
-        expected = [
-            [[1, 2, 3, 4, 5]],
-            [[1, 3, 5], [2, 4]],
-            [[1, 4], [2, 5], [3]],
-            [[1], [2], [3], [4], [5]],
-            [[1], [2], [3], [4], [5]],
-        ]
-        for i, bins in enumerate([1, 2, 3, 5, 10]):
-            self.assertListEqual(expected[i], cli.bin_cut(arr, bins))
