@@ -473,9 +473,10 @@ async def daily_calibration_sync():
     """凌晨2点数据同步，调用sync_day_bars，添加参数写minio和重采样
     然后需要往前追赶同步，剩余quota > 1天的量就往前赶，并在redis记录已经有daily_calibration_sync在运行了
     """
-    head, tail = await cache.sys.get(
-        constants.BAR_SYNC_ARCHIVE_HEAD
-    ), await cache.sys.get(constants.BAR_SYNC_ARCHIVE_TAIl)
+    head, tail = (
+        await cache.sys.get(constants.BAR_SYNC_ARCHIVE_HEAD),
+        await cache.sys.get(constants.BAR_SYNC_ARCHIVE_TAIl),
+    )
     now = get_now()
 
     if not head or not tail:
