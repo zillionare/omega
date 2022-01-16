@@ -82,18 +82,6 @@ class AbstractQuotesFetcher(QuotesFetcher):
         )
 
     @classmethod
-    async def get_bars(
-        cls,
-        sec: str,
-        end: Frame,
-        n_bars: int,
-        frame_type: FrameType,
-        unclosed=True,
-    ) -> np.ndarray:
-        # todo: 接口也可能要改，以区分盘中实时同步分钟线和校准同步分钟线、日线情况
-        raise NotImplementedError
-
-    @classmethod
     async def get_all_trade_days(cls):
         days = await cls.get_instance().get_all_trade_days()
         await cal.save_calendar(days)
