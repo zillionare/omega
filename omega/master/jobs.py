@@ -799,24 +799,32 @@ async def load_cron_task(scheduler):
     scheduler.add_job(
         sync_fund_net_value,
         "cron",
-        hour=20,
-        minute="0",
+        hour=4,
+        minute=15,
         args=(),
         name="sync_fund_net_value",
     )
     scheduler.add_job(
+        sync_funds,
+        "cron",
+        hour=4,
+        minute=0,
+        args=(),
+        name="sync_funds",
+    )
+    scheduler.add_job(
         sync_fund_share_daily,
         "cron",
-        hour=20,
-        minute="0",
+        hour=4,
+        minute=5,
         args=(),
         name="sync_fund_share_daily",
     )
     scheduler.add_job(
         sync_fund_portfolio_stock,
         "cron",
-        hour=18,
-        minute="22",
+        hour=4,
+        minute=10,
         args=(),
         name="sync_fund_portfolio_stock",
     )
