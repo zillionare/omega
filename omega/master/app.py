@@ -14,11 +14,11 @@ import cfg4py
 import fire
 import omicron
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from jobs import load_cron_task, sync_calendar, sync_security_list
 from pyemit import emit
 
 from omega.config import get_config_dir
 from omega.logreceivers.redis import RedisLogReceiver
+from omega.master.jobs import load_cron_task, sync_calendar, sync_security_list
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()

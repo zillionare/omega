@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 async def worker_exit(state, scope, error=None):
-    if error is None:
+    if error is None:  # pragma: no cover
         error = traceback.format_exc()
     # 删除is_running 并写上错误堆栈信息
     p = cache.sys.pipeline()
@@ -57,7 +57,7 @@ def abnormal_work_report():
                 return ret
             except exception.WorkerException as e:
                 await worker_exit(state, scope, e.msg)
-            except Exception as e:
+            except Exception as e:  # pragma: no cover
                 # 说明消费者消费时错误了
                 logger.exception(e)
                 await worker_exit(state, scope)

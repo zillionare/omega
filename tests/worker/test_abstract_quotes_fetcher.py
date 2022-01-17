@@ -10,7 +10,6 @@ import cfg4py
 import numpy as np
 import omicron
 from omicron import cache
-from omicron.models.calendar import Calendar as cal
 from omicron.core.types import FrameType
 
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
@@ -61,16 +60,6 @@ class TestAbstractQuotesFetcher(unittest.IsolatedAsyncioTestCase):
     async def test_get_all_trade_days(self):
         days = await aq.get_all_trade_days()
         self.assertIn(datetime.date(2020, 12, 31), days)
-
-    async def test_foo(self):
-        start = arrow.get("2020-11-02 15:00:00", tzinfo=cfg.tz).datetime
-        stop = arrow.get("2020-11-06 14:30:00", tzinfo=cfg.tz).datetime
-        frame_type = FrameType.MIN30
-        code = "000001.XSHE"
-
-        n = cal.count_frames(start, stop, frame_type)
-        bars = await aq.get_bars(code, stop, n, frame_type)
-        print(bars)
 
     async def test_get_fund_list(self):
         dtype = [

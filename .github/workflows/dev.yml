@@ -28,6 +28,10 @@ jobs:
       JQ_PASSWORD: ${{secrets.JQ_PASSWORD}}
       POSTGRES_ENABLED: true
       __cfg4py_server_role__: DEV
+      MINIO_HOST: localhost
+      MINIO_PORT: 9000
+      MINIO_ACCESS: root123
+      MINIO_SECRET: adminadmin
     # The type of runner that the job will run on
     strategy:
       matrix:
@@ -59,6 +63,21 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
+      minio:
+        image: lazybit/minio
+        ports:
+          - 9000:9000
+        env:
+          MINIO_ACCESS_KEY: root123
+          MINIO_SECRET_KEY: adminadmin
+        volumes:
+          - /tmp/data:/data
+        options: >-
+            --name=minio
+            --health-cmd "curl http://localhost:9000/minio/health/live"
+            --health-interval 10s
+            --health-timeout 5s
+            --health-retries 5
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
