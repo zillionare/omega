@@ -412,7 +412,7 @@ async def __daily_calibration_sync(
         index_queue=index_queue,
     )
 
-    await task.set_coefficient(240 * 2 + 4)
+    await task.set_coefficient((240 * 2 + 4) // 0.75)
 
     await delete_daily_calibration_queue(stock_min, index_min, stock_day, index_day)
     ret = await task.run()
