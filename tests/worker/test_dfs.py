@@ -4,7 +4,6 @@
 import datetime
 import logging
 import unittest
-from unittest import mock
 
 import cfg4py
 from omicron.core.types import FrameType

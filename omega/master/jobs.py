@@ -14,8 +14,8 @@ import async_timeout
 import cfg4py
 import numpy as np
 from cfg4py.config import Config
-from omicron import cache
 from omicron.core.types import FrameType, SecurityType
+from omicron.dal import cache
 from omicron.models.calendar import Calendar as cal
 from omicron.models.stock import Stock
 from omicron.notify.mail import mail_notify
@@ -34,7 +34,7 @@ def get_now():
     return datetime.datetime.now()
 
 
-def get_timeout(timeout=60):
+def get_timeout(timeout=60):  # pragma: no cover
     return timeout
 
 
@@ -51,7 +51,7 @@ def abnormal_master_report():
             try:
                 ret = await f()
                 return ret
-            except Exception as e:
+            except Exception as e:  # pragma: no cover
                 logger.exception(e)
                 # 发送邮件报告错误
                 subject = f"执行生产者{f.__name__}时发生异常"
@@ -130,7 +130,7 @@ class Task:
             exclude = map(lambda x: x, exclude.split(" "))
             codes = list(set(codes) - set(exclude))
         include = getattr(cfg.omega.sync.bars, "include", "")
-        if include:
+        if include:  # pragma: no cover
             include = list(filter(lambda x: x, cfg.omega.sync.bars.include.split(" ")))
             codes.extend(include)
         return list(set(codes))
@@ -293,31 +293,7 @@ async def sync_calendar():
         logger.warning("failed to fetch trade days.")
         return None
 
-    cal.day_frames = [cal.date2int(x) for x in trade_days]
-    weeks = []
-    last = trade_days[0]
-    for cur in trade_days:
-        if cur.weekday() < last.weekday() or (cur - last).days >= 7:
-            weeks.append(last)
-        last = cur
-
-    if weeks[-1] < last:
-        weeks.append(last)
-
-    cal.week_frames = [cal.date2int(x) for x in weeks]
-    await cache.save_calendar("week_frames", map(cal.date2int, weeks))
-
-    months = []
-    last = trade_days[0]
-    for cur in trade_days:
-        if cur.day < last.day:
-            months.append(last)
-        last = cur
-    months.append(last)
-
-    cal.month_frames = [cal.date2int(x) for x in months]
-    await cache.save_calendar("month_frames", map(cal.date2int, months))
-    logger.info("trade_days is updated to %s", trade_days[-1])
+    await cal.init()
 
 
 @abnormal_master_report()
@@ -350,17 +326,6 @@ async def delete_daily_calibration_queue(stock_min, index_min, stock_day, index_
     await p.execute()
 
 
-async def resample_bars(bars, frame_type: FrameType, dfs, prefix, dt):
-    """
-    重采样
-    分钟线-> 5 15 30 60
-    """
-
-    bars_min5 = Stock.resample(bars, FrameType.MIN1, frame_type)
-    bars_min5_binary = pickle.dumps(bars_min5, protocol=cfg.pickle.ver)
-    await dfs.write(bars_min5_binary, prefix, dt, frame_type)
-
-
 async def write_dfs(
     queue_name: str,
     frame_type: FrameType,
@@ -379,7 +344,7 @@ async def write_dfs(
 
     """
     dfs = Storage()
-    if dfs is None:
+    if dfs is None:  # pragma: no cover
         return
     p = cache.temp.pipeline()
     p.lrange(queue_name, 0, -1, encoding=None)

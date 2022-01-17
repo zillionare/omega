@@ -483,7 +483,7 @@ def find_fetcher_processes():
     result = {}
     for p in psutil.process_iter():
         cmd = " ".join(p.cmdline())
-        if "omega.app start" in cmd and "--impl" in cmd and "--port" in cmd:
+        if "omega.worker start" in cmd and "--impl" in cmd and "--port" in cmd:
             m = re.search(r"--impl=([^\s]+)", cmd)
             impl = m.group(1) if m else ""
 
@@ -576,7 +576,7 @@ def _start_fetcher(
         [
             sys.executable,
             "-m",
-            "omega.app",
+            "omega.worker",
             "start",
             f"--impl={impl}",
             f"--account={account}",
@@ -593,7 +593,7 @@ async def _start_jobs():
         [
             sys.executable,
             "-m",
-            "omega.jobs",
+            "omega.master",
             "start",
             f"--port={cfg.omega.jobs.port}",
         ]
@@ -601,13 +601,13 @@ async def _start_jobs():
 
     retry = 0
     while _find_jobs_process() is None and retry < 5:
-        print("等待omega.jobs启动中")
+        print("等待omega.master启动中")
         retry += 1
         await asyncio.sleep(1)
     if retry < 5:
-        print("omega.jobs启动成功。")
+        print("omega.master启动成功。")
     else:
-        print("omega.jobs启动失败。")
+        print("omega.master启动失败。")
         return
 
     _show_jobs_process()
@@ -616,7 +616,7 @@ async def _start_jobs():
 def _restart_jobs():
     pid = _find_jobs_process()
     if pid is None:
-        print("omega.jobs未运行。正在启动中...")
+        print("omega.master未运行。正在启动中...")
         _start_jobs()
     else:
         # 如果omega.jobs已经运行
@@ -637,11 +637,11 @@ async def _stop_jobs():
         pid = _find_jobs_process()
 
     if retry >= 5:
-        print("未能停止omega.jobs")
+        print("未能停止omega.master")
 
 
 def _show_jobs_process():
-    print(f"正在运行中的jobs进程:\n{'=' * 40}")
+    print(f"正在运行中的master进程:\n{'=' * 40}")
     pid = _find_jobs_process()
     if pid:
         print(pid)
@@ -653,7 +653,7 @@ def _find_jobs_process():
     for p in psutil.process_iter():
         try:
             cmd = " ".join(p.cmdline())
-            if cmd.find("omega.jobs") != -1:
+            if cmd.find("omega.master") != -1:
                 return p.pid
         except (PermissionError, ProcessLookupError):
             pass
@@ -769,11 +769,7 @@ async def _init():
     except Exception:
         print(f"dsn is {cfg.redis.dsn}")
 
-    impl = cfg.quotes_fetchers[0]["impl"]
-    params = cfg.quotes_fetchers[0]["workers"][0]
-    await AbstractQuotesFetcher.create_instance(impl, **params)
-
-    await omicron.init(AbstractQuotesFetcher)
+    await omicron.init()
 
 
 def run_with_init(func):

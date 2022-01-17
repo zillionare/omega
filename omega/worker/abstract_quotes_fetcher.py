@@ -67,6 +67,7 @@ class AbstractQuotesFetcher(QuotesFetcher):
             return securities
 
         await Stock.save_securities(securities)
+        return securities
 
     @classmethod
     async def get_bars_batch(

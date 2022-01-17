@@ -8,11 +8,11 @@ import aioredis
 import arrow
 import cfg4py
 from omega import cli
-import omega
 from omega.config import get_config_dir
 from pyemit import emit
 from ruamel.yaml import YAML
 from tests import init_test_env, start_archive_server, start_omega
+from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 
 
 class TestCLI(unittest.IsolatedAsyncioTestCase):
@@ -23,6 +23,14 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
         redis = await aioredis.create_redis(self.cfg.redis.dsn)
         last_sync = arrow.now(self.cfg.tz).format("YYYY-MM-DD HH:mm:SS")
         await redis.set("jobs.bars_sync.stop", last_sync)
+        await self.create_quotes_fetcher()
+
+    async def create_quotes_fetcher(self):
+        cfg = cfg4py.get_instance()
+        fetcher_info = cfg.quotes_fetchers[0]
+        impl = fetcher_info["impl"]
+        params = fetcher_info["workers"][0]
+        await aq.create_instance(impl, **params)
 
     async def asyncTearDown(self) -> None:
         await emit.stop()
