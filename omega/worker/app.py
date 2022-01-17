@@ -50,8 +50,7 @@ class Omega(object):
         self.scheduler.add_job(self.heart_beat, trigger="interval", seconds=3)
         self.scheduler.start()
         await omicron.cache.init()
-        await sync_calendar()
-        await sync_security_list()
+        await omicron.influxdb.init()
         logger.info("<<< init %s process done", self.__class__.__name__)
 
     async def heart_beat(self):

@@ -434,6 +434,7 @@ async def __daily_calibration_sync(
     return await daily_calibration_sync()
 
 
+@abnormal_master_report()
 async def daily_calibration_sync():
     """凌晨2点数据同步，调用sync_day_bars，添加参数写minio和重采样
     然后需要往前追赶同步，剩余quota > 1天的量就往前赶，并在redis记录已经有daily_calibration_sync在运行了
