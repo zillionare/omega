@@ -42,7 +42,7 @@ class AbstractStorage(ABC):
         prefix: str,
         dt: Union[datetime, date, AnyStr],
         frame_type: Union[FrameType, AnyStr],
-    ) -> AnyStr:
+    ) -> AnyStr:  # pragma: no cover
         """拼接文件名"""
         filename = []
         if isinstance(prefix, str) and prefix in ("stock", "index"):
@@ -72,7 +72,7 @@ class AbstractStorage(ABC):
         prefix,
         dt: Union[datetime, date, AnyStr],
         frame_type: Union[FrameType, AnyStr],
-    ):
+    ):  # pragma: no cover
         """
         将bar写入dfs中 按照 /日期/
         Args:
@@ -89,7 +89,7 @@ class AbstractStorage(ABC):
         prefix,
         dt: Union[datetime, date, AnyStr],
         frame_type: Union[FrameType, AnyStr],
-    ) -> np.array:
+    ) -> np.array:  # pragma: no cover
         """
         Args:
             prefix:  股票或基金的名称
@@ -100,9 +100,20 @@ class AbstractStorage(ABC):
 
         """
 
+    async def delete_bucket(self):  # pragma: no cover
+        """删除bucket"""
+
+    async def delete(
+        self,
+        prefix,
+        dt: Union[datetime, date, AnyStr],
+        frame_type: Union[FrameType, AnyStr],
+    ):
+        """删除一个文件"""
+
 
 class TempStorage:
-    async def write(self, *args, **kwargs):
+    async def write(self, *args, **kwargs):  # pragma: no cover
         pass
 
 
@@ -114,7 +125,7 @@ class Storage:
             return cls.__instance
 
         elif cfg.dfs.engine == "minio":
-            cls.__instance = MinioStorage()
+            cls.__instance = MinioStorage(*args, **kwargs)
         else:
             return None
         return cls.__instance
@@ -144,8 +155,12 @@ class MinioStorage(AbstractStorage):
         exists = self.client.bucket_exists(self.bucket)
         if not exists:
             self.client.make_bucket(self.bucket)
-        else:
+        else:  # pragma: no cover
             logger.info(f"bucket {self.bucket}已存在,跳过创建")
+
+    async def delete_bucket(self):
+        """删除bucket"""
+        self.client.remove_bucket(self.bucket)
 
     async def write(
         self,
@@ -167,5 +182,14 @@ class MinioStorage(AbstractStorage):
     ) -> np.array:
         filename = self.get_filename(prefix, dt, frame_type)
         response = self.client.get_object(self.bucket, filename)
-        # print(response.read())
         return response.read()
+
+    async def delete(
+        self,
+        prefix: AnyStr,
+        dt: Union[datetime, date, AnyStr],
+        frame_type: Union[FrameType, AnyStr],
+    ):
+        filename = self.get_filename(prefix, dt, frame_type)
+        self.client.remove_object(self.bucket, filename)
+        return True

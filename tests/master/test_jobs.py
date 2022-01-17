@@ -51,23 +51,24 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         elapsed = await syncjobs._stop_job_timer("unittest")
         self.assertTrue(5 <= elapsed <= 7)
 
-    # @mock.patch("omega.master.jobs.mail_notify")
-    # @mock.patch("omega.master.jobs.cal.save_calendar")
-    # # @mock.patch("omicron.dal.cache.save_calendar")
-    # @mock.patch("jqadaptor.fetcher.Fetcher.get_all_trade_days")
-    # async def test_sync_calendar(self, get_all_trade_days, *args):
-    #     # all_trade_days.npy
-    #     async def get_all_trade_days_mock():
-    #         return np.load(f"{test_dir()}/data/all_trade_days.npy", allow_pickle=True)
-    #
-    #     get_all_trade_days.side_effect = get_all_trade_days_mock
-    #     await syncjobs.sync_calendar()
+    @mock.patch("omega.master.jobs.mail_notify")
+    @mock.patch("omega.master.jobs.cal.save_calendar")
+    # @mock.patch("omicron.dal.cache.save_calendar")
+    @mock.patch("jqadaptor.fetcher.Fetcher.get_all_trade_days")
+    async def test_sync_calendar(self, get_all_trade_days, *args):
+        # all_trade_days.npy
+        async def get_all_trade_days_mock():
+            print("=====")
+            return np.load(f"{test_dir()}/data/all_trade_days.npy", allow_pickle=True)
+
+        get_all_trade_days.side_effect = get_all_trade_days_mock
+        await syncjobs.sync_calendar()
 
     @mock.patch("omega.master.jobs.mail_notify")
     async def test_sync_security_list(self, *args):
         await cache.security.delete("securities")
         await syncjobs.sync_security_list()
-        secs = Stock.choose()
+        secs = Stock.choose(["stock"])
         self.assertTrue(len(secs) > 0)
 
     @mock.patch("omega.master.jobs.get_timeout", return_value=5)

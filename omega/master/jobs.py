@@ -326,8 +326,8 @@ async def sync_security_list():
 
     注意证券列表在AbstractQuotesServer取得时就已保存，此处只是触发
     """
-    secs = await aq.get_security_list()
-    logger.info("%s secs are fetched and saved.", len(secs))
+    await aq.get_security_list()
+    logger.info("secs are fetched and saved.")
 
 
 async def delete_daily_calibration_queue(stock_min, index_min, stock_day, index_day):
