@@ -71,7 +71,7 @@ jobs:
           MINIO_ACCESS_KEY: root123
           MINIO_SECRET_KEY: adminadmin
         volumes:
-          - ${{ github.workspace }}/data:/data
+          - /tmp/data:/data
         options: >-
             --name=minio
             --health-cmd "curl http://localhost:9000/minio/health/live"
