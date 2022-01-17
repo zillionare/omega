@@ -34,7 +34,6 @@ from termcolor import colored
 import omega
 from omega.config import get_config_dir
 from omega.master import jobs as syncjobs
-from omega.worker import archive
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher
 
 logger = logging.getLogger(__name__)
@@ -685,6 +684,7 @@ async def _show_get_quota():
     spare = await AbstractQuotesFetcher.get_quota()
     print(f"fetcher当日剩余可调用条数: {spare}")
 
+
 async def status():
     show_fetcher_processes()
     print("\n")
@@ -733,34 +733,6 @@ async def http_get(url, content_type: str = "json"):
         logger.exception(e)
 
     return None
-
-
-async def get_archive_index():
-    url = cfg.omega.urls.archive + f"/index.yml?{random.random()}"
-    content = await http_get(url, "text")
-    if content is None:
-        print("当前没有历史数据可供下载")
-        return
-
-    return archive.parse_index(content)
-
-
-def bin_cut(arr: list, n: int):
-    """将数组arr切分成n份
-
-    Args:
-        arr ([type]): [description]
-        n ([type]): [description]
-
-    Returns:
-        [type]: [description]
-    """
-    result = [[] for i in range(n)]
-
-    for i, e in enumerate(arr):
-        result[i % n].append(e)
-
-    return [e for e in result if len(e)]
 
 
 async def show_subprocess_output(stream):
