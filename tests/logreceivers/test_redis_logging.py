@@ -12,7 +12,7 @@ from tests import init_test_env
 
 class TestRedisLogging(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
-        self.cfg = init_test_env()
+        self.cfg = await init_test_env()
 
     async def test_redis_logging(self):
         # remove handlers set by config file, if there is.

@@ -14,7 +14,6 @@ from typing import List
 
 import cfg4py
 import numpy as np
-from dfs import Storage
 from omicron import cache
 from omicron.core.types import FrameType, SecurityType
 from omicron.extensions.np import numpy_append_fields
@@ -30,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 async def worker_exit(state, scope, error=None):
-    if error is None:
+    if error is None:  # pragma: no cover
         error = traceback.format_exc()
     # 删除is_running 并写上错误堆栈信息
     p = cache.sys.pipeline()
@@ -44,7 +43,7 @@ async def push_fail_secs(secs, fail):
     await cache.sys.lpush(fail, str(secs))
 
 
-def decorator():
+def abnormal_work_report():
     def inner(f):
         @wraps(f)
         async def decorated_function(params):
@@ -58,7 +57,7 @@ def decorator():
                 return ret
             except exception.WorkerException as e:
                 await worker_exit(state, scope, e.msg)
-            except Exception as e:
+            except Exception as e:  # pragma: no cover
                 # 说明消费者消费时错误了
                 logger.exception(e)
                 await worker_exit(state, scope)
@@ -180,7 +179,7 @@ async def get_secs(limit: int, n_bars: int, scope: str):
         yield secs
 
 
-@decorator()
+@abnormal_work_report()
 async def sync_high_low_limit(params):
     """同步涨跌停worker"""
     scope, state, end, n_bars, fail = await parse_params(params)
@@ -224,14 +223,14 @@ async def __sync_min_bars(params):
         bars = await fetch_min_bars(secs, end, n_bars)
         if bars is None:
             await push_fail_secs(secs, fail)
-            return 1
+            raise exception.GotNoneData()
         await Stock.batch_cache_bars(FrameType.MIN1, bars)
         total += len(secs)
         tasks.extend(secs)
     return total, tasks
 
 
-@decorator()
+@abnormal_work_report()
 async def sync_minute_bars(params):
     """
     盘中同步分钟
@@ -257,7 +256,7 @@ async def parse_params(params):
     )
 
 
-@decorator()
+@abnormal_work_report()
 async def sync_day_bars(params):
     """这是下午三点收盘后的同步，仅写cache，同步分钟线和日线"""
     scope, state, end, n_bars, fail = await parse_params(params)
@@ -269,7 +268,9 @@ async def sync_day_bars(params):
         temp = tasks[i : i + limit]
         bars = await fetch_day_bars(temp, end)
         if bars is None:
-            return 1
+            await push_fail_secs(temp, fail)
+            raise exception.GotNoneData()
+
         await Stock.batch_cache_bars(FrameType.DAY, bars)
         total += len(temp)
 
@@ -351,7 +352,7 @@ async def __sync_daily_calibration(
     return total // 2
 
 
-@decorator()
+@abnormal_work_report()
 async def sync_daily_calibration(params):
     """凌晨2点的数据校准，
     同步分钟线 持久化
@@ -392,7 +393,7 @@ async def __sync_year_quarter_month_week(params, queue, data):
     return total
 
 
-@decorator()
+@abnormal_work_report()
 async def sync_year_quarter_month_week(params):
     scope, state, end, n_bars, fail = await parse_params(params)
     stock_queue = params.get("stock_queue")

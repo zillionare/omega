@@ -8,21 +8,29 @@ import aioredis
 import arrow
 import cfg4py
 from omega import cli
-import omega
 from omega.config import get_config_dir
 from pyemit import emit
 from ruamel.yaml import YAML
 from tests import init_test_env, start_archive_server, start_omega
+from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 
 
 class TestCLI(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
-        self.cfg = init_test_env()
+        self.cfg = await init_test_env()
 
         # disable catch up sync, since test_cli, jobs will be launched many times and cache might by empty
         redis = await aioredis.create_redis(self.cfg.redis.dsn)
         last_sync = arrow.now(self.cfg.tz).format("YYYY-MM-DD HH:mm:SS")
         await redis.set("jobs.bars_sync.stop", last_sync)
+        await self.create_quotes_fetcher()
+
+    async def create_quotes_fetcher(self):
+        cfg = cfg4py.get_instance()
+        fetcher_info = cfg.quotes_fetchers[0]
+        impl = fetcher_info["impl"]
+        params = fetcher_info["workers"][0]
+        await aq.create_instance(impl, **params)
 
     async def asyncTearDown(self) -> None:
         await emit.stop()
@@ -275,28 +283,3 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
                     # setup has started servers
                     print("stopping omega servers")
                     await cli.stop()
-
-    async def test_download_archive(self):
-        try:
-            self.archive_server = await start_archive_server()
-            self.omega = await start_omega()
-            with mock.patch("builtins.input", return_value="1"):
-                await cli.download_archive()
-        finally:
-            if self.archive_server:
-                self.archive_server.kill()
-            if self.omega:
-                self.omega.kill()
-
-    async def test_bin_cut(self):
-        arr = [1, 2, 3, 4, 5]
-
-        expected = [
-            [[1, 2, 3, 4, 5]],
-            [[1, 3, 5], [2, 4]],
-            [[1, 4], [2, 5], [3]],
-            [[1], [2], [3], [4], [5]],
-            [[1], [2], [3], [4], [5]],
-        ]
-        for i, bins in enumerate([1, 2, 3, 5, 10]):
-            self.assertListEqual(expected[i], cli.bin_cut(arr, bins))

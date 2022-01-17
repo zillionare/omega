@@ -5711,7 +5711,8 @@ async def init_test_env():
     formatter = logging.Formatter(fmt=fmt)
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-
+    cfg.omega.sync.bars.exclude = "000002.XSHE"
+    # cfg.omega.sync.bars.include = "000001.XSHE"
     redis = await aioredis.create_redis(cfg.redis.dsn, db=1)
 
     try:
@@ -5726,16 +5727,17 @@ async def init_test_env():
 
 
 async def is_local_omega_alive():
-    try:
-        url = f"{cfg.omega.urls.quotes_server}/sys/version"
-        async with aiohttp.ClientSession() as client:
-            async with client.get(url) as resp:
-                if resp.status == 200:
-                    return True
-    except Exception:
-        pass
-
-    return False
+    # try:
+    #     url = f"{cfg.omega.urls.quotes_server}/sys/version"
+    #     async with aiohttp.ClientSession() as client:
+    #         async with client.get(url) as resp:
+    #             if resp.status == 200:
+    #                 return True
+    # except Exception:
+    #     pass
+    #
+    # return False
+    return True
 
 
 async def start_omega(timeout=60):
@@ -5752,7 +5754,7 @@ async def start_omega(timeout=60):
         [
             sys.executable,
             "-m",
-            "omega.app",
+            "omega.worker",
             "start",
             "--impl=jqadaptor",
             f"-cfg={cfg_}",
@@ -5851,3 +5853,8 @@ def find_free_port():
         # s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         port = s.getsockname()[1]
         return port
+
+
+def test_dir():
+    home = os.path.dirname(__file__)
+    return home

@@ -2,13 +2,14 @@ import datetime
 import logging
 import os
 import unittest
+from unittest import mock
+from unittest.mock import AsyncMock, MagicMock
 
 import arrow
 import cfg4py
 import numpy as np
 import omicron
 from omicron import cache
-from omicron.models.calendar import Calendar as cal
 from omicron.core.types import FrameType
 
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
@@ -24,7 +25,7 @@ class TestAbstractQuotesFetcher(unittest.IsolatedAsyncioTestCase):
         await init_test_env()
 
         await self.create_quotes_fetcher()
-        await omicron.init(aq)
+        await omicron.init()
 
     async def asyncTearDown(self) -> None:
         await omicron.close()
@@ -46,182 +47,6 @@ class TestAbstractQuotesFetcher(unittest.IsolatedAsyncioTestCase):
         secs = await aq.get_security_list()
         self.assertEqual("000001.XSHE", secs[0][0])
 
-    async def test_get_bars_010(self):
-        """日线级别, 无停牌"""
-        sec = "000001.XSHE"
-        frame_type = FrameType.DAY
-        # 2020-4-3 Friday
-        end = arrow.get("2020-04-03").date()
-
-        # without cache
-        await self.clear_cache(sec, frame_type)
-        bars = await aq.get_bars(sec, end, 10, frame_type)
-
-        self.assertEqual(bars[0]["frame"], arrow.get("2020-03-23").date())
-        self.assertEqual(bars[-1]["frame"], arrow.get("2020-04-03").date())
-        self.assertAlmostEqual(12.0, bars[0]["open"], places=2)
-        self.assertAlmostEqual(12.82, bars[-1]["open"], places=2)
-
-        # 检查cache
-        cache_len = await cache.security.hlen(f"{sec}:{frame_type.value}")
-        self.assertEqual(12, cache_len)
-
-        # 日线级别，停牌期间，数据应该置为np.nan
-        sec = "000029.XSHE"
-        end = arrow.get("2020-8-18").date()
-        frame_type = FrameType.DAY
-        bars = await aq.get_bars(sec, end, 10, frame_type)
-        self.assertEqual(10, len(bars))
-        self.assertEqual(end, bars[-1]["frame"])
-        self.assertEqual(arrow.get("2020-08-05").date(), bars[0]["frame"])
-        self.assertTrue(np.all(np.isnan(bars["close"])))
-
-    async def test_get_bars_011(self):
-        """分钟级别，中间有停牌，end指定时间未对齐的情况"""
-        # 600721, ST百花， 2020-4-29停牌一天
-        sec = "600721.XSHG"
-        frame_type = FrameType.MIN60
-        end = arrow.get("2020-04-30 10:32", tzinfo="Asia/Shanghai").datetime
-
-        await self.clear_cache(sec, frame_type)
-        bars = await aq.get_bars(sec, end, 7, frame_type)
-        print(bars)
-
-        self.assertEqual(7, len(bars))
-        self.assertEqual(
-            arrow.get("2020-04-28 15:00", tzinfo="Asia/Shanghai"), bars["frame"][0]
-        )
-        self.assertEqual(
-            arrow.get("2020-04-30 10:30", tzinfo="Asia/Shanghai"), bars["frame"][-2]
-        )
-        self.assertEqual(
-            arrow.get("2020-4-30 10:32", tzinfo="Asia/Shanghai"), bars["frame"][-1]
-        )
-
-        self.assertAlmostEqual(5.37, bars["open"][0], places=2)
-        self.assertAlmostEqual(5.26, bars["open"][-2], places=2)
-        self.assertAlmostEqual(5.33, bars["open"][-1], places=2)
-
-        # 检查cache,10：32未存入cache
-        cache_len = await cache.security.hlen(f"{sec}:{frame_type.value}")
-        self.assertEqual(8, cache_len)
-        bars_2 = await cache.get_bars(sec, cal.floor(end, frame_type), 6, frame_type)
-        np.array_equal(bars[:-1], bars_2)
-
-    async def test_get_bars_012(self):
-        """分钟级别，中间有一天停牌，end指定时间正在交易"""
-        # 600721, ST百花， 2020-4-29停牌一天
-        sec = "600721.XSHG"
-        frame_type = FrameType.MIN60
-        end = arrow.get("2020-04-30 10:30", tzinfo=cfg.tz).datetime
-
-        bars = await aq.get_bars(sec, end, 6, frame_type)
-        print(bars)
-        self.assertEqual(6, len(bars))
-        self.assertEqual(
-            arrow.get("2020-04-28 15:00", tzinfo="Asia/Shanghai"), bars["frame"][0]
-        )
-        self.assertEqual(
-            arrow.get("2020-04-30 10:30", tzinfo="Asia/Shanghai"), bars["frame"][-1]
-        )
-        self.assertAlmostEqual(5.37, bars["open"][0], places=2)
-        self.assertAlmostEqual(5.26, bars["open"][-1], places=2)
-        self.assertTrue(np.isnan(bars["open"][1]))
-
-        # 结束时间帧未结束
-        end = arrow.get("2020-04-30 10:32:00.13", tzinfo=cfg.tz).datetime
-        frame_type = FrameType.MIN30
-        bars = await aq.get_bars(sec, end, 6, frame_type)
-        print(bars)
-        self.assertAlmostEqual(5.33, bars[-1]["close"], places=2)
-        self.assertEqual(end.replace(second=0, microsecond=0), bars[-1]["frame"])
-
-    async def test_get_bars_013(self):
-        """分钟级别，end指定时间正处在停牌中"""
-        # 600721, ST百花， 2020-4-29停牌一天
-        sec = "600721.XSHG"
-        frame_type = FrameType.MIN60
-        end = arrow.get("2020-04-29 10:30", tzinfo="Asia/Chongqing").datetime
-
-        await self.clear_cache(sec, frame_type)
-
-        bars = await aq.get_bars(sec, end, 6, frame_type)
-        print(bars)
-        self.assertEqual(6, len(bars))
-        self.assertEqual(
-            arrow.get("2020-04-27 15:00", tzinfo="Asia/Shanghai"), bars["frame"][0]
-        )
-        self.assertEqual(
-            arrow.get("2020-04-29 10:30", tzinfo="Asia/Shanghai"), bars["frame"][-1]
-        )
-        self.assertAlmostEqual(5.47, bars["open"][0], places=2)
-        self.assertAlmostEqual(5.37, bars["open"][-2], places=2)
-        self.assertTrue(np.isnan(bars["open"][-1]))
-
-        # 检查cache,10：30 已存入cache
-        cache_len = await cache.security.hlen(f"{sec}:{frame_type.value}")
-        self.assertEqual(8, cache_len)
-        bars_2 = await cache.get_bars(sec, cal.floor(end, frame_type), 6, frame_type)
-        np.array_equal(bars, bars_2)
-
-    async def test_get_bars_014(self):
-        """测试周线级别未结束的frame能否对齐"""
-        # 4/29停牌，4/30复牌, 4/30周线结束
-        sec = "600721.XSHG"
-        frame_type = FrameType.WEEK
-
-        end = arrow.get("2020-4-29 15:00").datetime  # 周三，该周周四结束
-        bars = await aq.get_bars(sec, end, 3, FrameType.WEEK)
-        print(bars)
-        """
-        [(datetime.date(2020, 4, 17), 6.02, 6.69, 5.84, 6.58, 22407., 1.407e+08, 1.455)
-         (datetime.date(2020, 4, 24), 6.51, 6.57, 5.68, 5.72, 25911., 1.92e+08, 1.455)
-         (datetime.date(2020, 4, 28), 5.7, 5.71, 5.17, 5.36, 11879667,6.39341393e+07, 1.455)]
-        """
-        self.assertEqual(datetime.date(2020, 4, 17), bars[0]["frame"])
-        self.assertEqual(datetime.date(2020, 4, 24), bars[1]["frame"])
-        self.assertEqual(datetime.date(2020, 4, 28), bars[-1]["frame"])
-
-        self.assertAlmostEqual(6.58, bars[0]["close"], places=2)
-        self.assertAlmostEqual(5.72, bars[1]["close"], places=2)
-        self.assertAlmostEqual(5.36, bars[-1]["close"], places=2)
-
-        end = arrow.get("2020-04-30 15:00").datetime
-        bars = await aq.get_bars(sec, end, 3, frame_type)
-        print(bars)
-        """
-        [(datetime.date(2020, 4, 17), 6.02, 6.69, 5.84, 6.58, 2241., 1.4e+08, 1.455)
-         (datetime.date(2020, 4, 24), 6.51, 6.57, 5.68, 5.72, 2511., 1.55e+08, 1.455)
-         (datetime.date(2020, 4, 30), 5.7, 5.71, 5.17, 5.39, 15645495, 84086903, 1.455)]
-        """
-
-        self.assertEqual(datetime.date(2020, 4, 17), bars[0]["frame"])
-        self.assertEqual(datetime.date(2020, 4, 24), bars[1]["frame"])
-        self.assertEqual(datetime.date(2020, 4, 30), bars[-1]["frame"])
-
-        self.assertAlmostEqual(6.58, bars[0]["close"], places=2)
-        self.assertAlmostEqual(5.72, bars[1]["close"], places=2)
-        self.assertAlmostEqual(5.39, bars[-1]["close"], places=2)
-
-    async def test_get_bars_015(self):
-        """test when include_unclosed is False"""
-        sec = "000001.XSHG"
-        frame_type = FrameType.WEEK
-        end = datetime.date(2021, 2, 9)
-
-        # without cache
-        await self.clear_cache(sec, frame_type)
-        bars = await aq.get_bars(sec, end, 1, frame_type)
-        self.assertEqual(datetime.date(2021, 2, 5), bars["frame"][0])
-
-    async def test_get_bars_016(self):
-        """test when bars is empty"""
-        sec = "605060.XSHG"
-        frame_type = FrameType.MONTH
-        end = datetime.date(2021, 2, 1)
-        bars = await aq.get_bars(sec, end, 1, frame_type)
-        self.assertIsNone(bars)
-
     async def test_get_bars_batch(self):
         secs = ["000001.XSHE", "000001.XSHG"]
         end_dt = arrow.get("2020-11-01").date()
@@ -236,61 +61,315 @@ class TestAbstractQuotesFetcher(unittest.IsolatedAsyncioTestCase):
         days = await aq.get_all_trade_days()
         self.assertIn(datetime.date(2020, 12, 31), days)
 
-    async def test_foo(self):
-        start = arrow.get("2020-11-02 15:00:00", tzinfo=cfg.tz).datetime
-        stop = arrow.get("2020-11-06 14:30:00", tzinfo=cfg.tz).datetime
-        frame_type = FrameType.MIN30
-        code = "000001.XSHE"
-
-        n = cal.count_frames(start, stop, frame_type)
-        bars = await aq.get_bars(code, stop, n, frame_type)
-        print(bars)
-
     async def test_get_fund_list(self):
-        code = ["512690"]
-        vals = await aq.get_fund_list(code=code)
-        self.assertEqual(len(code), len(vals))
+        dtype = [
+            ("code", "O"),
+            ("name", "O"),
+            ("advisor", "O"),
+            ("trustee", "O"),
+            ("operate_mode_id", "<i8"),
+            ("operate_mode", "O"),
+            ("start_date", "O"),
+            ("end_date", "O"),
+            ("underlying_asset_type_id", "<i8"),
+            ("underlying_asset_type", "O"),
+        ]
+        fetcher = aq.get_instance()
+        funds = np.array(
+            [
+                (
+                    "512690",
+                    "酒ETF",
+                    "鹏华基金管理有限公司",
+                    "中国建设银行股份有限公司",
+                    401005,
+                    "ETF",
+                    datetime.date(2019, 4, 4),
+                    datetime.date(2099, 1, 1),
+                    402001,
+                    "股票型",
+                )
+            ],
+            dtype=dtype,
+        )
 
-        vals = await aq.get_fund_list()
-        self.assertTrue(len(vals))
+        def side_effect(code):
+            if not code or "512690" in code:
+                return funds
+            return np.array([], dtype=dtype)
 
-        vals = await aq.get_fund_list(code=code, fields="code")
-        self.assertEqual(len(code), len(vals))
-        self.assertSequenceEqual(vals.dtype.names, ["code"])
+        with mock.patch.object(fetcher, "get_fund_list", side_effect=side_effect):
+            code = ["512690"]
+            vals = await aq.get_fund_list(code=code)
+            self.assertEqual(len(code), len(vals))
 
-        code = ["233333"]
-        vals = await aq.get_fund_list(code=code)
-        self.assertFalse(len(vals))
+        with mock.patch.object(fetcher, "get_fund_list", side_effect=side_effect):
+            vals = await aq.get_fund_list()
+            self.assertTrue(len(vals))
+
+        with mock.patch.object(fetcher, "get_fund_list", side_effect=side_effect):
+            vals = await aq.get_fund_list(code=code, fields="code")
+            self.assertEqual(len(code), len(vals))
+            self.assertSequenceEqual(vals.dtype.names, ["code"])
+
+        with mock.patch.object(fetcher, "get_fund_list", side_effect=side_effect):
+            code = ["233333"]
+            vals = await aq.get_fund_list(code=code)
+            self.assertFalse(len(vals))
 
     async def test_get_fund_net_value(self):
-        code = ["512690"]
-        vals = await aq.get_fund_list(code=code)
-        self.assertEqual(len(code), len(vals))
-        vals = await aq.get_fund_list(code=code, fields="code")
-        self.assertEqual(len(code), len(vals))
-        self.assertSequenceEqual(vals.dtype.names, ["code"])
-        vals = await aq.get_fund_net_value(day=arrow.get("2021-01-09").date())
-        self.assertTrue(len(vals))
+        code = ["501206"]
+        fund_net_values = np.array(
+            [("501206", 1.0, 1.0, 1.0, 1.0, 1.0, datetime.date(2021, 1, 9))],
+            dtype=[
+                ("code", "O"),
+                ("net_value", "<f8"),
+                ("sum_value", "<f8"),
+                ("factor", "<f8"),
+                ("acc_factor", "<f8"),
+                ("refactor_net_value", "<f8"),
+                ("day", "O"),
+            ],
+        )
+        fetcher = aq.get_instance()
+        with mock.patch.object(
+            fetcher, "get_fund_net_value", return_value=fund_net_values
+        ):
+            vals = await aq.get_fund_net_value(code=code)
+            self.assertEqual(len(code), len(vals))
+
+            vals = await aq.get_fund_net_value(code=code, fields="code")
+            self.assertEqual(len(code), len(vals))
+            self.assertSequenceEqual(vals.dtype.names, ["code"])
+
+            vals = await aq.get_fund_net_value(
+                code=code, day=arrow.get("2021-01-09").date()
+            )
+            self.assertTrue(len(vals))
 
     async def test_get_fund_share_daily(self):
+        fetcher = aq.get_instance()
         code = ["512690"]
         day = arrow.get("2021-10-26").date()
-        vals = await aq.get_fund_share_daily(code, day=day)
-        self.assertTrue(len(vals))
-        vals = await aq.get_fund_share_daily(code, day=day, fields="code")
-        self.assertTrue(len(vals))
-        self.assertSequenceEqual(vals.dtype.names, ["code"])
+        fund_share_dailies = np.array(
+            [
+                (
+                    "512690",
+                    7.86449196e09,
+                    datetime.date(2021, 10, 26),
+                    "鹏华中证酒交易型开放式指数证券投资基金",
+                )
+            ],
+            dtype=[("code", "O"), ("total_tna", "<f8"), ("date", "O"), ("name", "O")],
+        )
+
+        def side_effect(code=None, day=None):
+            return fund_share_dailies
+
+        with mock.patch.object(
+            fetcher, "get_fund_share_daily", side_effect=side_effect
+        ):
+            vals = await aq.get_fund_share_daily(code, day=day)
+            self.assertTrue(len(vals))
+
+        with mock.patch.object(
+            fetcher, "get_fund_share_daily", side_effect=side_effect
+        ):
+            vals = await aq.get_fund_share_daily(code, day=day, fields="code")
+            self.assertTrue(len(vals))
+            self.assertSequenceEqual(vals.dtype.names, ["code"])
 
     async def test_get_fund_portfolio_stock(self):
-        vals = await aq.get_fund_portfolio_stock(pub_date="2021-12-21")
-        self.assertEqual(len(vals), 0)
+        def side_effect(code=None, pub_date=None):
+            dtype = [
+                ("code", "O"),
+                ("period_start", "O"),
+                ("period_end", "O"),
+                ("pub_date", "O"),
+                ("report_type_id", "<i8"),
+                ("report_type", "O"),
+                ("rank", "<i8"),
+                ("symbol", "O"),
+                ("name", "O"),
+                ("shares", "<f8"),
+                ("market_cap", "<f8"),
+                ("proportion", "<f8"),
+                ("deadline", "O"),
+            ]
+            stocks = np.array(
+                [
+                    (
+                        "150016",
+                        datetime.date(2020, 10, 1),
+                        datetime.date(2020, 12, 31),
+                        datetime.date(2021, 1, 22),
+                        403004,
+                        "第四季度",
+                        2,
+                        "600690",
+                        "海尔智家",
+                        45141315.0,
+                        1.31857781e09,
+                        6.4,
+                        datetime.date(2020, 12, 31),
+                    ),
+                    (
+                        "150016",
+                        datetime.date(2020, 10, 1),
+                        datetime.date(2020, 12, 31),
+                        datetime.date(2021, 1, 22),
+                        403004,
+                        "第四季度",
+                        3,
+                        "600031",
+                        "三一重工",
+                        32392600.0,
+                        1.13160735e09,
+                        5.49,
+                        datetime.date(2020, 12, 31),
+                    ),
+                    (
+                        "150016",
+                        datetime.date(2020, 10, 1),
+                        datetime.date(2020, 12, 31),
+                        datetime.date(2021, 1, 22),
+                        403004,
+                        "第四季度",
+                        1,
+                        "601318",
+                        "中国平安",
+                        15876949.0,
+                        1.38097702e09,
+                        6.7,
+                        datetime.date(2020, 12, 31),
+                    ),
+                    (
+                        "150016",
+                        datetime.date(2020, 10, 1),
+                        datetime.date(2020, 12, 31),
+                        datetime.date(2021, 1, 22),
+                        403004,
+                        "第四季度",
+                        8,
+                        "000895",
+                        "双汇发展",
+                        13913806.0,
+                        6.43992558e08,
+                        3.13,
+                        datetime.date(2020, 12, 31),
+                    ),
+                    (
+                        "150016",
+                        datetime.date(2020, 10, 1),
+                        datetime.date(2020, 12, 31),
+                        datetime.date(2021, 1, 22),
+                        403004,
+                        "第四季度",
+                        7,
+                        "300413",
+                        "芒果超媒",
+                        9394546.0,
+                        6.81104585e08,
+                        3.31,
+                        datetime.date(2020, 12, 31),
+                    ),
+                    (
+                        "150016",
+                        datetime.date(2020, 10, 1),
+                        datetime.date(2020, 12, 31),
+                        datetime.date(2021, 1, 22),
+                        403004,
+                        "第四季度",
+                        4,
+                        "000333",
+                        "美的集团",
+                        8171559.0,
+                        8.04408268e08,
+                        3.91,
+                        datetime.date(2020, 12, 31),
+                    ),
+                    (
+                        "150016",
+                        datetime.date(2020, 10, 1),
+                        datetime.date(2020, 12, 31),
+                        datetime.date(2021, 1, 22),
+                        403004,
+                        "第四季度",
+                        5,
+                        "600309",
+                        "万华化学",
+                        7948547.0,
+                        7.23635719e08,
+                        3.51,
+                        datetime.date(2020, 12, 31),
+                    ),
+                    (
+                        "150016",
+                        datetime.date(2020, 10, 1),
+                        datetime.date(2020, 12, 31),
+                        datetime.date(2021, 1, 22),
+                        403004,
+                        "第四季度",
+                        9,
+                        "688099",
+                        "晶晨股份",
+                        7575165.0,
+                        5.88796540e08,
+                        2.86,
+                        datetime.date(2020, 12, 31),
+                    ),
+                    (
+                        "150016",
+                        datetime.date(2020, 10, 1),
+                        datetime.date(2020, 12, 31),
+                        datetime.date(2021, 1, 22),
+                        403004,
+                        "第四季度",
+                        10,
+                        "601012",
+                        "隆基股份",
+                        6707249.0,
+                        5.83584958e08,
+                        2.83,
+                        datetime.date(2020, 12, 31),
+                    ),
+                    (
+                        "150016",
+                        datetime.date(2020, 10, 1),
+                        datetime.date(2020, 12, 31),
+                        datetime.date(2021, 1, 22),
+                        403004,
+                        "第四季度",
+                        6,
+                        "002594",
+                        "比亚迪",
+                        3581370.0,
+                        6.95860191e08,
+                        3.38,
+                        datetime.date(2020, 12, 31),
+                    ),
+                ],
+                dtype=dtype,
+            )
+            if pub_date == "2021-01-22" or code == ["150016"]:
+                return stocks
+            return np.array([], dtype=dtype)
 
-        vals = await aq.get_fund_portfolio_stock(pub_date="2021-01-22")
-        self.assertTrue(len(vals))
+        fetcher = aq.get_instance()
+        with mock.patch.object(
+            fetcher, "get_fund_portfolio_stock", side_effect=side_effect
+        ):
+            vals = await aq.get_fund_portfolio_stock(pub_date="2021-12-21")
+            self.assertEqual(len(vals), 0)
 
-        vals = await aq.get_fund_portfolio_stock(code=["150016"])
-        self.assertTrue(len(vals))
+            vals = await aq.get_fund_portfolio_stock(
+                code=["150016"], pub_date="2021-01-22"
+            )
+            self.assertTrue(len(vals))
 
-        vals = await aq.get_fund_portfolio_stock(code=["150016"], fields="code")
-        self.assertTrue(len(vals))
-        self.assertSequenceEqual(vals.dtype.names, ["code"])
+            vals = await aq.get_fund_portfolio_stock(code=["150016"])
+            self.assertTrue(len(vals))
+
+            vals = await aq.get_fund_portfolio_stock(code=["150016"], fields="code")
+            self.assertTrue(len(vals))
+            self.assertSequenceEqual(vals.dtype.names, ["code"])

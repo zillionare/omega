@@ -22,7 +22,18 @@ logger = logging.getLogger(__name__)
 
 # 用来和DFS存储系统进行交互的封装
 class AbstractStorage(ABC):
-    """该类是用来和minio这种dfs存储系统进行交互的抽象类，如果需要对接不同的dfs，需要继承该类，并实现对应的方法"""
+    """该类是用来和minio这种dfs存储系统进行交互的抽象类，如果需要对接不同的dfs，需要继承该类，并实现对应的方法
+    在yaml中的配置如下
+    dfs:
+      engine: minio
+      minio:
+        host: ${MINIO_HOST}
+        port: ${MINIO_PORT}
+        access: ${MINIO_ACCESS}
+        secret: ${MINIO_SECRET}
+        secure: false
+        bucket: zillionare
+    """
 
     client = None
 
@@ -31,7 +42,7 @@ class AbstractStorage(ABC):
         prefix: str,
         dt: Union[datetime, date, AnyStr],
         frame_type: Union[FrameType, AnyStr],
-    ) -> AnyStr:
+    ) -> AnyStr:  # pragma: no cover
         """拼接文件名"""
         filename = []
         if isinstance(prefix, str) and prefix in ("stock", "index"):
@@ -61,7 +72,7 @@ class AbstractStorage(ABC):
         prefix,
         dt: Union[datetime, date, AnyStr],
         frame_type: Union[FrameType, AnyStr],
-    ):
+    ):  # pragma: no cover
         """
         将bar写入dfs中 按照 /日期/
         Args:
@@ -78,7 +89,7 @@ class AbstractStorage(ABC):
         prefix,
         dt: Union[datetime, date, AnyStr],
         frame_type: Union[FrameType, AnyStr],
-    ) -> np.array:
+    ) -> np.array:  # pragma: no cover
         """
         Args:
             prefix:  股票或基金的名称
@@ -89,9 +100,20 @@ class AbstractStorage(ABC):
 
         """
 
+    async def delete_bucket(self):  # pragma: no cover
+        """删除bucket"""
+
+    async def delete(
+        self,
+        prefix,
+        dt: Union[datetime, date, AnyStr],
+        frame_type: Union[FrameType, AnyStr],
+    ):
+        """删除一个文件"""
+
 
 class TempStorage:
-    async def write(self, *args, **kwargs):
+    async def write(self, *args, **kwargs):  # pragma: no cover
         pass
 
 
@@ -103,7 +125,7 @@ class Storage:
             return cls.__instance
 
         elif cfg.dfs.engine == "minio":
-            cls.__instance = MinioStorage()
+            cls.__instance = MinioStorage(*args, **kwargs)
         else:
             return None
         return cls.__instance
@@ -115,7 +137,6 @@ class Storage:
 
 class MinioStorage(AbstractStorage):
     def __init__(self, bucket=None):
-        print("MinioStorage __ init")
         """初始化minio连接，检查bucket 是否存在"""
         self.client = Minio(
             endpoint=f"{cfg.dfs.minio.host}:{cfg.dfs.minio.port}",
@@ -134,8 +155,12 @@ class MinioStorage(AbstractStorage):
         exists = self.client.bucket_exists(self.bucket)
         if not exists:
             self.client.make_bucket(self.bucket)
-        else:
+        else:  # pragma: no cover
             logger.info(f"bucket {self.bucket}已存在,跳过创建")
+
+    async def delete_bucket(self):
+        """删除bucket"""
+        self.client.remove_bucket(self.bucket)
 
     async def write(
         self,
@@ -157,5 +182,14 @@ class MinioStorage(AbstractStorage):
     ) -> np.array:
         filename = self.get_filename(prefix, dt, frame_type)
         response = self.client.get_object(self.bucket, filename)
-        # print(response.read())
         return response.read()
+
+    async def delete(
+        self,
+        prefix: AnyStr,
+        dt: Union[datetime, date, AnyStr],
+        frame_type: Union[FrameType, AnyStr],
+    ):
+        filename = self.get_filename(prefix, dt, frame_type)
+        self.client.remove_object(self.bucket, filename)
+        return True

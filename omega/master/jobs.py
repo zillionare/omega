@@ -14,8 +14,8 @@ import async_timeout
 import cfg4py
 import numpy as np
 from cfg4py.config import Config
-from omicron import cache
 from omicron.core.types import FrameType, SecurityType
+from omicron.dal import cache
 from omicron.models.calendar import Calendar as cal
 from omicron.models.stock import Stock
 from omicron.notify.mail import mail_notify
@@ -34,7 +34,7 @@ def get_now():
     return datetime.datetime.now()
 
 
-def get_timeout(timeout=60):
+def get_timeout(timeout=60):  # pragma: no cover
     return timeout
 
 
@@ -43,7 +43,7 @@ def get_first_day_frame():
     return cal.day_frames[0]
 
 
-def decorator():
+def abnormal_master_report():
     def inner(f):
         @wraps(f)
         async def decorated_function():
@@ -51,11 +51,12 @@ def decorator():
             try:
                 ret = await f()
                 return ret
-            except Exception as e:
+            except Exception as e:  # pragma: no cover
                 logger.exception(e)
                 # 发送邮件报告错误
                 subject = f"执行生产者{f.__name__}时发生异常"
                 body = f"详细信息：\n{traceback.format_exc()}"
+                traceback.print_exc()
                 await mail_notify(subject, body, html=True)
 
         return decorated_function
@@ -109,6 +110,7 @@ class Task:
 
     async def delete_state(self):
         await cache.sys.delete(self.state)
+        return True
 
     @property
     async def is_running(self):
@@ -128,17 +130,17 @@ class Task:
             exclude = map(lambda x: x, exclude.split(" "))
             codes = list(set(codes) - set(exclude))
         include = getattr(cfg.omega.sync.bars, "include", "")
-        if include:
+        if include:  # pragma: no cover
             include = list(filter(lambda x: x, cfg.omega.sync.bars.include.split(" ")))
             codes.extend(include)
-        return codes
+        return list(set(codes))
 
     async def generate_task(self):
         stock = await self.__generate_task(SecurityType.STOCK.value)
         index = await self.__generate_task(SecurityType.INDEX.value)
         self.__stock = stock
         self.__index = index
-        self.__task_list = list(stock + index)
+        self.__task_list = list(set(stock + index))
 
     async def tasks(self):
         if not self.__task_list:
@@ -187,9 +189,9 @@ class Task:
         else:
             p.delete(self.stock_queue)
             p.delete(self.index_queue)
-            if self.__stock:
+            if self.__stock:  # pragma: no cover
                 p.lpush(self.stock_queue, *self.__stock)
-            if self.__index:
+            if self.__index:  # pragma: no cover
                 p.lpush(self.index_queue, *self.__index)
             self.params.update(
                 {"stock_queue": self.stock_queue, "index_queue": self.index_queue}
@@ -235,23 +237,22 @@ class Task:
                         if worker_count is None:
                             # 说明消费者还没收到消息，等待
                             await asyncio.sleep(0.5)
-
+                            continue
                         if not is_running:
                             # 说明消费者异常退出了， 发送邮件
                             await self.send_email(error)
                             return False
                         # done_count = await cache.sys.hget(self.state, "done_count")
-                        # todo 检查消费者状态，如果没有is_running，并且任务完成数量不对，说明消费者移除退出了，错误信息在 error 这个key中
+                        # 检查消费者状态，如果没有is_running，并且任务完成数量不对，说明消费者移除退出了，错误信息在 error 这个key中
                         # 把error 和 fail 读出来之后 发送邮件，然后master退出，等待下一次执行
                         if done_count is None or int(done_count) != count:
                             await asyncio.sleep(0.5)
                         else:
                             print(f"{self.scope}耗时：{time.time() - s}")
-                            return
-            except asyncio.exceptions.TimeoutError:
-                # 从失败列表里把所有数据拉出来，
-                # msg = f"超时了，超时时间是：{self.timeout}"
+                            return True
+            except asyncio.exceptions.TimeoutError:  # pragma: no cover
                 await self.send_email()
+                return False
 
 
 async def _start_job_timer(job_name: str):
@@ -281,7 +282,7 @@ async def _stop_job_timer(job_name: str) -> int:
     return elapsed
 
 
-@decorator()
+@abnormal_master_report()
 async def sync_calendar():
     """从上游服务器获取所有交易日，并计算出周线帧和月线帧
 
@@ -292,41 +293,17 @@ async def sync_calendar():
         logger.warning("failed to fetch trade days.")
         return None
 
-    cal.day_frames = [cal.date2int(x) for x in trade_days]
-    weeks = []
-    last = trade_days[0]
-    for cur in trade_days:
-        if cur.weekday() < last.weekday() or (cur - last).days >= 7:
-            weeks.append(last)
-        last = cur
-
-    if weeks[-1] < last:
-        weeks.append(last)
-
-    cal.week_frames = [cal.date2int(x) for x in weeks]
-    await cache.save_calendar("week_frames", map(cal.date2int, weeks))
-
-    months = []
-    last = trade_days[0]
-    for cur in trade_days:
-        if cur.day < last.day:
-            months.append(last)
-        last = cur
-    months.append(last)
-
-    cal.month_frames = [cal.date2int(x) for x in months]
-    await cache.save_calendar("month_frames", map(cal.date2int, months))
-    logger.info("trade_days is updated to %s", trade_days[-1])
+    await cal.init()
 
 
-@decorator()
+@abnormal_master_report()
 async def sync_security_list():
     """更新证券列表
 
     注意证券列表在AbstractQuotesServer取得时就已保存，此处只是触发
     """
-    secs = await aq.get_security_list()
-    logger.info("%s secs are fetched and saved.", len(secs))
+    await aq.get_security_list()
+    logger.info("secs are fetched and saved.")
 
 
 async def delete_daily_calibration_queue(stock_min, index_min, stock_day, index_day):
@@ -349,17 +326,6 @@ async def delete_daily_calibration_queue(stock_min, index_min, stock_day, index_
     await p.execute()
 
 
-async def resample_bars(bars, frame_type: FrameType, dfs, prefix, dt):
-    """
-    重采样
-    分钟线-> 5 15 30 60
-    """
-
-    bars_min5 = Stock.resample(bars, FrameType.MIN1, frame_type)
-    bars_min5_binary = pickle.dumps(bars_min5, protocol=cfg.pickle.ver)
-    await dfs.write(bars_min5_binary, prefix, dt, frame_type)
-
-
 async def write_dfs(
     queue_name: str,
     frame_type: FrameType,
@@ -378,7 +344,7 @@ async def write_dfs(
 
     """
     dfs = Storage()
-    if dfs is None:
+    if dfs is None:  # pragma: no cover
         return
     p = cache.temp.pipeline()
     p.lrange(queue_name, 0, -1, encoding=None)
@@ -446,11 +412,11 @@ async def __daily_calibration_sync(
         index_queue=index_queue,
     )
 
-    await task.set_coefficient(240 * 2 + 4)
+    await task.set_coefficient((240 * 2 + 4) // 0.75)
 
     await delete_daily_calibration_queue(stock_min, index_min, stock_day, index_day)
     ret = await task.run()
-    if ret is not None:
+    if not ret:
         return ret
 
     # 读出来 写dfs
@@ -468,6 +434,7 @@ async def __daily_calibration_sync(
     return await daily_calibration_sync()
 
 
+@abnormal_master_report()
 async def daily_calibration_sync():
     """凌晨2点数据同步，调用sync_day_bars，添加参数写minio和重采样
     然后需要往前追赶同步，剩余quota > 1天的量就往前赶，并在redis记录已经有daily_calibration_sync在运行了
@@ -514,7 +481,7 @@ async def daily_calibration_sync():
     return await __daily_calibration_sync(tread_date, head=head, tail=tail)
 
 
-@decorator()
+@abnormal_master_report()
 async def sync_day_bars():
     """
     收盘之后同步今天的数据, 下午三点的同步
@@ -531,10 +498,10 @@ async def sync_day_bars():
     )
     await task.set_coefficient(240 * 2 + 4)
 
-    await task.run()
+    return await task.run()
 
 
-@decorator()
+@abnormal_master_report()
 async def sync_minute_bars():
     """盘中同步每分钟的数据
     1. 从redis拿到上一次同步的分钟数据
@@ -551,7 +518,7 @@ async def sync_minute_bars():
 
     if not cal.is_trade_day(end):
         print("非交易日，不同步")
-        return
+        return False
 
     queue_name = "minute"
     tail = await cache.sys.hget(constants.BAR_SYNC_STATE_MINUTE, "tail")
@@ -565,24 +532,20 @@ async def sync_minute_bars():
             tail = first
 
     n_bars = cal.count_frames(tail, end, FrameType.MIN1)  # 获取到一共有多少根k线
-    if n_bars < 1:
-        msg = "k线数量小于1 不同步"
-        logger.info(msg)
-        print(msg)
-        return
 
     params = {"start": tail, "end": end, "n_bars": n_bars}
     task = Task(Events.OMEGA_DO_SYNC_MIN, queue_name, params, timeout=get_timeout())
 
     flag = await task.run()
-    if flag is not None:
+    if flag:
         # 说明正常执行完的
         await cache.sys.hset(
             constants.BAR_SYNC_STATE_MINUTE, "tail", end.strftime("%Y-%m-%d %H:%M:00")
         )
+    return flag
 
 
-@decorator()
+@abnormal_master_report()
 async def sync_high_low_limit():
     """每天9点半之后同步一次今日涨跌停并写入redis"""
     timeout = get_timeout(60 * 10)
@@ -653,7 +616,7 @@ async def __sync_year_quarter_month_week(tail_key, frame_type):
         await task.set_coefficient(2)
         await delete_year_quarter_month_week_queue(stock_data, index_data)
         ret = await task.run()
-        if ret is not None:
+        if not ret:
             await delete_year_quarter_month_week_queue(stock_data, index_data)
             return False
         await write_dfs(stock_data, frame_type, "stock", tail)
@@ -664,7 +627,7 @@ async def __sync_year_quarter_month_week(tail_key, frame_type):
     return False
 
 
-@decorator()
+@abnormal_master_report()
 async def sync_year_quarter_month_week():
     """同步年月日周"""
     # 检查周线 tail
@@ -687,7 +650,7 @@ async def sync_year_quarter_month_week():
     await sync_year_quarter_month_week()
 
 
-@decorator()
+@abnormal_master_report()
 async def sync_funds():
     """更新基金列表"""
     secs = await aq.get_fund_list()
@@ -695,7 +658,7 @@ async def sync_funds():
     return secs
 
 
-@decorator()
+@abnormal_master_report()
 async def sync_fund_net_value(day: datetime.date = None, ndays: int = 8):
     """更新基金净值数据"""
     now = day or datetime.datetime.now().date()
@@ -705,7 +668,7 @@ async def sync_fund_net_value(day: datetime.date = None, ndays: int = 8):
         n += 1
 
 
-@decorator()
+@abnormal_master_report()
 async def sync_fund_share_daily(day: datetime.date = None, ndays: int = 8):
     """更新基金份额数据"""
     now = day or datetime.datetime.now().date()
@@ -715,7 +678,7 @@ async def sync_fund_share_daily(day: datetime.date = None, ndays: int = 8):
         n += 1
 
 
-@decorator()
+@abnormal_master_report()
 async def sync_fund_portfolio_stock(day: datetime.date = None, ndays: int = 8):
     """更新基金十大持仓股数据"""
     now = day or datetime.datetime.now().date()
@@ -732,7 +695,6 @@ async def load_cron_task(scheduler):
         "cron",
         hour=h,
         minute=m,
-        args=("calendar",),
         name="sync_calendar",
     )
     scheduler.add_job(
@@ -742,15 +704,7 @@ async def load_cron_task(scheduler):
         hour=h,
         minute=m,
     )
-    # 盘中的实时同步
-    scheduler.add_job(
-        sync_calendar,
-        "cron",
-        hour=h,
-        minute=m,
-        args=("calendar",),
-        name="sync_calendar",
-    )
+
     scheduler.add_job(
         sync_minute_bars,
         "cron",
@@ -811,24 +765,32 @@ async def load_cron_task(scheduler):
     scheduler.add_job(
         sync_fund_net_value,
         "cron",
-        hour=20,
-        minute="0",
+        hour=4,
+        minute=15,
         args=(),
         name="sync_fund_net_value",
     )
     scheduler.add_job(
+        sync_funds,
+        "cron",
+        hour=4,
+        minute=0,
+        args=(),
+        name="sync_funds",
+    )
+    scheduler.add_job(
         sync_fund_share_daily,
         "cron",
-        hour=20,
-        minute="0",
+        hour=4,
+        minute=5,
         args=(),
         name="sync_fund_share_daily",
     )
     scheduler.add_job(
         sync_fund_portfolio_stock,
         "cron",
-        hour=18,
-        minute="22",
+        hour=4,
+        minute=10,
         args=(),
         name="sync_fund_portfolio_stock",
     )

@@ -14,8 +14,8 @@ import numpy as np
 from numpy.lib import recfunctions as rfn
 from omicron.core.types import Frame, FrameType
 from omicron.models.calendar import Calendar as cal
+from omicron.models.funds import FundNetValue, FundPortfolioStock, Funds, FundShareDaily
 from omicron.models.stock import Stock
-from omicron.models.funds import FundPortfolioStock, Funds, FundShareDaily, FundNetValue
 from scipy import rand
 
 from omega.worker.quotes_fetcher import QuotesFetcher
@@ -27,7 +27,6 @@ cfg = cfg4py.get_instance()
 
 class AbstractQuotesFetcher(QuotesFetcher):
     _instances = []
-    quota = 4000
 
     @classmethod
     async def create_instance(cls, module_name, **kwargs):
@@ -68,6 +67,7 @@ class AbstractQuotesFetcher(QuotesFetcher):
             return securities
 
         await Stock.save_securities(securities)
+        return securities
 
     @classmethod
     async def get_bars_batch(
@@ -81,18 +81,6 @@ class AbstractQuotesFetcher(QuotesFetcher):
         return await cls.get_instance().get_bars_batch(
             secs, end, n_bars, frame_type.value, include_unclosed
         )
-
-    @classmethod
-    async def get_bars(
-        cls,
-        sec: str,
-        end: Frame,
-        n_bars: int,
-        frame_type: FrameType,
-        unclosed=True,
-    ) -> np.ndarray:
-        # todo: 接口也可能要改，以区分盘中实时同步分钟线和校准同步分钟线、日线情况
-        raise NotImplementedError
 
     @classmethod
     async def get_all_trade_days(cls):
@@ -113,11 +101,6 @@ class AbstractQuotesFetcher(QuotesFetcher):
         if len(bars) == 0:
             return None
         return bars
-
-    @classmethod
-    async def get_quota(cls):
-        quota = await cls.get_instance().get_query_count()
-        return quota.get("spare")
 
     @classmethod
     async def get_quota(cls):
