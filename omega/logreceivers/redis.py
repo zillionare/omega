@@ -25,11 +25,12 @@ class RedisLogReceiver:
         self._dir = os.path.dirname(filename)
         if not os.path.exists(self._dir):
             try:
-                os.makedirs(self._dir)
+                os.makedirs(self._dir, exist_ok=True)
             except Exception as e:
                 print(e)
                 print("创建日志目录失败，已将日志目录更改为：/tmp/omega.log")
                 filename = "/tmp/omega.log"
+                self._dir = "/tmp"
 
         self._filename = os.path.split(filename)[-1]
         self._fmt = (
