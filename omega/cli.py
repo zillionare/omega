@@ -422,7 +422,6 @@ async def setup(reset_factory=False, force=False):
     await config_postgres(settings)
     save_config(settings)
 
-    print_title("Step 6. 下载历史数据")
     config_dir = get_config_dir()
     cfg4py.init(config_dir, False)
     remove_console_log_handler()
