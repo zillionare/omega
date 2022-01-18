@@ -422,7 +422,6 @@ async def setup(reset_factory=False, force=False):
     await config_postgres(settings)
     save_config(settings)
 
-    print_title("Step 6. 下载历史数据")
     config_dir = get_config_dir()
     cfg4py.init(config_dir, False)
     remove_console_log_handler()
@@ -515,7 +514,7 @@ async def start(service: str = ""):
     if service == "":
         await _start_jobs()
         await _start_fetcher_processes()
-    elif service == "jobs":
+    elif service == "master":
         return await _start_jobs()
     elif service == "worker":
         return await _start_fetcher_processes()
@@ -696,7 +695,7 @@ async def stop(service: str = ""):
     if service == "":
         await _stop_jobs()
         await _stop_fetcher_processes()
-    elif service == "jobs":
+    elif service == "master":
         return await _stop_jobs()
     else:
         await _stop_fetcher_processes()
@@ -711,7 +710,7 @@ async def restart(service: str = ""):
         await _stop_fetcher_processes()
         await _start_jobs()
         await _start_fetcher_processes()
-    elif service == "jobs":
+    elif service == "master":
         return await _restart_jobs()
     else:
         await _stop_fetcher_processes()

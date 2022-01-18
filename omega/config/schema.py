@@ -43,7 +43,7 @@ class Config(object):
     class postgres:
         dsn: Optional[str] = None
 
-        enabled: Optional[str] = None
+        enabled: Optional[bool] = None
 
     class pickle:
         ver: Optional[int] = None
@@ -77,7 +77,7 @@ class Config(object):
         class minio:
             host: Optional[str] = None
 
-            port: Optional[int] = None
+            port: Optional[str] = None
 
             access: Optional[str] = None
 
