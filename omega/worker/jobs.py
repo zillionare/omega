@@ -15,9 +15,9 @@ from typing import List
 import cfg4py
 import numpy as np
 from omicron import cache
-from omicron.core.types import FrameType, SecurityType
 from omicron.extensions.np import numpy_append_fields
 from omicron.models.stock import Stock
+from zillionare_core_types.core.types import FrameType, SecurityType
 
 from omega.core.constants import HIGH_LOW_LIMIT
 from omega.worker import exception

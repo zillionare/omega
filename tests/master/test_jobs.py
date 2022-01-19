@@ -18,7 +18,7 @@ from omega.worker import jobs as workjobs
 from omega.worker.dfs import TempStorage
 from tests import init_test_env
 from omega.core.constants import HIGH_LOW_LIMIT
-from omicron.core.types import FrameType
+from zillionare_core_types.core.types import FrameType
 from omicron.models.stock import Stock
 from tests import test_dir
 
@@ -52,7 +52,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(5 <= elapsed <= 7)
 
     @mock.patch("omega.master.jobs.mail_notify")
-    @mock.patch("omega.master.jobs.cal.save_calendar")
+    @mock.patch("omega.master.jobs.TimeFrame.save_calendar")
     # @mock.patch("omicron.dal.cache.save_calendar")
     @mock.patch("jqadaptor.fetcher.Fetcher.get_all_trade_days")
     async def test_sync_calendar(self, get_all_trade_days, *args):
@@ -277,7 +277,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             "omega.master.jobs.get_first_day_frame", side_effect=day_frame_mock()
         ):
             with mock.patch(
-                "omicron.models.calendar.Calendar.count_frames",
+                "omicron.models.timeframe.TimeFrame.count_frames",
                 side_effect=count_frames(),
             ):
                 ret = await syncjobs.daily_calibration_sync()
@@ -297,7 +297,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             "omega.master.jobs.get_first_day_frame", side_effect=day_frame_mock()
         ):
             with mock.patch(
-                "omicron.models.calendar.Calendar.count_frames",
+                "omicron.models.timeframe.TimeFrame.count_frames",
                 side_effect=count_frames(),
             ):
                 ret = await syncjobs.daily_calibration_sync()
@@ -427,7 +427,8 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         mail_notify.side_effect = mail_notify_mock
 
         with mock.patch(
-            "omicron.models.calendar.Calendar.count_frames", side_effect=count_frames()
+            "omicron.models.timeframe.TimeFrame.count_frames",
+            side_effect=count_frames(),
         ):
             await syncjobs.sync_year_quarter_month_week()
             # 检查redis里的周是否是某个值
@@ -445,7 +446,8 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         # mock 写dfs的方法
         await clear()
         with mock.patch(
-            "omicron.models.calendar.Calendar.count_frames", side_effect=count_frames()
+            "omicron.models.timeframe.TimeFrame.count_frames",
+            side_effect=count_frames(),
         ):
             await syncjobs.sync_year_quarter_month_week()
             self.assertIn("Got None Data", email_content)
@@ -455,7 +457,8 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
 
         # 测试已经在运行了 重复启动
         with mock.patch(
-            "omicron.models.calendar.Calendar.count_frames", side_effect=count_frames()
+            "omicron.models.timeframe.TimeFrame.count_frames",
+            side_effect=count_frames(),
         ):
             ret = await syncjobs.sync_year_quarter_month_week()
             self.assertFalse(ret)
@@ -464,7 +467,8 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         get_quota.return_value = 0
         # 测试quota 不够
         with mock.patch(
-            "omicron.models.calendar.Calendar.count_frames", side_effect=count_frames()
+            "omicron.models.timeframe.TimeFrame.count_frames",
+            side_effect=count_frames(),
         ):
             ret = await syncjobs.sync_year_quarter_month_week()
             self.assertIn(f"剩余可用quota：{get_quota.return_value}", email_content)
