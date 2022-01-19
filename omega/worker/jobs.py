@@ -78,6 +78,14 @@ async def get_limit():
     return 3000
 
 
+async def cache_init():
+    """初始化缓存 交易日历和证券代码"""
+    if not await cache.security.exists(f"calendar:{FrameType.DAY.value}"):
+        await AbstractQuotesFetcher.get_all_trade_days()
+    if not await cache.security.exists("security:stock"):
+        await AbstractQuotesFetcher.get_security_list()
+
+
 async def fetch_bars(
     secs: List[str], end: datetime.datetime, n_bars: int, frame_type: FrameType
 ):

@@ -92,10 +92,7 @@ async def init():  # noqa
     except Exception:
         pass
 
-    await sync_calendar()
-    await sync_security_list()
     await omicron.init()
-
     scheduler = AsyncIOScheduler(timezone=cfg.tz)
     await heartbeat()
     scheduler.add_job(heartbeat, "interval", seconds=5)

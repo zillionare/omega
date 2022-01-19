@@ -77,7 +77,7 @@ class Config(object):
         class minio:
             host: Optional[str] = None
 
-            port: Optional[str] = None
+            port: Optional[int] = None
 
             access: Optional[str] = None
 

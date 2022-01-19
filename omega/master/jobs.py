@@ -450,7 +450,7 @@ async def __daily_calibration_sync(
         await cache.sys.set(constants.BAR_SYNC_ARCHIVE_TAIl, tail.strftime("%Y-%m-%d"))
     await delete_daily_calibration_queue(stock_min, index_min, stock_day, index_day)
     # 检查tail是不是上一个交易日的，如果是上一个交易日，则需要清空redis
-    pre_trade_day = cal.day_shift(now, -1).strftime("%Y-%m-%d")
+    pre_trade_day = TimeFrame.day_shift(now, -1).strftime("%Y-%m-%d")
     tread_date = tread_date.strftime("%Y-%m-%d")
     if pre_trade_day == tread_date:
         await Stock.reset_cache()
@@ -507,7 +507,7 @@ async def run_daily_calibration_sync(now):
 async def daily_calibration_sync():
     now = get_now()
     sys.setrecursionlimit(10000)
-    await run_daily_calibration_sync(now)
+    return await run_daily_calibration_sync(now)
 
 
 @abnormal_master_report()

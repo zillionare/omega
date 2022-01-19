@@ -20,7 +20,6 @@ from pyemit import emit
 
 from omega.config import get_config_dir
 from omega.core.events import Events
-from omega.master.jobs import sync_calendar, sync_security_list
 from omega.worker import jobs
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher
 
@@ -46,7 +45,8 @@ class Omega(object):
 
         await AbstractQuotesFetcher.create_instance(self.fetcher_impl, **self.params)
         # listen on omega events
-
+        await omicron.cache.init()
+        await jobs.cache_init()
         await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
         self.scheduler.add_job(self.heart_beat, trigger="interval", seconds=5)
         self.scheduler.start()
