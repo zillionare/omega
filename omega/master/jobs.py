@@ -565,7 +565,10 @@ async def sync_minute_bars():
 
     params = {"start": tail, "end": end, "n_bars": n_bars}
     task = Task(
-        Events.OMEGA_DO_SYNC_MIN, queue_name, params, timeout=get_timeout(timeout)
+        Events.OMEGA_DO_SYNC_MIN,
+        queue_name,
+        params,
+        timeout=get_timeout(timeout * n_bars),
     )
 
     flag = await task.run()
