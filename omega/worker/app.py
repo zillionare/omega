@@ -6,6 +6,7 @@ Author: Aaron-Yang [code@jieyu.ai]
 Contributors:
 """
 import asyncio
+import datetime
 import logging
 import os
 import time
@@ -59,7 +60,7 @@ class Omega(object):
                 "account": self.gid,
                 "quota": await AbstractQuotesFetcher.get_quota(),
                 "impl": self.fetcher_impl,
-                "time": time.time(),
+                "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             },
         )
 
