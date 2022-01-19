@@ -388,6 +388,7 @@ async def write_dfs(
 
 async def __daily_calibration_sync(
     tread_date: datetime.datetime,
+    now: datetime.datetime,
     head: datetime.datetime = None,
     tail: datetime.datetime = None,
 ):
@@ -448,11 +449,16 @@ async def __daily_calibration_sync(
     if tail is not None:
         await cache.sys.set(constants.BAR_SYNC_ARCHIVE_TAIl, tail.strftime("%Y-%m-%d"))
     await delete_daily_calibration_queue(stock_min, index_min, stock_day, index_day)
-    return await daily_calibration_sync()
+    # 检查tail是不是上一个交易日的，如果是上一个交易日，则需要清空redis
+    pre_trade_day = cal.day_shift(now, -1).strftime("%Y-%m-%d")
+    tread_date = tread_date.strftime("%Y-%m-%d")
+    if pre_trade_day == tread_date:
+        await Stock.reset_cache()
+        logger.info("上一个交易日数据已同步完毕, 已清空缓存")
+    return await run_daily_calibration_sync(now)
 
 
-@abnormal_master_report()
-async def daily_calibration_sync():
+async def run_daily_calibration_sync(now):
     """凌晨2点数据同步，调用sync_day_bars，添加参数写minio和重采样
     然后需要往前追赶同步，剩余quota > 1天的量就往前赶，并在redis记录已经有daily_calibration_sync在运行了
     """
@@ -460,7 +466,6 @@ async def daily_calibration_sync():
         await cache.sys.get(constants.BAR_SYNC_ARCHIVE_HEAD),
         await cache.sys.get(constants.BAR_SYNC_ARCHIVE_TAIl),
     )
-    now = get_now()
 
     if not head or not tail:
         # 任意一个缺失都不行
@@ -492,10 +497,17 @@ async def daily_calibration_sync():
     # 检查时间是否小于于 2005年，大于则说明同步完成了
     day_frame = get_first_day_frame()
     if TimeFrame.date2int(tread_date) < day_frame:
-        print("所有数据已同步完毕")
+        logger.info("所有数据已同步完毕")
         return True
 
-    return await __daily_calibration_sync(tread_date, head=head, tail=tail)
+    return await __daily_calibration_sync(tread_date, now, head=head, tail=tail)
+
+
+@abnormal_master_report()
+async def daily_calibration_sync():
+    now = get_now()
+    sys.setrecursionlimit(10000)
+    await run_daily_calibration_sync(now)
 
 
 @abnormal_master_report()
