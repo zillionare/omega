@@ -19,6 +19,8 @@ class Events:
     # year_quarter_month_week
     OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK = "omega/year_quarter_month_week"
 
+    OMEGA_HEART_BEAT = "omega/heart_beat"
+
 
 class ValidationError:
     NO_CHECKSUM = 0

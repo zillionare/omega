@@ -45,28 +45,22 @@ class Omega(object):
 
         await AbstractQuotesFetcher.create_instance(self.fetcher_impl, **self.params)
         # listen on omega events
+
         await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
-        # await self.heart_beat()
-        self.scheduler.add_job(self.heart_beat, trigger="interval", seconds=3)
+        self.scheduler.add_job(self.heart_beat, trigger="interval", seconds=5)
         self.scheduler.start()
-        await omicron.cache.init()
-        await omicron.influxdb.init()
+        await omicron.init()
         logger.info("<<< init %s process done", self.__class__.__name__)
 
     async def heart_beat(self):
-        pid = os.getpid()
-        key = f"process.fetchers.{pid}"
-        logger.debug("send heartbeat from omega worker: %s", pid)
-        await omicron.cache.sys.hmset(
-            key,
-            "impl",
-            self.fetcher_impl,
-            "gid",
-            self.gid,
-            "pid",
-            pid,
-            "heartbeat",
-            time.time(),
+        await emit.emit(
+            Events.OMEGA_HEART_BEAT,
+            {
+                "account": self.gid,
+                "quota": await AbstractQuotesFetcher.get_quota(),
+                "impl": self.fetcher_impl,
+                "time": time.time(),
+            },
         )
 
 
@@ -100,6 +94,9 @@ def start(impl: str, cfg: dict = None, **fetcher_params):
     emit.register(Events.OMEGA_DO_SYNC_DAILY_CALIBRATION, jobs.sync_daily_calibration)
     emit.register(Events.OMEGA_DO_SYNC_DAY, jobs.sync_day_bars)
     emit.register(Events.OMEGA_DO_SYNC_MIN, jobs.sync_minute_bars)
+    emit.register(
+        Events.OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK, jobs.sync_year_quarter_month_week
+    )
     omega = Omega(impl, cfg, **fetcher_params)
     loop = asyncio.get_event_loop()
     loop.run_until_complete(omega.init())

@@ -12,6 +12,7 @@ import traceback
 from functools import wraps
 from typing import List
 
+import async_timeout
 import cfg4py
 import numpy as np
 from omicron import cache
@@ -48,19 +49,25 @@ def abnormal_work_report():
         @wraps(f)
         async def decorated_function(params):
             """装饰所有worker，统一处理错误信息"""
-            # 执行之前，将状态中的worker_count + 1，以确保生产者能知道有多少个worker收到了消息
-            scope, state, end, n_bars, fail = await parse_params(params)
-
-            await cache.sys.hincrby(state, "worker_count")
+            scope, state, end, n_bars, fail, timeout = await parse_params(params)
+            if isinstance(timeout, int):
+                timeout -= 5  # 提前5秒退出
             try:
-                ret = await f(params)
-                return ret
-            except exception.WorkerException as e:
-                await worker_exit(state, scope, e.msg)
-            except Exception as e:  # pragma: no cover
-                # 说明消费者消费时错误了
-                logger.exception(e)
+                async with async_timeout.timeout(timeout):
+                    # 执行之前，将状态中的worker_count + 1，以确保生产者能知道有多少个worker收到了消息
+                    await cache.sys.hincrby(state, "worker_count")
+                    try:
+                        ret = await f(params)
+                        return ret
+                    except exception.WorkerException as e:
+                        await worker_exit(state, scope, e.msg)
+                    except Exception as e:  # pragma: no cover
+                        # 说明消费者消费时错误了
+                        logger.exception(e)
+                        await worker_exit(state, scope)
+            except asyncio.exceptions.TimeoutError:  # pragma: no cover
                 await worker_exit(state, scope)
+                return False
 
         return decorated_function
 
@@ -169,8 +176,8 @@ async def get_secs(limit: int, n_bars: int, scope: str):
 
     """
     while True:
-        p = cache.sys.pipeline()
         step = limit // n_bars  # 根据 单次api允许获取的条数 和一共多少根k线 计算每次最多可以获取多少个股票的
+        p = cache.sys.pipeline()
         p.lrange(scope, 0, step - 1)
         p.ltrim(scope, step, -1)
         secs, _ = await p.execute()
@@ -182,7 +189,7 @@ async def get_secs(limit: int, n_bars: int, scope: str):
 @abnormal_work_report()
 async def sync_high_low_limit(params):
     """同步涨跌停worker"""
-    scope, state, end, n_bars, fail = await parse_params(params)
+    scope, state, end, n_bars, fail, timeout = await parse_params(params)
 
     limit = await get_limit()
     hashmap = []
@@ -216,7 +223,7 @@ async def sync_high_low_limit(params):
 async def __sync_min_bars(params):
     """同步分支线数据并写缓存"""
     limit = await get_limit()
-    scope, state, end, n_bars, fail = await parse_params(params)
+    scope, state, end, n_bars, fail, timeout = await parse_params(params)
     total = 0
     tasks = []
     async for secs in get_secs(limit, n_bars, scope):
@@ -240,26 +247,28 @@ async def sync_minute_bars(params):
     Returns:
 
     """
-    scope, state, end, n_bars, fail = await parse_params(params)
+    scope, state, end, n_bars, fail, timeout = await parse_params(params)
     total, tasks = await __sync_min_bars(params)
 
     await cache.sys.hincrby(state, "done_count", total)
 
 
 async def parse_params(params):
+    logger.info(params)
     return (
         params.get("__scope"),
         params.get("__state"),
         params.get("end"),
         params.get("n_bars", 1),
         params.get("__fail"),
+        params.get("__timeout"),
     )
 
 
 @abnormal_work_report()
 async def sync_day_bars(params):
     """这是下午三点收盘后的同步，仅写cache，同步分钟线和日线"""
-    scope, state, end, n_bars, fail = await parse_params(params)
+    scope, state, end, n_bars, fail, timeout = await parse_params(params)
     limit = await get_limit()
 
     total, tasks = await __sync_min_bars(params)
@@ -302,7 +311,7 @@ async def handle_dfs_data(bars1, bars2, queue_name):
         return False
 
 
-async def persistence_daily_calibration(bars1, bars2, secs, fail, queue):
+async def persistence_daily_calibration(bars1, bars2, secs, fail, queue, frame_type):
     # 将数据持久化
     if bars1 is None or bars2 is None:
         await push_fail_secs(secs, fail)
@@ -311,7 +320,7 @@ async def persistence_daily_calibration(bars1, bars2, secs, fail, queue):
     if not await handle_dfs_data(bars1, bars2, queue):
         await push_fail_secs(secs, fail)
         raise exception.ChecksumFail()
-    await Stock.persist_bars(FrameType.MIN1, bars1)
+    await Stock.persist_bars(frame_type, bars1)
     return len(secs)
 
 
@@ -328,7 +337,7 @@ async def __sync_daily_calibration(
     Returns:
 
     """
-    _, state, end, n_bars, fail = await parse_params(params)
+    _, state, end, n_bars, fail, timeout = await parse_params(params)
 
     limit = await get_limit()
     total = 0
@@ -338,7 +347,7 @@ async def __sync_daily_calibration(
         min_bars1 = await fetch_min_bars(secs, end, n_bars)
         min_bars2 = await fetch_min_bars(secs, end, n_bars)
         total += await persistence_daily_calibration(
-            min_bars1, min_bars2, secs, fail, queue_min
+            min_bars1, min_bars2, secs, fail, queue_min, FrameType.MIN1
         )
 
     for i in range(0, len(tasks), limit):
@@ -346,7 +355,7 @@ async def __sync_daily_calibration(
         bars1 = await fetch_day_bars(temp, end)
         bars2 = await fetch_day_bars(temp, end)
         total += await persistence_daily_calibration(
-            bars1, bars2, temp, fail, queue_day
+            bars1, bars2, temp, fail, queue_day, FrameType.DAY
         )
 
     return total // 2
@@ -357,7 +366,7 @@ async def sync_daily_calibration(params):
     """凌晨2点的数据校准，
     同步分钟线 持久化
     同步日线 持久化"""
-    scope, state, end, n_bars, fail = await parse_params(params)
+    scope, state, end, n_bars, fail, timeout = await parse_params(params)
     stock_min = params.get("stock_min")
     index_min = params.get("index_min")
     stock_day = params.get("stock_day")
@@ -373,7 +382,7 @@ async def sync_daily_calibration(params):
 
 
 async def __sync_year_quarter_month_week(params, queue, data):
-    scope, state, end, n_bars, fail = await parse_params(params)
+    scope, state, end, n_bars, fail, timeout = await parse_params(params)
     frame_type = params.get("frame_type")
 
     limit = await get_limit()
@@ -381,21 +390,14 @@ async def __sync_year_quarter_month_week(params, queue, data):
     async for secs in get_secs(limit, n_bars, queue):
         bars1 = await fetch_bars(secs, end, n_bars, frame_type)
         bars2 = await fetch_bars(secs, end, n_bars, frame_type)
-        if bars1 is None or bars2 is None:
-            await push_fail_secs(secs, fail)
-            raise exception.GotNoneData()
-        # 校验通过，持久化
-        if not await handle_dfs_data(bars1, bars2, data):
-            await push_fail_secs(secs, fail)
-            raise exception.ChecksumFail()
-        await Stock.persist_bars(frame_type, bars1)
+        await persistence_daily_calibration(bars1, bars2, secs, fail, queue, frame_type)
         total += len(secs)
     return total
 
 
 @abnormal_work_report()
 async def sync_year_quarter_month_week(params):
-    scope, state, end, n_bars, fail = await parse_params(params)
+    scope, state, end, n_bars, fail, timeout = await parse_params(params)
     stock_queue = params.get("stock_queue")
     index_queue = params.get("index_queue")
     stock_data = params.get("stock_data")

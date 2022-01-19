@@ -121,6 +121,7 @@ class RedisLogReceiver:
     async def reader(self):
         while await self._channel.wait_message():
             msg = (await self._channel.get()).decode("utf-8")
+            print(msg)
             self._write(msg)
 
     @staticmethod

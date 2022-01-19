@@ -484,6 +484,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             "sync_calendar",
             "1m:10:*",
             "sync_fund_share_daily",
+            "sync_year_quarter_month_week",
             "daily_calibration_sync",
             "sync_high_low_limit",
             "1m:13-14:*",
