@@ -95,7 +95,10 @@ async def fetch_bars(
     temp = []
     if bars is not None:
         for code in bars:
-            bar = numpy_append_fields(bars[code], "code", code, dtypes=[("code", "O")])
+            temp_bar = bars[code]
+            if not isinstance(temp_bar, np.ndarray):
+                continue
+            bar = numpy_append_fields(temp_bar, "code", code, dtypes=[("code", "O")])
             temp.append(bar)
         return np.concatenate(temp)
 
@@ -160,7 +163,11 @@ async def fetch_day_bars(secs: List[str], end: datetime.datetime):
     )
     high_low_limit = await get_high_low_limit(secs, end)
     result = []
+    end_str = end.strftime("%Y-%m-%d")
     for sec in high_low_limit:
+        date = sec["time"].astype("M8[ms]").astype("O").strftime("%Y-%m-%d")
+        if date != end_str:
+            continue
         name = sec[1]
         bar = numpy_append_fields(
             bars[name],
@@ -169,7 +176,10 @@ async def fetch_day_bars(secs: List[str], end: datetime.datetime):
             dtypes,
         )
         result.append(bar)
-    return np.concatenate(result)
+    if result:
+        return np.concatenate(result)
+    else:
+        return result
 
 
 async def get_secs(limit: int, n_bars: int, scope: str):
@@ -239,7 +249,8 @@ async def __sync_min_bars(params):
         if bars is None:
             await push_fail_secs(secs, fail)
             raise exception.GotNoneData()
-        await Stock.batch_cache_bars(FrameType.MIN1, bars)
+        if isinstance(bars, np.ndarray):
+            await Stock.batch_cache_bars(FrameType.MIN1, bars)
         total += len(secs)
         tasks.extend(secs)
     return total, tasks
@@ -287,8 +298,8 @@ async def sync_day_bars(params):
         if bars is None:
             await push_fail_secs(temp, fail)
             raise exception.GotNoneData()
-
-        await Stock.batch_cache_bars(FrameType.DAY, bars)
+        if isinstance(bars, np.ndarray):
+            await Stock.batch_cache_bars(FrameType.DAY, bars)
         total += len(temp)
 
     await cache.sys.hincrby(state, "done_count", total // 2)
@@ -328,7 +339,8 @@ async def persistence_daily_calibration(bars1, bars2, secs, fail, queue, frame_t
     if not await handle_dfs_data(bars1, bars2, queue):
         await push_fail_secs(secs, fail)
         raise exception.ChecksumFail()
-    await Stock.persist_bars(frame_type, bars1)
+    if isinstance(bars1, np.ndarray):
+        await Stock.persist_bars(frame_type, bars1)
     return len(secs)
 
 

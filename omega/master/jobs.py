@@ -483,7 +483,7 @@ async def run_daily_calibration_sync(now):
             now.replace(hour=0, minute=0, second=0, microsecond=0),
             FrameType.DAY,
         )
-        if count_frame - 1 > 1:
+        if count_frame > 1:
             # 说明有空洞
             tread_date = tail = tail_date
             head = None
@@ -626,7 +626,7 @@ async def __sync_year_quarter_month_week(tail_key, frame_type):
         frame_type,
     )
     params = {}
-    if count_frame - 1 > 1:
+    if count_frame >= 1:
         queue_name = frame_type.value
         stock_queue = f"{queue_name}.stock"
         index_queue = f"{queue_name}.index"
@@ -667,22 +667,27 @@ async def __sync_year_quarter_month_week(tail_key, frame_type):
     return False
 
 
-async def run_sync_year_quarter_month_week():
+async def run_sync_year_quarter_month_week(week=True, month=True):
     # 检查周线 tail
     logger.info("sync_year_quarter_month_week 启动")
-    if not await __sync_year_quarter_month_week(
-        constants.BAR_SYNC_WEEK_TAIl, FrameType.WEEK
-    ):
-        logger.info(f"执行{FrameType.WEEK.value}时退出")
-        return False
-    if not await __sync_year_quarter_month_week(
-        constants.BAR_SYNC_MONTH_TAIl, FrameType.MONTH
-    ):
-        logger.info(f"执行{FrameType.MONTH.value}时退出")
 
-        return False
+    if week:
+        week = await __sync_year_quarter_month_week(
+            constants.BAR_SYNC_WEEK_TAIl, FrameType.WEEK
+        )
+        logger.info(f"执行{FrameType.WEEK.value}完毕")
 
-    await run_sync_year_quarter_month_week()
+    if month:
+        month = await __sync_year_quarter_month_week(
+            constants.BAR_SYNC_MONTH_TAIl, FrameType.MONTH
+        )
+        logger.info(f"执行{FrameType.MONTH.value}完毕")
+
+        # return False
+    if not week and not month:
+        logger.info("同步周、月完毕")
+        return False
+    await run_sync_year_quarter_month_week(week, month)
 
 
 @abnormal_master_report()

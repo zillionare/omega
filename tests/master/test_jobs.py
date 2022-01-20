@@ -412,7 +412,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
 
         def count_frames():
             """mock 计算帧间隔的方法"""
-            i = 5
+            i = 3
 
             def inner(*args, **kwargs):
                 nonlocal i
@@ -484,21 +484,23 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
 
         await syncjobs.load_cron_task(scheduler)
         base = {
-            "sync_calendar",
+            "1m:11:0-30",
             "1m:10:*",
-            "sync_fund_share_daily",
-            "sync_year_quarter_month_week",
-            "daily_calibration_sync",
-            "sync_high_low_limit",
             "1m:13-14:*",
+            "1m:15:00",
+            "sync_funds",
             "sync_fund_net_value",
             "sync_fund_portfolio_stock",
-            "sync_day_bars",
-            "1m:11:0-30",
-            "sync_security_list",
-            "1m:15:00",
+            "sync_year_quarter_month_week",
             "1m:9:31-59",
+            "daily_calibration_sync",
+            "sync_security_list",
+            "sync_high_low_limit",
+            "sync_day_bars",
+            "sync_fund_share_daily",
+            "sync_calendar",
         }
+        print(set([job.name for job in scheduler.get_jobs()]))
         self.assertSetEqual(base, set([job.name for job in scheduler.get_jobs()]))
 
     @mock.patch("omega.master.jobs.get_timeout", return_value=10)
