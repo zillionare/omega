@@ -570,7 +570,7 @@ async def sync_minute_bars():
         params,
         timeout=get_timeout(timeout * n_bars),
     )
-
+    await task.set_coefficient(n_bars)
     flag = await task.run()
     if flag:
         # 说明正常执行完的
