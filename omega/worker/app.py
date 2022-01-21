@@ -48,6 +48,7 @@ class Omega(object):
         await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
         # await self.heart_beat()
         self.scheduler.add_job(self.heart_beat, trigger="interval", seconds=3)
+        await jobs.load_cron_task(self.scheduler)
         self.scheduler.start()
         await omicron.cache.init()
         await omicron.influxdb.init()

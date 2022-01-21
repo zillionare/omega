@@ -14,9 +14,11 @@ from typing import List
 
 import cfg4py
 import numpy as np
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from omicron import cache
 from omicron.extensions.np import numpy_append_fields
 from omicron.models.stock import Stock
+from omicron.notify.mail import mail_notify
 from zillionare_core_types.core.types import FrameType, SecurityType
 
 from omega.core.constants import HIGH_LOW_LIMIT
@@ -405,3 +407,111 @@ async def sync_year_quarter_month_week(params):
     total += await __sync_year_quarter_month_week(params, index_queue, index_data)
 
     await cache.sys.hincrby(state, "done_count", total)
+
+
+def cron_work_report():
+    def inner(f):
+        @wraps(f)
+        async def decorated_function():
+            """装饰所有worker，统一处理错误信息"""
+            has_same_task = await cache.sys.exists(f"""cron_{f.__name__}""")
+            if has_same_task:
+                return None
+            await cache.sys.setex(f"""cron_{f.__name__}""", 3600 * 2, 1)
+            try:
+                ret = await f()
+                return ret
+            except Exception as e:  # pragma: no cover
+                # 说明消费者消费时错误了
+                logger.exception(e)
+                subject = f"执行定时任务{f.__name__}时发生异常"
+                body = f"详细信息：\n{traceback.format_exc()}"
+                await mail_notify(subject, body, html=True)
+
+        return decorated_function
+
+    return inner
+
+
+@cron_work_report()
+async def sync_funds():
+    """更新基金列表"""
+    secs = await AbstractQuotesFetcher.get_fund_list()
+    logger.info("%s secs are fetched and saved.", len(secs))
+    return secs
+
+
+@cron_work_report()
+async def sync_fund_net_value():
+    """更新基金净值数据"""
+    now = datetime.datetime.now().date()
+    ndays = 8
+    n = 0
+    while n < ndays:
+        await AbstractQuotesFetcher.get_fund_net_value(
+            day=now - datetime.timedelta(days=n)
+        )
+        n += 1
+        if n > 2:
+            break
+    return True
+
+
+@cron_work_report()
+async def sync_fund_share_daily():
+    """更新基金份额数据"""
+    now = datetime.datetime.now().date()
+    ndays = 8
+    n = 0
+    while n < ndays:
+        await AbstractQuotesFetcher.get_fund_share_daily(
+            day=now - datetime.timedelta(days=n)
+        )
+        n += 1
+    return True
+
+
+@cron_work_report()
+async def sync_fund_portfolio_stock():
+    """更新基金十大持仓股数据"""
+    now = datetime.datetime.now().date()
+    ndays = 8
+    n = 0
+    while n < ndays:
+        await AbstractQuotesFetcher.get_fund_portfolio_stock(
+            pub_date=now - datetime.timedelta(days=n)
+        )
+        n += 1
+    return True
+
+
+async def load_cron_task(scheduler: AsyncIOScheduler):
+
+    scheduler.add_job(
+        sync_fund_net_value,
+        "cron",
+        hour=4,
+        minute=15,
+        name="sync_fund_net_value",
+    )
+    scheduler.add_job(
+        sync_funds,
+        "cron",
+        hour=4,
+        minute=0,
+        name="sync_funds",
+    )
+    scheduler.add_job(
+        sync_fund_share_daily,
+        "cron",
+        hour=4,
+        minute=5,
+        name="sync_fund_share_daily",
+    )
+    scheduler.add_job(
+        sync_fund_portfolio_stock,
+        "cron",
+        hour=4,
+        minute=10,
+        name="sync_fund_portfolio_stock",
+    )
