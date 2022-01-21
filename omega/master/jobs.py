@@ -173,6 +173,7 @@ class Task:
 
     async def run(self):
         """分配任务并发送emit通知worker开始执行，然后阻塞等待"""
+        logger.info(f"{self.params} 任务启动")
         if await self.is_running:
             return False
         tasks = await self.tasks()
@@ -363,12 +364,10 @@ async def write_dfs(
     dfs = Storage()
     if dfs is None:  # pragma: no cover
         return
-    p = cache.temp.pipeline()
-    p.lrange(queue_name, 0, -1, encoding=None)
-    p.delete(queue_name)
-    data, _ = await p.execute()
+    data = await cache.temp.lrange(queue_name, 0, -1, encoding=None)
     if not data:
         return
+    logger.info(f"queue_name:{queue_name},frame_type:{frame_type.value}")
     bars = [pickle.loads(i) for i in data]
     # data = pickle.loads(data)
     bars = np.concatenate(bars)
@@ -383,7 +382,8 @@ async def write_dfs(
         ):
             resampled = Stock.resample(bars, FrameType.MIN1, ftype)
             resampled_binary = pickle.dumps(resampled, protocol=cfg.pickle.ver)
-            await dfs.write(resampled_binary, prefix, dt, frame_type)
+            await dfs.write(resampled_binary, prefix, dt, ftype)
+    await cache.temp.delete(queue_name)
 
 
 async def __daily_calibration_sync(
@@ -436,7 +436,7 @@ async def __daily_calibration_sync(
     ret = await task.run()
     if not ret:
         return ret
-
+    logger.info(f"daily_calibration -- params:{params} 已执行完毕，准备进行持久化")
     # 读出来 写dfs
     await write_dfs(stock_min, FrameType.MIN1, "stock", end, resample=True)
     await write_dfs(stock_day, FrameType.DAY, "stock", end)
@@ -455,6 +455,7 @@ async def __daily_calibration_sync(
     if pre_trade_day == tread_date:
         await Stock.reset_cache()
         logger.info("上一个交易日数据已同步完毕, 已清空缓存")
+    logger.info(f"持久化完成， params:{params}执行完毕")
     return await run_daily_calibration_sync(now)
 
 
@@ -469,7 +470,7 @@ async def run_daily_calibration_sync(now):
 
     if not head or not tail:
         # 任意一个缺失都不行
-        print("说明是首次同步，查找上一个已收盘的交易日")
+        logger.info("说明是首次同步，查找上一个已收盘的交易日")
         pre_trade_day = TimeFrame.day_shift(now, -1)
         tread_date = datetime.datetime.combine(pre_trade_day, datetime.time(0, 0))
         head = tail = pre_trade_day
@@ -505,6 +506,7 @@ async def run_daily_calibration_sync(now):
 
 @abnormal_master_report()
 async def daily_calibration_sync():
+    logger.info("每日数据校准已启动")
     now = get_now()
     sys.setrecursionlimit(10000)
     return await run_daily_calibration_sync(now)
@@ -537,7 +539,7 @@ async def sync_minute_bars():
     2. 计算开始和结束时间
     """
     end = get_now().replace(second=0, microsecond=0)
-    first = end.replace(hour=9, minute=31, second=0, microsecond=0)
+    first = end.replace(hour=9, minute=30, second=0, microsecond=0)
     timeout = 60
     # 检查当前时间是否在交易时间内
     if end.hour * 60 + end.minute not in TimeFrame.ticks[FrameType.MIN1]:
@@ -560,7 +562,7 @@ async def sync_minute_bars():
         tail = datetime.datetime.strptime(tail, "%Y-%m-%d %H:%M:00")
         if tail < first:
             tail = first
-
+    tail += datetime.timedelta(minutes=1)  # 取上次同步截止时间+1 计算出n_bars
     n_bars = TimeFrame.count_frames(tail, end, FrameType.MIN1)  # 获取到一共有多少根k线
 
     params = {"start": tail, "end": end, "n_bars": n_bars}

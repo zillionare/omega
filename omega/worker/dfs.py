@@ -172,6 +172,7 @@ class MinioStorage(AbstractStorage):
         filename = self.get_filename(prefix, dt, frame_type)
         data = io.BytesIO(bar)
         ret = self.client.put_object(self.bucket, filename, data, length=len(bar))
+        logger.info(f"Written {filename} to minio")
         return ret
 
     async def read(

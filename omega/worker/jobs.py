@@ -410,7 +410,7 @@ async def __sync_year_quarter_month_week(params, queue, data):
     async for secs in get_secs(limit, n_bars, queue):
         bars1 = await fetch_bars(secs, end, n_bars, frame_type)
         bars2 = await fetch_bars(secs, end, n_bars, frame_type)
-        await persistence_daily_calibration(bars1, bars2, secs, fail, queue, frame_type)
+        await persistence_daily_calibration(bars1, bars2, secs, fail, data, frame_type)
         total += len(secs)
     return total
 
