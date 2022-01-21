@@ -17,8 +17,14 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from pyemit import emit
 
 from omega.config import get_config_dir
+from omega.core.events import Events
 from omega.logreceivers.redis import RedisLogReceiver
-from omega.master.jobs import load_cron_task, sync_calendar, sync_security_list
+from omega.master.jobs import (
+    load_cron_task,
+    sync_calendar,
+    sync_security_list,
+    work_state,
+)
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher
 
 logger = logging.getLogger(__name__)
@@ -52,11 +58,19 @@ async def heartbeat():
     await omicron.cache.sys.hmset(key, "pid", pid, "heartbeat", time.time())
 
 
+async def handle_work_heart_beat(params: dict):
+
+    account = params.get("account")
+    work_state[account] = params
+    print(work_state)
+
+
 async def init():  # noqa
     global scheduler
-
     config_dir = get_config_dir()
     cfg4py.init(get_config_dir(), False)
+    emit.register(Events.OMEGA_HEART_BEAT, handle_work_heart_beat)
+    await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
     for fetcher in cfg.quotes_fetchers:
         impl = fetcher.get("impl")
         workers = fetcher.get("workers")
@@ -78,11 +92,7 @@ async def init():  # noqa
     except Exception:
         pass
 
-    await sync_calendar()
-    await sync_security_list()
     await omicron.init()
-
-    await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
     scheduler = AsyncIOScheduler(timezone=cfg.tz)
     await heartbeat()
     scheduler.add_job(heartbeat, "interval", seconds=5)

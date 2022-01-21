@@ -5,6 +5,7 @@ import asyncio
 import datetime
 import logging
 import pickle
+import sys
 import time
 import traceback
 from functools import wraps
@@ -28,6 +29,7 @@ from omega.worker.dfs import Storage
 
 logger = logging.getLogger(__name__)
 cfg: Config = cfg4py.get_instance()
+work_state = {}  # work的状态
 
 
 def get_now():
@@ -147,6 +149,13 @@ class Task:
             await self.generate_task()
         return self.__task_list
 
+    @classmethod
+    async def get_quota(cls):
+        quota = 0
+        for worker in work_state.values():
+            quota += worker.get("quota", 0)
+        return quota
+
     async def send_email(self, error=None):
         subject = f"执行{self.state}时异常！"
         if error:
@@ -156,21 +165,24 @@ class Task:
         body += "\n\n================================================\n\n"
         body += "消费者得到的参数是：" + str(self.params)
         body += "\n\n================================================\n\n"
-        quota = await aq.get_quota()
+        quota = await self.get_quota()
         body += f"剩余可用quota：{quota}"
         body += f"{await self.get_fail()}"
+        logger.info(f"发送邮件subject:{subject}, body: {body}")
         await mail_notify(subject, body, html=True)
 
     async def run(self):
         """分配任务并发送emit通知worker开始执行，然后阻塞等待"""
+        logger.info(f"{self.params} 任务启动")
         if await self.is_running:
             return False
         tasks = await self.tasks()
         count = len(tasks)
         if not count:
+            logger.info(f"未找到任何股票或证券，不执行 params：{self.params}")
             return False
         # 检查quota，通过 task的数量 * 一个系数
-        quota = await aq.get_quota()
+        quota = await self.get_quota()
         need = count * self.coefficient
         if quota < need:
             msg = f"剩余quota不够本次同步，剩余：{quota}, 至少需要{need}才可以同步，"
@@ -198,7 +210,12 @@ class Task:
             )
         await p.execute()
         self.params.update(
-            {"__scope": self.scope, "__state": self.state, "__fail": self.fail}
+            {
+                "__scope": self.scope,
+                "__state": self.state,
+                "__fail": self.fail,
+                "__timeout": self.timeout,
+            }
         )
         await emit.emit(self.channel, self.params)
         ret = await self.check_done(count)
@@ -224,35 +241,36 @@ class Task:
 
         """
         s = time.time()
-        while True:
-            try:
-                async with async_timeout.timeout(self.timeout):
-                    while True:
-                        p = cache.sys.pipeline()
-                        p.hget(self.state, "is_running")
-                        p.hget(self.state, "done_count")
-                        p.hget(self.state, "error")
-                        p.hget(self.state, "worker_count")
-                        is_running, done_count, error, worker_count = await p.execute()
-                        if worker_count is None:
-                            # 说明消费者还没收到消息，等待
-                            await asyncio.sleep(0.5)
-                            continue
-                        if not is_running:
-                            # 说明消费者异常退出了， 发送邮件
-                            await self.send_email(error)
-                            return False
-                        # done_count = await cache.sys.hget(self.state, "done_count")
-                        # 检查消费者状态，如果没有is_running，并且任务完成数量不对，说明消费者移除退出了，错误信息在 error 这个key中
-                        # 把error 和 fail 读出来之后 发送邮件，然后master退出，等待下一次执行
-                        if done_count is None or int(done_count) != count:
-                            await asyncio.sleep(0.5)
-                        else:
-                            print(f"{self.scope}耗时：{time.time() - s}")
-                            return True
-            except asyncio.exceptions.TimeoutError:  # pragma: no cover
-                await self.send_email()
-                return False
+        try:
+            async with async_timeout.timeout(self.timeout):
+                while True:
+                    p = cache.sys.pipeline()
+                    p.hget(self.state, "is_running")
+                    p.hget(self.state, "done_count")
+                    p.hget(self.state, "error")
+                    p.hget(self.state, "worker_count")
+                    is_running, done_count, error, worker_count = await p.execute()
+                    if worker_count is None:
+                        # 说明消费者还没收到消息，等待
+                        await asyncio.sleep(0.5)
+                        continue
+                    if not is_running:
+                        # 说明消费者异常退出了， 发送邮件
+                        await self.send_email(error)
+                        return False
+                    # done_count = await cache.sys.hget(self.state, "done_count")
+                    # 检查消费者状态，如果没有is_running，并且任务完成数量不对，说明消费者移除退出了，错误信息在 error 这个key中
+                    # 把error 和 fail 读出来之后 发送邮件，然后master退出，等待下一次执行
+                    if done_count is None or int(done_count) != count:
+                        await asyncio.sleep(0.5)
+                    else:
+                        print(f"{self.scope}耗时：{time.time() - s}")
+                        logger.info(f"{self.scope}耗时：{time.time() - s}")
+                        return True
+        except asyncio.exceptions.TimeoutError:  # pragma: no cover
+            logger.info("消费者超时退出")
+            await self.send_email()
+            return False
 
 
 async def _start_job_timer(job_name: str):
@@ -346,12 +364,10 @@ async def write_dfs(
     dfs = Storage()
     if dfs is None:  # pragma: no cover
         return
-    p = cache.temp.pipeline()
-    p.lrange(queue_name, 0, -1, encoding=None)
-    p.delete(queue_name)
-    data, _ = await p.execute()
+    data = await cache.temp.lrange(queue_name, 0, -1, encoding=None)
     if not data:
         return
+    logger.info(f"queue_name:{queue_name},frame_type:{frame_type.value}")
     bars = [pickle.loads(i) for i in data]
     # data = pickle.loads(data)
     bars = np.concatenate(bars)
@@ -366,11 +382,13 @@ async def write_dfs(
         ):
             resampled = Stock.resample(bars, FrameType.MIN1, ftype)
             resampled_binary = pickle.dumps(resampled, protocol=cfg.pickle.ver)
-            await dfs.write(resampled_binary, prefix, dt, frame_type)
+            await dfs.write(resampled_binary, prefix, dt, ftype)
+    await cache.temp.delete(queue_name)
 
 
 async def __daily_calibration_sync(
     tread_date: datetime.datetime,
+    now: datetime.datetime,
     head: datetime.datetime = None,
     tail: datetime.datetime = None,
 ):
@@ -418,7 +436,7 @@ async def __daily_calibration_sync(
     ret = await task.run()
     if not ret:
         return ret
-
+    logger.info(f"daily_calibration -- params:{params} 已执行完毕，准备进行持久化")
     # 读出来 写dfs
     await write_dfs(stock_min, FrameType.MIN1, "stock", end, resample=True)
     await write_dfs(stock_day, FrameType.DAY, "stock", end)
@@ -431,11 +449,17 @@ async def __daily_calibration_sync(
     if tail is not None:
         await cache.sys.set(constants.BAR_SYNC_ARCHIVE_TAIl, tail.strftime("%Y-%m-%d"))
     await delete_daily_calibration_queue(stock_min, index_min, stock_day, index_day)
-    return await daily_calibration_sync()
+    # 检查tail是不是上一个交易日的，如果是上一个交易日，则需要清空redis
+    pre_trade_day = TimeFrame.day_shift(now, -1).strftime("%Y-%m-%d")
+    tread_date = tread_date.strftime("%Y-%m-%d")
+    if pre_trade_day == tread_date:
+        await Stock.reset_cache()
+        logger.info("上一个交易日数据已同步完毕, 已清空缓存")
+    logger.info(f"持久化完成， params:{params}执行完毕")
+    return await run_daily_calibration_sync(now)
 
 
-@abnormal_master_report()
-async def daily_calibration_sync():
+async def run_daily_calibration_sync(now):
     """凌晨2点数据同步，调用sync_day_bars，添加参数写minio和重采样
     然后需要往前追赶同步，剩余quota > 1天的量就往前赶，并在redis记录已经有daily_calibration_sync在运行了
     """
@@ -443,11 +467,10 @@ async def daily_calibration_sync():
         await cache.sys.get(constants.BAR_SYNC_ARCHIVE_HEAD),
         await cache.sys.get(constants.BAR_SYNC_ARCHIVE_TAIl),
     )
-    now = get_now()
 
     if not head or not tail:
         # 任意一个缺失都不行
-        print("说明是首次同步，查找上一个已收盘的交易日")
+        logger.info("说明是首次同步，查找上一个已收盘的交易日")
         pre_trade_day = TimeFrame.day_shift(now, -1)
         tread_date = datetime.datetime.combine(pre_trade_day, datetime.time(0, 0))
         head = tail = pre_trade_day
@@ -461,7 +484,7 @@ async def daily_calibration_sync():
             now.replace(hour=0, minute=0, second=0, microsecond=0),
             FrameType.DAY,
         )
-        if count_frame - 1 > 1:
+        if count_frame > 1:
             # 说明有空洞
             tread_date = tail = tail_date
             head = None
@@ -475,10 +498,18 @@ async def daily_calibration_sync():
     # 检查时间是否小于于 2005年，大于则说明同步完成了
     day_frame = get_first_day_frame()
     if TimeFrame.date2int(tread_date) < day_frame:
-        print("所有数据已同步完毕")
+        logger.info("所有数据已同步完毕")
         return True
 
-    return await __daily_calibration_sync(tread_date, head=head, tail=tail)
+    return await __daily_calibration_sync(tread_date, now, head=head, tail=tail)
+
+
+@abnormal_master_report()
+async def daily_calibration_sync():
+    logger.info("每日数据校准已启动")
+    now = get_now()
+    sys.setrecursionlimit(10000)
+    return await run_daily_calibration_sync(now)
 
 
 @abnormal_master_report()
@@ -508,7 +539,8 @@ async def sync_minute_bars():
     2. 计算开始和结束时间
     """
     end = get_now().replace(second=0, microsecond=0)
-    first = end.replace(hour=9, minute=31, second=0, microsecond=0)
+    first = end.replace(hour=9, minute=30, second=0, microsecond=0)
+    timeout = 60
     # 检查当前时间是否在交易时间内
     if end.hour * 60 + end.minute not in TimeFrame.ticks[FrameType.MIN1]:
         if 11 <= end.hour < 13:
@@ -530,12 +562,17 @@ async def sync_minute_bars():
         tail = datetime.datetime.strptime(tail, "%Y-%m-%d %H:%M:00")
         if tail < first:
             tail = first
-
+    tail += datetime.timedelta(minutes=1)  # 取上次同步截止时间+1 计算出n_bars
     n_bars = TimeFrame.count_frames(tail, end, FrameType.MIN1)  # 获取到一共有多少根k线
 
     params = {"start": tail, "end": end, "n_bars": n_bars}
-    task = Task(Events.OMEGA_DO_SYNC_MIN, queue_name, params, timeout=get_timeout())
-
+    task = Task(
+        Events.OMEGA_DO_SYNC_MIN,
+        queue_name,
+        params,
+        timeout=get_timeout(timeout * n_bars),
+    )
+    await task.set_coefficient(n_bars)
     flag = await task.run()
     if flag:
         # 说明正常执行完的
@@ -590,7 +627,8 @@ async def __sync_year_quarter_month_week(tail_key, frame_type):
         now.replace(hour=0, minute=0, second=0, microsecond=0),
         frame_type,
     )
-    if count_frame - 1 > 1:
+    params = {}
+    if count_frame >= 1:
         queue_name = frame_type.value
         stock_queue = f"{queue_name}.stock"
         index_queue = f"{queue_name}.index"
@@ -618,36 +656,49 @@ async def __sync_year_quarter_month_week(tail_key, frame_type):
         ret = await task.run()
         if not ret:
             await delete_year_quarter_month_week_queue(stock_data, index_data)
+            logger.info(
+                f"同步{frame_type.value}时退出，count_frame：{count_frame}, params:{params}"
+            )
             return False
         await write_dfs(stock_data, frame_type, "stock", tail)
         await write_dfs(index_data, frame_type, "index", tail)
         await delete_year_quarter_month_week_queue(stock_data, index_data)
         await cache.sys.set(tail_key, tail.strftime("%Y-%m-%d"))
         return True
+    logger.info(f"同步{frame_type.value}时退出，count_frame：{count_frame}, params:{params}")
     return False
+
+
+async def run_sync_year_quarter_month_week(week=True, month=True):
+    # 检查周线 tail
+    logger.info("sync_year_quarter_month_week 启动")
+
+    if week:
+        week = await __sync_year_quarter_month_week(
+            constants.BAR_SYNC_WEEK_TAIl, FrameType.WEEK
+        )
+        logger.info(f"执行{FrameType.WEEK.value}完毕")
+
+    if month:
+        month = await __sync_year_quarter_month_week(
+            constants.BAR_SYNC_MONTH_TAIl, FrameType.MONTH
+        )
+        logger.info(f"执行{FrameType.MONTH.value}完毕")
+
+        # return False
+    if not week and not month:
+        logger.info("同步周、月完毕")
+        return False
+    await run_sync_year_quarter_month_week(week, month)
 
 
 @abnormal_master_report()
 async def sync_year_quarter_month_week():
     """同步年月日周"""
     # 检查周线 tail
-    if not await __sync_year_quarter_month_week(
-        constants.BAR_SYNC_WEEK_TAIl, FrameType.WEEK
-    ):
-        return False
-    if not await __sync_year_quarter_month_week(
-        constants.BAR_SYNC_MONTH_TAIl, FrameType.MONTH
-    ):
-        return False
-    # if not await __sync_year_quarter_month_week(
-    #         constants.BAR_SYNC_QUARTER_TAIl, FrameType.QUARTER
-    # ):
-    #     return
-    # if not await __sync_year_quarter_month_week(
-    #         constants.BAR_SYNC_YEAR_TAIl, FrameType.YEAR
-    # ):
-    #     return
-    await sync_year_quarter_month_week()
+    logger.info("sync_year_quarter_month_week 启动")
+    sys.setrecursionlimit(10000)
+    await run_sync_year_quarter_month_week()
 
 
 async def load_cron_task(scheduler):
@@ -692,7 +743,7 @@ async def load_cron_task(scheduler):
         sync_minute_bars,
         "cron",
         hour="13-14",
-        minute="*",
+        minute="1-59",
         name=f"{FrameType.MIN1.value}:13-14:*",
     )
     scheduler.add_job(
@@ -708,6 +759,13 @@ async def load_cron_task(scheduler):
         hour="15",
         minute=5,
         name="sync_day_bars",
+    )
+    scheduler.add_job(
+        sync_year_quarter_month_week,
+        "cron",
+        hour=2,
+        minute=5,
+        name="sync_year_quarter_month_week",
     )
     scheduler.add_job(
         daily_calibration_sync,
