@@ -81,7 +81,7 @@ class QuotesFetcher(ABC):
         返回数据包括：
             code: 股票代码
             day: 日期
-            captialization: 总股本
+            capitalization: 总股本
             circulating_cap: 流通股本（万股）
             market_cap: 总市值（亿元）
             circulating_market_cap： 流通市值（亿元）

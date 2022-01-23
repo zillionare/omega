@@ -6,7 +6,10 @@ nav:
   - 使用手册 : usage.md
   - 社区: https://www.jieyu.ai
   - 版本历史: history.md
-  - API文档: api.md
+  - API文档:
+    - 控制台: api/cli.md
+    - Master: api/master.md
+    - Worker: api/worker.md
 
 theme:
   name: material

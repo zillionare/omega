@@ -182,7 +182,7 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
                 expected = "postgres://account:password@127.0.0.1:6380/zillionare"
                 self.assertEqual(expected, settings["postgres"]["dsn"])
 
-        # test continure with wrong config
+        # test continue with wrong config
         with mock.patch(
             "builtins.input",
             side_effect=[

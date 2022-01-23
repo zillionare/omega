@@ -21,7 +21,6 @@ from omicron.models.stock import Stock
 from omicron.models.timeframe import TimeFrame
 from omicron.notify.mail import mail_notify
 from pyemit import emit
-from zillionare_core_types.core.types import FrameType, SecurityType
 
 from omega.core import constants
 from omega.core.events import Events
@@ -232,14 +231,14 @@ class Task:
         #     body += "\n执行这些股票数据时发生错误：" + str(fails)
         return fails
 
-    async def check_done(self, count: int):
+    async def check_done(self, count: int) -> bool:
         """
         等待fether完成任务
         Args:
             count: 需要等待完成的任务的条数
 
         Returns:
-
+            任务是否完成
         """
         s = time.time()
         try:
@@ -399,8 +398,6 @@ async def __daily_calibration_sync(
         tread_date: 本次需要校验的交易日时间对象
         head: 已经同步的最早时间
         tail: 已经同步的最晚时间
-
-    Returns:
 
     """
     start = tread_date.replace(hour=9, minute=31, microsecond=0, second=0)
@@ -611,7 +608,7 @@ async def __sync_year_quarter_month_week(tail_key, frame_type):
     year_quarter_month_week_calendar = {
         FrameType.WEEK: TimeFrame.int2date(TimeFrame.week_frames[0]),
         FrameType.MONTH: TimeFrame.int2date(TimeFrame.month_frames[0]),
-        FrameType.QUARTER: TimeFrame.int2date(TimeFrame.quater_frames[0]),
+        FrameType.QUARTER: TimeFrame.int2date(TimeFrame.quarter_frames[0]),
         FrameType.YEAR: TimeFrame.int2date(TimeFrame.year_frames[0]),
     }
 

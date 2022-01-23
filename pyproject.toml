@@ -82,6 +82,7 @@ mkdocs-autorefs = {version = "0.1.1", optional = true}
 livereload = {version = "^2.6.3", optional = true}
 minio = "^7.1.2"
 zillionare-core-types = "^0.2"
+msgpack = {version = "^1.0.3", optional = true}
 [tool.poetry.extras]
 test = [
     "pytest",
@@ -92,7 +93,7 @@ test = [
     "pytest-cov"
     ]
 
-dev = ["tox", "pre-commit", "virtualenv", "pip", "twine"]
+dev = ["tox", "pre-commit", "virtualenv", "pip", "twine", "msgpack"]
 
 doc = [
     "mkdocs",

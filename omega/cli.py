@@ -5,15 +5,12 @@
 管理应用程序生命期、全局对象、任务、全局消息响应
 """
 import asyncio
-import itertools
 import logging
 import os
-import random
 import re
 import signal
 import subprocess
 import sys
-import time
 from pathlib import Path
 from typing import Any, Callable, List, Union
 
@@ -25,14 +22,11 @@ import fire
 import omicron
 import psutil
 import sh
-from coretypes import FrameType
 from pyemit import emit
 from ruamel.yaml import YAML
 from termcolor import colored
 
-import omega
 from omega.config import get_config_dir
-from omega.master import jobs as syncjobs
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher
 
 logger = logging.getLogger(__name__)
@@ -54,11 +48,13 @@ def load_factory_settings():
 
 
 def factory_config_dir():
+    import omega
+
     module_dir = os.path.dirname(omega.__file__)
     return os.path.join(module_dir, "config")
 
 
-def format_msg(msg: str):
+def format_msg(msg: str) -> str:
     """格式化msg并显示在控制台上
 
     本函数允许在写代码时按格式要求进行缩进和排版，但在输出时，这些格式都会被移除；对较长的文本，
@@ -66,9 +62,10 @@ def format_msg(msg: str):
 
     如果需要在msg中插入换行或者制表符，使用`\\n`和`\\t`。
     args:
-        msg:
+        msg: 需要格式化的msg
 
     returns:
+        格式化后的msg
     """
     msg = re.sub(r"\n\s+", "", msg)
     msg = re.sub(r"[\t\n]", "", msg)
@@ -378,8 +375,6 @@ async def setup(reset_factory=False, force=False):
         reset_factory: reset to factory settings
         force: if true, force setup no matter if run already
 
-    Returns:
-
     """
     msg = """
     Zillionare-omega (大富翁)\\n
@@ -434,6 +429,8 @@ async def setup(reset_factory=False, force=False):
 
 
 def save_config(settings):
+    import omega
+
     os.makedirs(get_config_dir(), exist_ok=True)
     config_file = os.path.join(get_config_dir(), "defaults.yaml")
     settings["version"] = omega.__version__
@@ -501,8 +498,6 @@ async def start(service: str = ""):
 
     Args:
         service: if service is '', then starts worker processes.
-
-    Returns:
 
     """
     print(f"正在启动zillionare-omega {colored(service, 'green')}...")
