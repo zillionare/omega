@@ -25,6 +25,7 @@ import fire
 import omicron
 import psutil
 import sh
+from coretypes import FrameType
 from pyemit import emit
 from ruamel.yaml import YAML
 from termcolor import colored

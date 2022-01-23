@@ -19,7 +19,7 @@ from omega.worker import jobs as workjobs
 from omega.worker.dfs import TempStorage
 from tests import init_test_env
 from omega.core.constants import HIGH_LOW_LIMIT
-from zillionare_core_types.core.types import FrameType
+from coretypes import FrameType
 from omicron.models.stock import Stock
 from tests import test_dir
 

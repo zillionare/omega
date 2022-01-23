@@ -10,7 +10,7 @@ import cfg4py
 import numpy as np
 import omicron
 from omicron import cache
-from zillionare_core_types.core.types import FrameType
+from coretypes import FrameType
 
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from tests import init_test_env

@@ -6,7 +6,7 @@ import logging
 import unittest
 
 import cfg4py
-from zillionare_core_types.core.types import FrameType
+from coretypes import FrameType
 
 from omega.worker.dfs import Storage, MinioStorage
 from omega.config.schema import Config

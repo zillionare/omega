@@ -8,7 +8,7 @@ import socket
 import subprocess
 import sys
 from contextlib import closing
-from zillionare_core_types.core.types import FrameType
+from coretypes import FrameType
 
 import aiohttp
 import arrow

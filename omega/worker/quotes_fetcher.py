@@ -9,7 +9,7 @@ from abc import ABC
 from typing import List, Optional, Union
 
 import numpy
-from zillionare_core_types.core.types import Frame, FrameType
+from coretypes import Frame, FrameType
 
 
 class QuotesFetcher(ABC):

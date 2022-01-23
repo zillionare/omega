@@ -15,6 +15,7 @@ import async_timeout
 import cfg4py
 import numpy as np
 from cfg4py.config import Config
+from coretypes import FrameType, SecurityType
 from omicron.dal import cache
 from omicron.models.stock import Stock
 from omicron.models.timeframe import TimeFrame
