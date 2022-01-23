@@ -12,7 +12,6 @@ import numpy as np
 from coretypes import FrameType
 from minio import Minio, error
 from omicron.models.timeframe import TimeFrame
-from coretypes import FrameType
 
 from omega.config.schema import Config
 
