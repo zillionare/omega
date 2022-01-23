@@ -20,7 +20,7 @@ from omicron import cache
 from omicron.extensions.np import numpy_append_fields
 from omicron.models.stock import Stock
 from omicron.notify.mail import mail_notify
-from zillionare_core_types.core.types import FrameType, SecurityType
+from coretypes import FrameType, SecurityType
 
 from omega.core.constants import HIGH_LOW_LIMIT
 from omega.worker import exception

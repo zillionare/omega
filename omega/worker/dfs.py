@@ -11,7 +11,7 @@ import cfg4py
 import numpy as np
 from minio import Minio, error
 from omicron.models.timeframe import TimeFrame
-from zillionare_core_types.core.types import FrameType
+from coretypes import FrameType
 
 from omega.config.schema import Config
 
