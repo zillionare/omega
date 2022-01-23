@@ -14,9 +14,9 @@ import async_timeout
 import cfg4py
 import numpy as np
 from cfg4py.config import Config
-from omicron.core.types import FrameType, SecurityType
+from coretypes import FrameType, SecurityType
 from omicron.dal import cache
-from omicron.models.calendar import Calendar as cal
+from omicron.models.timeframe import TimeFrame
 from omicron.models.stock import Stock
 from omicron.notify.mail import mail_notify
 from pyemit import emit
@@ -40,7 +40,7 @@ def get_timeout(timeout=60):  # pragma: no cover
 
 def get_first_day_frame():
     """获取自股市开盘以来，第一个交易日"""
-    return cal.day_frames[0]
+    return TimeFrame.day_frames[0]
 
 
 def abnormal_master_report():
@@ -293,7 +293,7 @@ async def sync_calendar():
         logger.warning("failed to fetch trade days.")
         return None
 
-    await cal.init()
+    await TimeFrame.init()
 
 
 @abnormal_master_report()
@@ -448,7 +448,7 @@ async def daily_calibration_sync():
     if not head or not tail:
         # 任意一个缺失都不行
         print("说明是首次同步，查找上一个已收盘的交易日")
-        pre_trade_day = cal.day_shift(now, -1)
+        pre_trade_day = TimeFrame.day_shift(now, -1)
         tread_date = datetime.datetime.combine(pre_trade_day, datetime.time(0, 0))
         head = tail = pre_trade_day
 
@@ -456,7 +456,7 @@ async def daily_calibration_sync():
         # 说明不是首次同步，检查tail到现在有没有空洞
         tail_date = datetime.datetime.strptime(tail, "%Y-%m-%d")
         head_date = datetime.datetime.strptime(head, "%Y-%m-%d")
-        count_frame = cal.count_frames(
+        count_frame = TimeFrame.count_frames(
             tail_date,
             now.replace(hour=0, minute=0, second=0, microsecond=0),
             FrameType.DAY,
@@ -469,12 +469,12 @@ async def daily_calibration_sync():
         else:
             # 说明没有空洞
             tread_date = head = datetime.datetime.combine(
-                cal.day_shift(head_date, -1), datetime.time(0, 0)
+                TimeFrame.day_shift(head_date, -1), datetime.time(0, 0)
             )
             tail = None
     # 检查时间是否小于于 2005年，大于则说明同步完成了
     day_frame = get_first_day_frame()
-    if cal.date2int(tread_date) < day_frame:
+    if TimeFrame.date2int(tread_date) < day_frame:
         print("所有数据已同步完毕")
         return True
 
@@ -510,13 +510,13 @@ async def sync_minute_bars():
     end = get_now().replace(second=0, microsecond=0)
     first = end.replace(hour=9, minute=31, second=0, microsecond=0)
     # 检查当前时间是否在交易时间内
-    if end.hour * 60 + end.minute not in cal.ticks[FrameType.MIN1]:
+    if end.hour * 60 + end.minute not in TimeFrame.ticks[FrameType.MIN1]:
         if 11 <= end.hour < 13:
             end = end.replace(hour=11, minute=30)
         else:
             end = end.replace(hour=15, second=0, minute=0)
 
-    if not cal.is_trade_day(end):
+    if not TimeFrame.is_trade_day(end):
         print("非交易日，不同步")
         return False
 
@@ -531,7 +531,7 @@ async def sync_minute_bars():
         if tail < first:
             tail = first
 
-    n_bars = cal.count_frames(tail, end, FrameType.MIN1)  # 获取到一共有多少根k线
+    n_bars = TimeFrame.count_frames(tail, end, FrameType.MIN1)  # 获取到一共有多少根k线
 
     params = {"start": tail, "end": end, "n_bars": n_bars}
     task = Task(Events.OMEGA_DO_SYNC_MIN, queue_name, params, timeout=get_timeout())
@@ -550,7 +550,7 @@ async def sync_high_low_limit():
     """每天9点半之后同步一次今日涨跌停并写入redis"""
     timeout = get_timeout(60 * 10)
     end = get_now().replace(hour=15, minute=0, second=0, microsecond=0)
-    if not cal.is_trade_day(end):
+    if not TimeFrame.is_trade_day(end):
         print("非交易日，不同步")
         return False
     params = {"end": end}
@@ -571,10 +571,10 @@ async def delete_year_quarter_month_week_queue(stock, index):
 
 async def __sync_year_quarter_month_week(tail_key, frame_type):
     year_quarter_month_week_calendar = {
-        FrameType.WEEK: cal.int2date(cal.week_frames[0]),
-        FrameType.MONTH: cal.int2date(cal.month_frames[0]),
-        FrameType.QUARTER: cal.int2date(cal.quater_frames[0]),
-        FrameType.YEAR: cal.int2date(cal.year_frames[0]),
+        FrameType.WEEK: TimeFrame.int2date(TimeFrame.week_frames[0]),
+        FrameType.MONTH: TimeFrame.int2date(TimeFrame.month_frames[0]),
+        FrameType.QUARTER: TimeFrame.int2date(TimeFrame.quater_frames[0]),
+        FrameType.YEAR: TimeFrame.int2date(TimeFrame.year_frames[0]),
     }
 
     tail = await cache.sys.get(tail_key)
@@ -583,9 +583,9 @@ async def __sync_year_quarter_month_week(tail_key, frame_type):
         tail = year_quarter_month_week_calendar.get(frame_type)
     else:
         tail = datetime.datetime.strptime(tail, "%Y-%m-%d")
-        tail = cal.shift(tail, 1, frame_type)
+        tail = TimeFrame.shift(tail, 1, frame_type)
     # 判断week_tail到现在有没有空洞
-    count_frame = cal.count_frames(
+    count_frame = TimeFrame.count_frames(
         tail,
         now.replace(hour=0, minute=0, second=0, microsecond=0),
         frame_type,

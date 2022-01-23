@@ -10,8 +10,8 @@ from typing import AnyStr, Dict, Union
 import cfg4py
 import numpy as np
 from minio import Minio, error
-from omicron.models.calendar import Calendar as cal
-from omicron.models.calendar import FrameType
+from omicron.models.timeframe import TimeFrame
+from coretypes import FrameType
 
 from omega.config.schema import Config
 
@@ -58,9 +58,9 @@ class AbstractStorage(ABC):
         else:
             raise TypeError("prefix must be type FrameType, str")
         if isinstance(dt, str):
-            filename.append(cal.int2date(dt))
+            filename.append(TimeFrame.int2date(dt))
         elif isinstance(dt, datetime) or isinstance(dt, date):
-            filename.append(str(cal.date2int(dt)))
+            filename.append(str(TimeFrame.date2int(dt)))
         else:
             raise TypeError("dt must be type datetime, date, str")
 

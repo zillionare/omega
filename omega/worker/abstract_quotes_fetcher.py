@@ -11,9 +11,9 @@ from typing import List, Optional, Union
 import arrow
 import cfg4py
 import numpy as np
+from coretypes import Frame, FrameType
 from numpy.lib import recfunctions as rfn
-from omicron.core.types import Frame, FrameType
-from omicron.models.calendar import Calendar as cal
+from omicron.models.timeframe import TimeFrame
 from omicron.models.funds import FundNetValue, FundPortfolioStock, Funds, FundShareDaily
 from omicron.models.stock import Stock
 from scipy import rand
@@ -85,7 +85,7 @@ class AbstractQuotesFetcher(QuotesFetcher):
     @classmethod
     async def get_all_trade_days(cls):
         days = await cls.get_instance().get_all_trade_days()
-        await cal.save_calendar(days)
+        await TimeFrame.save_calendar(days)
         return days
 
     @classmethod
@@ -104,7 +104,7 @@ class AbstractQuotesFetcher(QuotesFetcher):
 
     @classmethod
     async def get_quota(cls):
-        quota = await cls.get_instance().get_query_count()
+        quota = await cls.get_instance().get_quota()
         return quota.get("spare")
 
     @classmethod

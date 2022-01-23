@@ -25,8 +25,7 @@ import fire
 import omicron
 import psutil
 import sh
-from omicron.core.types import FrameType
-from omicron.models.calendar import Calendar as cal
+from coretypes import FrameType
 from pyemit import emit
 from ruamel.yaml import YAML
 from termcolor import colored

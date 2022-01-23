@@ -81,6 +81,7 @@ idna = "2.5"
 mkdocs-autorefs = {version = "0.1.1", optional = true}
 livereload = {version = "^2.6.3", optional = true}
 minio = "^7.1.2"
+zillionare-core-types = "^0.2"
 [tool.poetry.extras]
 test = [
     "pytest",
