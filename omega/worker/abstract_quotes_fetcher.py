@@ -17,6 +17,7 @@ from omicron.models.funds import FundNetValue, FundPortfolioStock, Funds, FundSh
 from omicron.models.stock import Stock
 from omicron.models.timeframe import TimeFrame
 from scipy import rand
+from coretypes import Frame, FrameType
 
 from omega.worker.quotes_fetcher import QuotesFetcher
 

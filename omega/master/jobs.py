@@ -21,6 +21,7 @@ from omicron.models.stock import Stock
 from omicron.models.timeframe import TimeFrame
 from omicron.notify.mail import mail_notify
 from pyemit import emit
+from coretypes import FrameType, SecurityType
 
 from omega.core import constants
 from omega.core.events import Events
