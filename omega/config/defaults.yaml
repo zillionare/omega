@@ -76,10 +76,10 @@ dfs:
     bucket: zillionare
 
 influxdb:
-  url: http://192.168.100.111:8086
-  token: Gui_t2RaMJ44bTyPHWs1cLIuJDyyUjldvq52HzlLXcz3z5jyCdPIgrGZIJAh4gZXhny9JGveOzi1r72WgtJ-xg==
-  org: my-org
-  bucket_name: zillionare
+  url: http://${INFLUXDB_HOST}:${INFLUXDB_PORT}
+  token: ${INFLUXDB_TOKEN}
+  org: ${INFLUXDB_ORG}
+  bucket_name: ${INFLUXDB_BUCKET}
 
 notify:
     mail_from: shaohu.chen@qq.com
