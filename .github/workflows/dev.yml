@@ -41,7 +41,7 @@ jobs:
       postgres:
         image: postgres
         env: # this is defined by image postgres
-          POSTGRES_PASSWORD: zillionare
+          POSTGRES_PASSWORD: 123456
           POSTGRES_USER: zillionare
           POSTGRES_DB: zillionare
         options: >-
