@@ -21,6 +21,7 @@ from omicron import cache
 from omicron.extensions.np import numpy_append_fields
 from omicron.models.stock import Stock
 from omicron.notify.mail import mail_notify
+from retrying import retry
 
 from omega.core.constants import HIGH_LOW_LIMIT
 from omega.worker import exception
@@ -88,6 +89,7 @@ async def cache_init():
         await AbstractQuotesFetcher.get_security_list()
 
 
+@retry(stop_max_attempt_number=5)
 async def fetch_bars(
     secs: List[str], end: datetime.datetime, n_bars: int, frame_type: FrameType
 ):
@@ -133,6 +135,7 @@ async def fetch_week_bars(secs: List[str], end: datetime.datetime, n_bars: int):
     return await fetch_bars(secs, end, n_bars, FrameType.WEEK)
 
 
+@retry(stop_max_attempt_number=5)
 async def get_high_low_limit(secs, end):
     """获取涨跌停价"""
     return await AbstractQuotesFetcher.get_high_limit_price(secs, end)
@@ -146,6 +149,7 @@ def get_remnant_s():
     return int((end - now).total_seconds())
 
 
+@retry(stop_max_attempt_number=5)
 async def fetch_day_bars(secs: List[str], end: datetime.datetime):
     """
     获取日线数据
@@ -332,6 +336,12 @@ async def handle_dfs_data(bars1, bars2, queue_name):
         return False
 
 
+@retry(stop_max_attempt_number=5)
+async def persist_bars(frame_type, bars1):
+    logger.info(f"正在写入inflaxdb:frame_type:{frame_type}")
+    await Stock.persist_bars(frame_type, bars1)
+
+
 async def persistence_daily_calibration(bars1, bars2, secs, fail, queue, frame_type):
     # 将数据持久化
     if bars1 is None or bars2 is None:
@@ -342,7 +352,7 @@ async def persistence_daily_calibration(bars1, bars2, secs, fail, queue, frame_t
         await push_fail_secs(secs, fail)
         raise exception.ChecksumFail()
     if isinstance(bars1, np.ndarray):
-        await Stock.persist_bars(frame_type, bars1)
+        await persist_bars(frame_type, bars1)
     return len(secs)
 
 

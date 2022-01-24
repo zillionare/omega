@@ -21,6 +21,7 @@ from omicron.models.stock import Stock
 from omicron.models.timeframe import TimeFrame
 from omicron.notify.mail import mail_notify
 from pyemit import emit
+from retrying import retry
 
 from omega.core import constants
 from omega.core.events import Events
@@ -173,7 +174,7 @@ class Task:
 
     async def run(self):
         """分配任务并发送emit通知worker开始执行，然后阻塞等待"""
-        logger.info(f"{self.params} 任务启动")
+        logger.info(f"{self.task_queue_name}:{self.params} 任务启动")
         if await self.is_running:
             return False
         tasks = await self.tasks()
@@ -264,8 +265,12 @@ class Task:
                     if done_count is None or int(done_count) != count:
                         await asyncio.sleep(0.5)
                     else:
-                        print(f"{self.scope}耗时：{time.time() - s}")
-                        logger.info(f"{self.scope}耗时：{time.time() - s}")
+                        print(
+                            f"{self.scope}, params:{self.params},耗时：{time.time() - s}"
+                        )
+                        logger.info(
+                            f"{self.scope}, params:{self.params},耗时：{time.time() - s}"
+                        )
                         return True
         except asyncio.exceptions.TimeoutError:  # pragma: no cover
             logger.info("消费者超时退出")
@@ -344,6 +349,13 @@ async def delete_daily_calibration_queue(stock_min, index_min, stock_day, index_
     await p.execute()
 
 
+@retry(stop_max_attempt_number=5)
+async def persist_bars(frame_type, bars1):
+    logger.info(f"正在写入inflaxdb:frame_type:{frame_type}")
+    await Stock.persist_bars(frame_type, bars1)
+    logger.info(f"已经写入inflaxdb:frame_type:{frame_type}")
+
+
 async def write_dfs(
     queue_name: str,
     frame_type: FrameType,
@@ -382,6 +394,7 @@ async def write_dfs(
         ):
             resampled = Stock.resample(bars, FrameType.MIN1, ftype)
             resampled_binary = pickle.dumps(resampled, protocol=cfg.pickle.ver)
+            await persist_bars(ftype, resampled)
             await dfs.write(resampled_binary, prefix, dt, ftype)
     await cache.temp.delete(queue_name)
 
@@ -448,13 +461,23 @@ async def __daily_calibration_sync(
         await cache.sys.set(constants.BAR_SYNC_ARCHIVE_TAIl, tail.strftime("%Y-%m-%d"))
     await delete_daily_calibration_queue(stock_min, index_min, stock_day, index_day)
     # 检查tail是不是上一个交易日的，如果是上一个交易日，则需要清空redis
-    pre_trade_day = TimeFrame.day_shift(now, -1).strftime("%Y-%m-%d")
-    tread_date = tread_date.strftime("%Y-%m-%d")
-    if pre_trade_day == tread_date:
+    pre_trade_day = TimeFrame.date2int(get_yesterday_or_pre_trade_day(now))
+    tread_date = TimeFrame.date2int(tread_date)
+    if pre_trade_day == tread_date and get_now() < start:  # 时间小于当天9点31才能清，防止盘中被清掉数据
         await Stock.reset_cache()
         logger.info("上一个交易日数据已同步完毕, 已清空缓存")
     logger.info(f"持久化完成， params:{params}执行完毕")
+    print(f"持久化完成， params:{params}执行完毕")
     return await run_daily_calibration_sync(now)
+
+
+def get_yesterday_or_pre_trade_day(now):
+    """获取昨天或者上一个交易日"""
+    if TimeFrame.date2int(now) in TimeFrame.day_frames:
+        pre_trade_day = TimeFrame.day_shift(now, -1)
+    else:
+        pre_trade_day = TimeFrame.day_shift(now, 0)
+    return pre_trade_day
 
 
 async def run_daily_calibration_sync(now):
@@ -469,7 +492,7 @@ async def run_daily_calibration_sync(now):
     if not head or not tail:
         # 任意一个缺失都不行
         logger.info("说明是首次同步，查找上一个已收盘的交易日")
-        pre_trade_day = TimeFrame.day_shift(now, -1)
+        pre_trade_day = get_yesterday_or_pre_trade_day(now)
         tread_date = datetime.datetime.combine(pre_trade_day, datetime.time(0, 0))
         head = tail = pre_trade_day
 
@@ -479,11 +502,14 @@ async def run_daily_calibration_sync(now):
         head_date = datetime.datetime.strptime(head, "%Y-%m-%d")
         count_frame = TimeFrame.count_frames(
             tail_date,
-            now.replace(hour=0, minute=0, second=0, microsecond=0),
+            now,
             FrameType.DAY,
         )
         if count_frame > 1:
             # 说明有空洞
+            tail_date = datetime.datetime.combine(
+                TimeFrame.day_shift(tail_date, 1), datetime.time(0, 0)
+            )
             tread_date = tail = tail_date
             head = None
 
@@ -552,14 +578,17 @@ async def sync_minute_bars():
 
     queue_name = "minute"
     tail = await cache.sys.hget(constants.BAR_SYNC_STATE_MINUTE, "tail")
-    if not tail:
-        # 如果么有end,则取今天的9点31分
-        tail = first
-    else:
+    if tail:
         # todo 如果有，这个时间最早只能是今天的9点31分,因为有可能是昨天执行完的最后一次
         tail = datetime.datetime.strptime(tail, "%Y-%m-%d %H:%M:00")
         if tail < first:
             tail = first
+        elif tail.hour == 11 and tail.minute == 30:
+            # 说明上午已经同步完了，到下午同步了，把tail改为13点
+            tail = tail.replace(hour=13, minute=0)
+    else:
+        tail = first
+
     tail += datetime.timedelta(minutes=1)  # 取上次同步截止时间+1 计算出n_bars
     n_bars = TimeFrame.count_frames(tail, end, FrameType.MIN1)  # 获取到一共有多少根k线
 

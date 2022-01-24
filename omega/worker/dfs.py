@@ -12,6 +12,7 @@ import numpy as np
 from coretypes import FrameType
 from minio import Minio, error
 from omicron.models.timeframe import TimeFrame
+from retrying import retry
 
 from omega.config.schema import Config
 
@@ -162,6 +163,7 @@ class MinioStorage(AbstractStorage):
         """删除bucket"""
         self.client.remove_bucket(self.bucket)
 
+    @retry(stop_max_attempt_number=5)
     async def write(
         self,
         bar: bytes,
