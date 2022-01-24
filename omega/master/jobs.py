@@ -352,7 +352,9 @@ async def delete_daily_calibration_queue(stock_min, index_min, stock_day, index_
 @retry(stop_max_attempt_number=5)
 async def persist_bars(frame_type, bars1):
     logger.info(f"正在写入inflaxdb:frame_type:{frame_type}")
-    await Stock.persist_bars(frame_type, bars1)
+    # todo
+    # await Stock.persist_bars(frame_type, bars1)
+
     logger.info(f"已经写入inflaxdb:frame_type:{frame_type}")
 
 
@@ -383,6 +385,7 @@ async def write_dfs(
     bars = [pickle.loads(i) for i in data]
     # data = pickle.loads(data)
     bars = np.concatenate(bars)
+    await persist_bars(frame_type, bars)
     binary = pickle.dumps(bars, protocol=cfg.pickle.ver)
     await dfs.write(binary, prefix, dt, frame_type)
     if resample and frame_type == FrameType.MIN1:
@@ -489,10 +492,10 @@ async def run_daily_calibration_sync(now):
         await cache.sys.get(constants.BAR_SYNC_ARCHIVE_TAIl),
     )
 
+    pre_trade_day = get_yesterday_or_pre_trade_day(now)
     if not head or not tail:
         # 任意一个缺失都不行
         logger.info("说明是首次同步，查找上一个已收盘的交易日")
-        pre_trade_day = get_yesterday_or_pre_trade_day(now)
         tread_date = datetime.datetime.combine(pre_trade_day, datetime.time(0, 0))
         head = tail = pre_trade_day
 
@@ -502,7 +505,7 @@ async def run_daily_calibration_sync(now):
         head_date = datetime.datetime.strptime(head, "%Y-%m-%d")
         count_frame = TimeFrame.count_frames(
             tail_date,
-            now,
+            pre_trade_day,
             FrameType.DAY,
         )
         if count_frame > 1:

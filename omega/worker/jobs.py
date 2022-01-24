@@ -339,7 +339,10 @@ async def handle_dfs_data(bars1, bars2, queue_name):
 @retry(stop_max_attempt_number=5)
 async def persist_bars(frame_type, bars1):
     logger.info(f"正在写入inflaxdb:frame_type:{frame_type}")
-    await Stock.persist_bars(frame_type, bars1)
+    # todo
+    # await Stock.persist_bars(frame_type, bars1)
+
+    logger.info(f"已经写入inflaxdb:frame_type:{frame_type}")
 
 
 async def persistence_daily_calibration(bars1, bars2, secs, fail, queue, frame_type):
@@ -351,7 +354,7 @@ async def persistence_daily_calibration(bars1, bars2, secs, fail, queue, frame_t
     if not await handle_dfs_data(bars1, bars2, queue):
         await push_fail_secs(secs, fail)
         raise exception.ChecksumFail()
-    if isinstance(bars1, np.ndarray):
+    if frame_type == FrameType.DAY and isinstance(bars1, np.ndarray):
         await persist_bars(frame_type, bars1)
     return len(secs)
 
