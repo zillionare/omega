@@ -1,6 +1,62 @@
+tz: Asia/Shanghai
+logreceiver:
+  klass: omega.logging.receiver.redis.RedisLogReceiver
+  dsn: redis://localhost:6379
+  channel: omega.log
+  filename: /tmp/log/zillionare/omega.log
+  backup_count: 7
+  max_bytes: 10M
+redis:
+  dsn: redis://localhost:6379
+postgres:
+  dsn: postgres://zillionare:123456@localhost:5432/zillionare
+  enabled: true
+pickle:
+  ver: 4
 omega:
+  home: ~/zillionare/omgea
+  jobs:
+    port: 3180
+  urls:
+    quotes_server: http://localhost:3181
+    archive: http://stocks.jieyu.ai
+  heartbeat: 10
   sync:
+    security_list: 01:00
+    calendar: 01:00
     bars:
       cat:
         - stock
         - index
+
+
+quotes_fetchers:
+  - impl: jqadaptor    # there must be a create_instance method in this module
+    workers:
+      - account: ${JQ_ACCOUNT}
+        password: ${JQ_PASSWORD}
+        port: 3181
+        # note! for the first group, if you set n, then you'll get n + 1 workers
+        sessions: 1
+
+dfs:
+  engine: minio
+  minio:
+    host: localhost
+    port: 9000
+    access: minioadmin
+    secret: minioadmin
+    secure: false
+    bucket: my-bucket
+
+influxdb:
+  url: http://localhost:8086
+  token: my-token
+  org: my-org
+  bucket_name: my-bucket
+
+notify:
+    mail_from: ${MAIL_FROM}
+    mail_to:
+        - ${MAIL_TO}
+    mail_server: ${MAIL_SERVER}
