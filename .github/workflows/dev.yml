@@ -5,9 +5,8 @@ name: CI
 # Controls when the action will run.
 on:
   push:
-    branches: [ master, main, release ]
-  pull_request:
-    branches: [ master, main, release ]
+    branches:
+      - '*'
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -17,21 +16,9 @@ jobs:
   test:
     env:
       TZ: Asia/Shanghai
-      REDIS_HOST: localhost
-      REDIS_PORT: 6379
-      POSTGRES_DB: zillionare
-      POSTGRES_HOST: localhost
-      POSTGRES_USER: zillionare
-      POSTGRES_PORT: 5432
-      POSTGRES_PASSWORD: zillionare
       JQ_ACCOUNT: "${{secrets.JQ_ACCOUNT}}"
       JQ_PASSWORD: ${{secrets.JQ_PASSWORD}}
-      POSTGRES_ENABLED: true
       __cfg4py_server_role__: DEV
-      MINIO_HOST: localhost
-      MINIO_PORT: 9000
-      MINIO_ACCESS: root123
-      MINIO_SECRET: adminadmin
     # The type of runner that the job will run on
     strategy:
       matrix:
@@ -68,8 +55,8 @@ jobs:
         ports:
           - 9000:9000
         env:
-          MINIO_ACCESS_KEY: root123
-          MINIO_SECRET_KEY: adminadmin
+          MINIO_ACCESS_KEY: minioadmin
+          MINIO_SECRET_KEY: minioadmin
         volumes:
           - /tmp/data:/data
         options: >-
@@ -99,6 +86,12 @@ jobs:
             sudo -E apt-get install --yes --no-install-recommends postgresql-client
             PGPASSWORD=zillionare psql -U zillionare -h localhost --dbname=zillionare --file=omega/config/sql/init.sql
             PGPASSWORD=zillionare psql -U zillionare -h localhost --dbname=zillionare --file=omega/config/sql/v1.0.sql
+
+      - name: init influxdb
+        run: |
+          docker run -d -p 8086:8086 --name my_influxdb influxdb
+          sleep 3
+          docker exec -i my_influxdb bash -c 'influx setup --username my-user --password my-password --org my-org --bucket my-bucket --retention 168d --token my-token --force'
 
       - name: test with tox
         run:
