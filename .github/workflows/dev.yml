@@ -85,8 +85,8 @@ jobs:
             export TZ=Asia/Shanghai
             sudo -E apt-get update
             sudo -E apt-get install --yes --no-install-recommends postgresql-client
-            PGPASSWORD=$POSTGRES_PASSWORD psql -U $POSTGRES_USER -h localhost --dbname=zillionare --file=omega/config/sql/init.sql
-            PGPASSWORD=$POSTGRES_PASSWORD psql -U $POSTGRES_USER -h localhost --dbname=zillionare --file=omega/config/sql/v1.0.sql
+            PGPASSWORD=123456 psql -U zillionare -h localhost --dbname=zillionare --file=omega/config/sql/init.sql
+            PGPASSWORD=123456 psql -U zillionare -h localhost --dbname=zillionare --file=omega/config/sql/v1.0.sql
 
       - name: init influxdb
         run: |
