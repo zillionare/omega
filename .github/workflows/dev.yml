@@ -19,6 +19,7 @@ jobs:
       JQ_ACCOUNT: "${{secrets.JQ_ACCOUNT}}"
       JQ_PASSWORD: ${{secrets.JQ_PASSWORD}}
       __cfg4py_server_role__: DEV
+      IS_GITHUB: 1
     # The type of runner that the job will run on
     strategy:
       matrix:
