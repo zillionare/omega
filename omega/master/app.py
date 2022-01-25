@@ -19,13 +19,7 @@ from pyemit import emit
 from omega.config import get_config_dir
 from omega.core.events import Events
 from omega.logreceivers.redis import RedisLogReceiver
-from omega.master.jobs import (
-    load_cron_task,
-    sync_calendar,
-    sync_security_list,
-    work_state,
-)
-from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher
+from omega.master.jobs import load_cron_task, work_state
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
@@ -71,19 +65,6 @@ async def init():  # noqa
     cfg4py.init(get_config_dir(), False)
     emit.register(Events.OMEGA_HEART_BEAT, handle_work_heart_beat)
     await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
-    for fetcher in cfg.quotes_fetchers:
-        impl = fetcher.get("impl")
-        workers = fetcher.get("workers")
-        for group in workers:
-            sessions = group.get("sessions", 1)
-            account = group.get("account")
-            password = group.get("password")
-            await AbstractQuotesFetcher.create_instance(
-                impl,
-                account=account,
-                password=password,
-                sessions=sessions,
-            )
 
     await start_logging()
     logger.info("init omega-master process with config at %s", config_dir)

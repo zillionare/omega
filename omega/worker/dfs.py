@@ -137,7 +137,7 @@ class Storage:
 
 
 class MinioStorage(AbstractStorage):
-    def __init__(self, bucket=None):
+    def __init__(self, bucket=None, readonly=False):
         """初始化minio连接，检查bucket 是否存在"""
         self.client = Minio(
             endpoint=f"{cfg.dfs.minio.host}:{cfg.dfs.minio.port}",
@@ -145,11 +145,13 @@ class MinioStorage(AbstractStorage):
             secret_key=cfg.dfs.minio.secret,
             secure=cfg.dfs.minio.secure,
         )
+        self.__readonly = readonly
         if bucket is None:
             self.bucket = cfg.dfs.minio.bucket
         else:
             self.bucket = bucket
-        self.create_bucket()
+        if not self.__readonly:
+            self.create_bucket()
 
     def create_bucket(self):
         # 调用make_bucket来创建一个存储桶。

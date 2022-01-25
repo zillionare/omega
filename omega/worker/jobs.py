@@ -17,7 +17,7 @@ import cfg4py
 import numpy as np
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from coretypes import FrameType, SecurityType
-from omicron import cache
+from omicron import TimeFrame, cache
 from omicron.extensions.np import numpy_append_fields
 from omicron.models.stock import Stock
 from omicron.notify.mail import mail_notify
@@ -449,12 +449,14 @@ def cron_work_report():
         @wraps(f)
         async def decorated_function():
             """装饰所有worker，统一处理错误信息"""
-            has_same_task = await cache.sys.exists(f"""cron_{f.__name__}""")
+            key = f"""cron_{f.__name__}"""
+            has_same_task = await cache.sys.exists(key)
             if has_same_task:
                 return None
-            await cache.sys.setex(f"""cron_{f.__name__}""", 3600 * 2, 1)
+            await cache.sys.setex(key, 3600 * 2, 1)
             try:
                 ret = await f()
+                await cache.sys.delete(key)
                 return ret
             except Exception as e:  # pragma: no cover
                 # 说明消费者消费时错误了
@@ -520,8 +522,46 @@ async def sync_fund_portfolio_stock():
     return True
 
 
-async def load_cron_task(scheduler: AsyncIOScheduler):
+@cron_work_report()
+async def sync_calendar():
+    """从上游服务器获取所有交易日，并计算出周线帧和月线帧
 
+    Returns:
+    """
+    trade_days = await AbstractQuotesFetcher.get_all_trade_days()
+    if trade_days is None or len(trade_days) == 0:
+        logger.warning("failed to fetch trade days.")
+        return None
+
+    await TimeFrame.init()
+
+
+@cron_work_report()
+async def sync_security_list():
+    """更新证券列表
+
+    注意证券列表在AbstractQuotesServer取得时就已保存，此处只是触发
+    """
+    await AbstractQuotesFetcher.get_security_list()
+    logger.info("secs are fetched and saved.")
+
+
+async def load_cron_task(scheduler: AsyncIOScheduler):
+    h, m = map(int, cfg.omega.sync.security_list.split(":"))
+    scheduler.add_job(
+        sync_calendar,
+        "cron",
+        hour=h,
+        minute=m,
+        name="sync_calendar",
+    )
+    scheduler.add_job(
+        sync_security_list,
+        "cron",
+        name="sync_security_list",
+        hour=h,
+        minute=m,
+    )
     scheduler.add_job(
         sync_fund_net_value,
         "cron",

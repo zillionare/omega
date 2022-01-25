@@ -305,30 +305,6 @@ async def _stop_job_timer(job_name: str) -> int:
     return elapsed
 
 
-@abnormal_master_report()
-async def sync_calendar():
-    """从上游服务器获取所有交易日，并计算出周线帧和月线帧
-
-    Returns:
-    """
-    trade_days = await aq.get_all_trade_days()
-    if trade_days is None or len(trade_days) == 0:
-        logger.warning("failed to fetch trade days.")
-        return None
-
-    await TimeFrame.init()
-
-
-@abnormal_master_report()
-async def sync_security_list():
-    """更新证券列表
-
-    注意证券列表在AbstractQuotesServer取得时就已保存，此处只是触发
-    """
-    await aq.get_security_list()
-    logger.info("secs are fetched and saved.")
-
-
 async def delete_daily_calibration_queue(stock_min, index_min, stock_day, index_day):
     """
     清理校准同步的队列，防止数据重复
@@ -732,21 +708,6 @@ async def sync_year_quarter_month_week():
 
 
 async def load_cron_task(scheduler):
-    h, m = map(int, cfg.omega.sync.security_list.split(":"))
-    scheduler.add_job(
-        sync_calendar,
-        "cron",
-        hour=h,
-        minute=m,
-        name="sync_calendar",
-    )
-    scheduler.add_job(
-        sync_security_list,
-        "cron",
-        name="sync_security_list",
-        hour=h,
-        minute=m,
-    )
 
     scheduler.add_job(
         sync_minute_bars,

@@ -56,26 +56,6 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         elapsed = await syncjobs._stop_job_timer("unittest")
         self.assertTrue(5 <= elapsed <= 7)
 
-    @mock.patch("omega.master.jobs.mail_notify")
-    @mock.patch("omega.master.jobs.TimeFrame.save_calendar")
-    # @mock.patch("omicron.dal.cache.save_calendar")
-    @mock.patch("jqadaptor.fetcher.Fetcher.get_all_trade_days")
-    async def test_sync_calendar(self, get_all_trade_days, *args):
-        # all_trade_days.npy
-        async def get_all_trade_days_mock():
-            print("=====")
-            return np.load(f"{test_dir()}/data/all_trade_days.npy", allow_pickle=True)
-
-        get_all_trade_days.side_effect = get_all_trade_days_mock
-        await syncjobs.sync_calendar()
-
-    @mock.patch("omega.master.jobs.mail_notify")
-    async def test_sync_security_list(self, *args):
-        await cache.security.delete("securities")
-        await syncjobs.sync_security_list()
-        secs = Stock.choose(["stock"])
-        self.assertTrue(len(secs) > 0)
-
     @mock.patch("omega.master.jobs.get_timeout", return_value=10)
     @mock.patch("omicron.models.stock.Stock.batch_cache_bars")
     @mock.patch(
@@ -513,17 +493,15 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
 
         await syncjobs.load_cron_task(scheduler)
         base = {
-            "1m:9:31-59",
-            "1m:15:00",
-            "daily_calibration_sync",
-            "sync_security_list",
-            "1m:10:*",
-            "sync_day_bars",
+            "1m:11:0-30",
             "sync_year_quarter_month_week",
+            "daily_calibration_sync",
+            "1m:15:00",
+            "1m:9:31-59",
+            "1m:10:*",
             "1m:13-14:*",
             "sync_high_low_limit",
-            "sync_calendar",
-            "1m:11:0-30",
+            "sync_day_bars",
         }
         print(set([job.name for job in scheduler.get_jobs()]))
         self.assertSetEqual(base, set([job.name for job in scheduler.get_jobs()]))
