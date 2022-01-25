@@ -450,20 +450,18 @@ def cron_work_report():
         async def decorated_function():
             """装饰所有worker，统一处理错误信息"""
             key = f"""cron_{f.__name__}"""
-            has_same_task = await cache.sys.exists(key)
-            if has_same_task:
-                return None
-            await cache.sys.setex(key, 3600 * 2, 1)
-            try:
-                ret = await f()
-                await cache.sys.delete(key)
-                return ret
-            except Exception as e:  # pragma: no cover
-                # 说明消费者消费时错误了
-                logger.exception(e)
-                subject = f"执行定时任务{f.__name__}时发生异常"
-                body = f"详细信息：\n{traceback.format_exc()}"
-                await mail_notify(subject, body, html=True)
+            if await cache.sys.setnx(key, 1):
+                await cache.sys.setex(key, 3600 * 2, 1)
+                try:
+                    ret = await f()
+                    await cache.sys.delete(key)
+                    return ret
+                except Exception as e:  # pragma: no cover
+                    # 说明消费者消费时错误了
+                    logger.exception(e)
+                    subject = f"执行定时任务{f.__name__}时发生异常"
+                    body = f"详细信息：\n{traceback.format_exc()}"
+                    await mail_notify(subject, body, html=True)
 
         return decorated_function
 
