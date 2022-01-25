@@ -210,7 +210,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Got None Data", email_content)
         await Stock.reset_cache()
 
-    @mock.patch("omega.master.jobs.get_timeout", return_value=10)
+    @mock.patch("omega.master.jobs.get_timeout", return_value=20)
     @mock.patch(
         "omega.master.jobs.get_now", return_value=datetime.datetime(2022, 1, 11, 16)
     )

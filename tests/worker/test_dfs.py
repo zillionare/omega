@@ -4,7 +4,7 @@
 import datetime
 import logging
 import unittest
-
+import asyncio
 import cfg4py
 from coretypes import FrameType
 
@@ -20,11 +20,12 @@ class TestDFS(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         await init_test_env()
 
-    # @mock.patch("omega.worker.dfs.Minio")
     async def test_minio(self, *args):
+        Storage.reset()
         cfg.dfs.engine = "minio"
         cfg.dfs.minio.bucket = "testbucket"
         minio = Storage()
+        await asyncio.sleep(1)
         # 测试启动之后桶一定存在了
         self.assertTrue(minio.client.bucket_exists(cfg.dfs.minio.bucket))
         # 读写测试
@@ -32,6 +33,7 @@ class TestDFS(unittest.IsolatedAsyncioTestCase):
         prefix = "stock"
         dt = datetime.datetime.now()
         await minio.write(content, prefix, dt, FrameType.MIN1)
+        await asyncio.sleep(1)
         self.assertEqual(await minio.read(prefix, dt, FrameType.MIN1), content)
 
         Storage.reset()
