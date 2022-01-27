@@ -21,7 +21,7 @@ from omega.worker import jobs as workjobs
 from omega.worker.dfs import TempStorage
 from tests import init_test_env
 from omega.core.constants import HIGH_LOW_LIMIT
-from coretypes import FrameType
+from coretypes import FrameType, stock_bars_dtype
 from omicron.models.stock import Stock
 from tests import test_dir
 
@@ -447,11 +447,44 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(
                 await cache.sys.get(constants.BAR_SYNC_MONTH_TAIl), "2005-01-31"
             )
-            # TODO 从数据库查询出来验证对不对
-            # week_bars = await Stock.get_bars("000001.XSHE",
-            #                                  1,
-            #                                  FrameType.WEEK,
-            #                                  datetime.datetime(2005, 1, 6))
+            # 从数据库查询出来验证对不对
+            stocks = Stock.choose(["stock"])
+            stocks.remove("300001.XSHE")
+            week_bars = await Stock.batch_get_bars(
+                stocks, 1, FrameType.WEEK, datetime.datetime(2005, 1, 7)
+            )
+            bars1 = np.concatenate([week_bars["000001.XSHE"], week_bars["600000.XSHG"]])
+            self.assertTrue(
+                (
+                    bars1
+                    == np.array(
+                        [
+                            (
+                                datetime.datetime(2005, 1, 7),
+                                6.59,
+                                6.6,
+                                6.35,
+                                6.51,
+                                9535540.0,
+                                61820855.0,
+                                27.242,
+                            ),
+                            (
+                                datetime.datetime(2005, 1, 7),
+                                6.9799995,
+                                6.9799995,
+                                6.63,
+                                6.7,
+                                17695146.0,
+                                1.19499146e08,
+                                1.557,
+                            ),
+                        ],
+                        dtype=stock_bars_dtype,
+                    )
+                ).all()
+            )
+
         await clear()
         # 测试上游返回None值
         get_bars_batch.return_value = None
@@ -486,7 +519,6 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             self.assertIn(f"剩余可用quota：{get_quota.return_value}", email_content)
         # await clear()
         # 测试超时
-        get_quota.return_value = 100000
 
     async def test_load_cron_task(self):
         scheduler = AsyncIOScheduler(timezone=cfg.tz)
