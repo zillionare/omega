@@ -329,7 +329,7 @@ async def delete_daily_calibration_queue(stock_min, index_min, stock_day, index_
 async def persist_bars(frame_type, bars1):
     logger.info(f"正在写入inflaxdb:frame_type:{frame_type}")
     # todo
-    # await Stock.persist_bars(frame_type, bars1)
+    await Stock.persist_bars(frame_type, bars1)
 
     logger.info(f"已经写入inflaxdb:frame_type:{frame_type}")
 
@@ -375,6 +375,7 @@ async def write_dfs(
             resampled_binary = pickle.dumps(resampled, protocol=cfg.pickle.ver)
             await persist_bars(ftype, resampled)
             await dfs.write(resampled_binary, prefix, dt, ftype)
+
     await cache.temp.delete(queue_name)
 
 
@@ -708,7 +709,6 @@ async def sync_year_quarter_month_week():
 
 
 async def load_cron_task(scheduler):
-
     scheduler.add_job(
         sync_minute_bars,
         "cron",

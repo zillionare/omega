@@ -16,10 +16,11 @@ import async_timeout
 import cfg4py
 import numpy as np
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from coretypes import FrameType, SecurityType
-from omicron import TimeFrame, cache
+from coretypes import FrameType
+from omicron import cache
 from omicron.extensions.np import numpy_append_fields
 from omicron.models.stock import Stock
+from omicron.models.timeframe import TimeFrame
 from omicron.notify.mail import mail_notify
 from retrying import retry
 
@@ -340,7 +341,7 @@ async def handle_dfs_data(bars1, bars2, queue_name):
 async def persist_bars(frame_type, bars1):
     logger.info(f"正在写入inflaxdb:frame_type:{frame_type}")
     # todo
-    # await Stock.persist_bars(frame_type, bars1)
+    await Stock.persist_bars(frame_type, bars1)
 
     logger.info(f"已经写入inflaxdb:frame_type:{frame_type}")
 
@@ -354,7 +355,7 @@ async def persistence_daily_calibration(bars1, bars2, secs, fail, queue, frame_t
     if not await handle_dfs_data(bars1, bars2, queue):
         await push_fail_secs(secs, fail)
         raise exception.ChecksumFail()
-    if frame_type == FrameType.DAY and isinstance(bars1, np.ndarray):
+    if frame_type != FrameType.MIN1 and isinstance(bars1, np.ndarray):
         await persist_bars(frame_type, bars1)
     return len(secs)
 
