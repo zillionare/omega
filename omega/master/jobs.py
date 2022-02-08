@@ -443,7 +443,10 @@ async def __daily_calibration_sync(
     # 检查tail是不是上一个交易日的，如果是上一个交易日，则需要清空redis
     pre_trade_day = TimeFrame.date2int(get_yesterday_or_pre_trade_day(now))
     tread_date = TimeFrame.date2int(tread_date)
-    if pre_trade_day == tread_date and get_now() < start:  # 时间小于当天9点31才能清，防止盘中被清掉数据
+    temp_now = get_now()
+    if pre_trade_day == tread_date and temp_now < temp_now.replace(
+        hour=9, minute=31, microsecond=0, second=0
+    ):  # 时间小于当天9点31才能清，防止盘中被清掉数据
         await Stock.reset_cache()
         logger.info("上一个交易日数据已同步完毕, 已清空缓存")
     logger.info(f"持久化完成， params:{params}执行完毕")
@@ -542,6 +545,7 @@ async def sync_minute_bars():
     1. 从redis拿到上一次同步的分钟数据
     2. 计算开始和结束时间
     """
+    await asyncio.sleep(0.5)
     end = get_now().replace(second=0, microsecond=0)
     first = end.replace(hour=9, minute=30, second=0, microsecond=0)
     timeout = 60
