@@ -43,7 +43,7 @@ class Config(object):
     class postgres:
         dsn: Optional[str] = None
 
-        enabled: Optional[bool] = None
+        enabled: Optional[str] = None
 
     class pickle:
         ver: Optional[int] = None

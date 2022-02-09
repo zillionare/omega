@@ -4,10 +4,8 @@
 import asyncio
 import datetime
 import hashlib
-import json
 import logging
 import pickle
-import time
 import traceback
 from functools import wraps
 from typing import List
@@ -163,23 +161,34 @@ async def fetch_day_bars(secs: List[str], end: datetime.datetime):
     Returns: 返回np数组
 
     """
-    dtypes = [("high_limit", "<f8"), ("low_limit", "<f8"), ("code", "O")]
     """获取日线数据，和 今日的涨跌停并合并"""
+    logger.info(f"获取日线，secs:{secs}, end:{end}")
+    dtypes = [("high_limit", "<f8"), ("low_limit", "<f8"), ("code", "O")]
+    end = end.replace(hour=15, minute=0, second=0)
     bars = await AbstractQuotesFetcher.get_bars_batch(
         secs, end=end, n_bars=1, frame_type=FrameType.DAY
     )
     high_low_limit = await get_high_low_limit(secs, end)
     result = []
-    end_str = end.strftime("%Y-%m-%d")
     for sec in high_low_limit:
-        date = sec["time"].astype("M8[ms]").astype("O").strftime("%Y-%m-%d")
-        if date != end_str:
-            continue
         name = sec[1]
+        bar = bars[name]
+        if not bar:
+            logger.info(f"从上游未获取到该股票的数据, name:{name}, end: {end}")
+            continue
+        date1 = sec["time"].astype("M8[ms]").astype("O").strftime("%Y-%m-%d")
+        date2 = bar["frame"][0].strftime("%Y-%m-%d")
+        if date1 != date2:
+            logger.error(f"name:{name}, date1:{date1} != date2:{date2}, end:{end}")
+            print(f"name:{name}, date1:{date1} != date2:{date2}, end:{end}")
+            continue
+        high_limit = np.nan_to_num(sec["high_limit"])
+        low_limit = np.nan_to_num(sec["low_limit"])
+
         bar = numpy_append_fields(
-            bars[name],
+            bar,
             ("high_limit", "low_limit", "code"),
-            [sec["high_limit"], sec["low_limit"], name],
+            [high_limit, low_limit, name],
             dtypes,
         )
         result.append(bar)

@@ -364,7 +364,7 @@ async def write_dfs(
     await persist_bars(frame_type, bars)
     binary = pickle.dumps(bars, protocol=cfg.pickle.ver)
     await dfs.write(binary, prefix, dt, frame_type)
-    if resample and frame_type == FrameType.MIN1:
+    if resample and frame_type == FrameType.MIN1 and 1 == 0:
         for ftype in (
             FrameType.MIN5,
             FrameType.MIN15,
