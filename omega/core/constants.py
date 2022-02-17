@@ -20,4 +20,4 @@ BAR_SYNC_QUARTER_TAIl = "jobs.bars_sync.quarter.tail"
 BAR_SYNC_MONTH_TAIl = "jobs.bars_sync.month.tail"
 BAR_SYNC_WEEK_TAIl = "jobs.bars_sync.week.tail"
 
-HIGH_LOW_LIMIT = "high_low_limit"
+TRADE_PRICE_LIMITS = "trade_price_limits"

@@ -10,7 +10,8 @@ import pickle
 import time
 import traceback
 from functools import wraps
-from typing import List
+from typing import Dict, List
+import pandas as pd
 
 import async_timeout
 import cfg4py
@@ -24,9 +25,9 @@ from omicron.models.timeframe import TimeFrame
 from omicron.notify.mail import mail_notify
 from retrying import retry
 
-from omega.core.constants import HIGH_LOW_LIMIT
+from omega.core.constants import TRADE_PRICE_LIMITS
 from omega.worker import exception
-from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher
+from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as fetcher
 
 cfg = cfg4py.get_instance()
 
@@ -53,7 +54,7 @@ def abnormal_work_report():
         @wraps(f)
         async def decorated_function(params):
             """装饰所有worker，统一处理错误信息"""
-            scope, state, end, n_bars, fail, timeout = await parse_params(params)
+            scope, state, timeout = params.get("__scope"), params.get("__state"), params.get("__timeout")
             if isinstance(timeout, int):
                 timeout -= 5  # 提前5秒退出
             try:
@@ -78,37 +79,25 @@ def abnormal_work_report():
     return inner
 
 
-async def get_limit():
-    return 3000
-
-
 async def cache_init():
     """初始化缓存 交易日历和证券代码"""
     if not await cache.security.exists(f"calendar:{FrameType.DAY.value}"):
-        await AbstractQuotesFetcher.get_all_trade_days()
+        await fetcher.get_all_trade_days()
     if not await cache.security.exists("security:stock"):
-        await AbstractQuotesFetcher.get_security_list()
+        await fetcher.get_security_list()
 
 
 @retry(stop_max_attempt_number=5)
 async def fetch_bars(
     secs: List[str], end: datetime.datetime, n_bars: int, frame_type: FrameType
-):
-    bars = await AbstractQuotesFetcher.get_bars_batch(
+)->Dict[str, np.ndarray]:
+    # todo: omicron可以保存dict[code->bars],无需进行转换。这里的转换只是为了适应底层逻辑，没有特别的功能，在底层可以修改的情况下，可以不做不必要的转换。
+    return await fetcher.get_bars_batch(
         secs, end=end, n_bars=n_bars, frame_type=frame_type
     )
-    temp = []
-    if bars is not None:
-        for code in bars:
-            temp_bar = bars[code]
-            if not isinstance(temp_bar, np.ndarray):
-                continue
-            bar = numpy_append_fields(temp_bar, "code", code, dtypes=[("code", "O")])
-            temp.append(bar)
-        return np.concatenate(temp)
 
 
-async def fetch_min_bars(secs: List[str], end: datetime.datetime, n_bars: int):
+async def fetch_min_bars(secs: List[str], end: datetime.datetime, n_bars: int)->Dict[str, np.ndarray]:
     """
     从远端获取分钟线数据
     Args:
@@ -119,6 +108,7 @@ async def fetch_min_bars(secs: List[str], end: datetime.datetime, n_bars: int):
     Returns:
 
     """
+    # todo: 这个封装的必要性？
     return await fetch_bars(secs, end, n_bars, FrameType.MIN1)
 
 
@@ -133,17 +123,20 @@ async def fetch_week_bars(secs: List[str], end: datetime.datetime, n_bars: int):
     Returns:
 
     """
+    # todo: 这个封装的必要性？
     return await fetch_bars(secs, end, n_bars, FrameType.WEEK)
 
 
 @retry(stop_max_attempt_number=5)
-async def get_high_low_limit(secs, end):
+async def get_trade_price_limits(secs, end):
     """获取涨跌停价"""
-    return await AbstractQuotesFetcher.get_high_limit_price(secs, end)
+    # todo: 可以重命名为get_trade_limit_price
+    return await fetcher.get_trade_price_limits(secs, end)
 
 
 def get_remnant_s():
     """获取从现在开始到晚上12点还剩多少秒"""
+    # todo: 内部函数，建议使用_get_x
     now = datetime.datetime.now()
     end = datetime.datetime(year=now.year, month=now.month, day=now.day + 1)
     # 当前时间秒数
@@ -165,10 +158,10 @@ async def fetch_day_bars(secs: List[str], end: datetime.datetime):
     """
     dtypes = [("high_limit", "<f8"), ("low_limit", "<f8"), ("code", "O")]
     """获取日线数据，和 今日的涨跌停并合并"""
-    bars = await AbstractQuotesFetcher.get_bars_batch(
+    bars = await fetcher.get_bars_batch(
         secs, end=end, n_bars=1, frame_type=FrameType.DAY
     )
-    high_low_limit = await get_high_low_limit(secs, end)
+    high_low_limit = await get_trade_price_limits(secs, end)
     result = []
     end_str = end.strftime("%Y-%m-%d")
     for sec in high_low_limit:
@@ -214,13 +207,13 @@ async def get_secs(limit: int, n_bars: int, scope: str):
 @abnormal_work_report()
 async def sync_high_low_limit(params):
     """同步涨跌停worker"""
-    scope, state, end, n_bars, fail, timeout = await parse_params(params)
+    scope, state, end, fail = params.get("scope"), params.get("state"), params.get("end"), params.get("fail")
 
-    limit = await get_limit()
-    hashmap = []
+    limit = await fetcher.max_result_size("bars")
+    hashmap = [] # todo: bad name
     total = 0
     async for secs in get_secs(limit, 1, scope):
-        bars = await get_high_low_limit(secs, end)
+        bars = await get_trade_price_limits(secs, end)
         if bars is None:
             await push_fail_secs(secs, fail)
             raise exception.GotNoneData()
@@ -238,29 +231,29 @@ async def sync_high_low_limit(params):
             )
             total += 1
     if hashmap:
-        await cache.sys.hmset(HIGH_LOW_LIMIT, *hashmap)
+        await cache.sys.hmset(TRADE_PRICE_LIMITS, *hashmap)
         # 取到到晚上12点还有多少秒
-        await cache.sys.expire(HIGH_LOW_LIMIT, get_remnant_s())
+        # fixme: 为什么是到晚上12点？这个数据会等到calibration_sync时才会写入到persistent db中
+        await cache.sys.expire(TRADE_PRICE_LIMITS, get_remnant_s())
     await cache.sys.hincrby(state, "done_count", total)
     return True
 
 
 async def __sync_min_bars(params):
     """同步分支线数据并写缓存"""
-    limit = await get_limit()
-    scope, state, end, n_bars, fail, timeout = await parse_params(params)
-    total = 0
-    tasks = []
+    # todo: add unittest
+    limit = await fetcher.max_result_size("bars")
+    scope, end, n_bars, fail = params.get("__scope"), params.get("end"), params.get("n_bars", 1), params.get("__fail")
+    secs_done = []
     async for secs in get_secs(limit, n_bars, scope):
         bars = await fetch_min_bars(secs, end, n_bars)
-        if bars is None:
+        if len(bars) == 0:
             await push_fail_secs(secs, fail)
             raise exception.GotNoneData()
-        if isinstance(bars, np.ndarray):
-            await Stock.batch_cache_bars(FrameType.MIN1, bars)
-        total += len(secs)
-        tasks.extend(secs)
-    return total, tasks
+        
+        await Stock.batch_cache_bars(FrameType.MIN1, bars)
+        secs_done.extend(secs)
+    return secs_done
 
 
 @abnormal_work_report()
@@ -273,44 +266,43 @@ async def sync_minute_bars(params):
     Returns:
 
     """
-    scope, state, end, n_bars, fail, timeout = await parse_params(params)
+    state = params.get("__state")
     total, tasks = await __sync_min_bars(params)
 
     await cache.sys.hincrby(state, "done_count", total)
 
 
 async def parse_params(params):
+    # todo: remove me
     logger.info(params)
     return (
-        params.get("__scope"),
         params.get("__state"),
         params.get("end"),
-        params.get("n_bars", 1),
         params.get("__fail"),
+        params.get("__scope"),
+        params.get("n_bars", 1),
         params.get("__timeout"),
     )
 
 
 @abnormal_work_report()
-async def sync_day_bars(params):
+async def after_hour_sync(params):
     """这是下午三点收盘后的同步，仅写cache，同步分钟线和日线"""
-    scope, state, end, n_bars, fail, timeout = await parse_params(params)
-    limit = await get_limit()
+    state, end, fail = params.get("__state"), params.get("end"), params.get("__fail")
+    limit = await fetcher.max_result_size("bars")
 
-    total, tasks = await __sync_min_bars(params)
+    secs = await __sync_min_bars(params)
 
-    for i in range(0, len(tasks), limit):
-        temp = tasks[i : i + limit]
-        bars = await fetch_day_bars(temp, end)
-        if bars is None:
-            await push_fail_secs(temp, fail)
+    for i in range(0, len(secs), limit):
+        batch = secs[i : i + limit]
+        bars = await fetch_day_bars(batch, end)
+        if len(bars) == 0:
+            await push_fail_secs(batch, fail)
             raise exception.GotNoneData()
-        if isinstance(bars, np.ndarray):
-            await Stock.batch_cache_bars(FrameType.DAY, bars)
-        total += len(temp)
+        
+        await Stock.batch_cache_bars(FrameType.DAY, bars)
 
-    await cache.sys.hincrby(state, "done_count", total // 2)
-    return True
+    await cache.sys.hincrby(state, "done_count", len(secs))
 
 
 async def checksum(value1, value2):
@@ -338,10 +330,10 @@ async def handle_dfs_data(bars1, bars2, queue_name):
 
 
 @retry(stop_max_attempt_number=5)
-async def persist_bars(frame_type, bars1):
-    logger.info(f"正在写入inflaxdb:frame_type:{frame_type}")
+async def persist_bars(frame_type: FrameType, bars: pd.DataFrame):
+    logger.info(f"正在写入influxdb:frame_type:{frame_type}")
     # todo
-    await Stock.persist_bars(frame_type, bars1)
+    await Stock.persist_bars(frame_type, bars)
 
     logger.info(f"已经写入inflaxdb:frame_type:{frame_type}")
 
@@ -373,28 +365,28 @@ async def __sync_daily_calibration(
     Returns:
 
     """
-    _, state, end, n_bars, fail, timeout = await parse_params(params)
+    end, n_bars, fail = params.get("end"), params.get("n_bars", 1), params.get("__fail")
 
-    limit = await get_limit()
-    total = 0
-    tasks = []
+    limit = await fetcher.max_result_size("bars")
+    done = 0
+    for_day_bars = []
     async for secs in get_secs(limit, n_bars, scope):
-        tasks.extend(secs)
+        for_day_bars.extend(secs)
         min_bars1 = await fetch_min_bars(secs, end, n_bars)
         min_bars2 = await fetch_min_bars(secs, end, n_bars)
-        total += await persistence_daily_calibration(
+        done += await persistence_daily_calibration(
             min_bars1, min_bars2, secs, fail, queue_min, FrameType.MIN1
         )
 
-    for i in range(0, len(tasks), limit):
-        temp = tasks[i : i + limit]
+    for i in range(0, len(for_day_bars), limit):
+        temp = for_day_bars[i : i + limit]
         bars1 = await fetch_day_bars(temp, end)
         bars2 = await fetch_day_bars(temp, end)
-        total += await persistence_daily_calibration(
+        done += await persistence_daily_calibration(
             bars1, bars2, temp, fail, queue_day, FrameType.DAY
         )
 
-    return total // 2
+    return done // 2
 
 
 @abnormal_work_report()
@@ -402,7 +394,8 @@ async def sync_daily_calibration(params):
     """凌晨2点的数据校准，
     同步分钟线 持久化
     同步日线 持久化"""
-    scope, state, end, n_bars, fail, timeout = await parse_params(params)
+    state = params.get("__state")
+
     stock_min = params.get("stock_min")
     index_min = params.get("index_min")
     stock_day = params.get("stock_day")
@@ -418,10 +411,10 @@ async def sync_daily_calibration(params):
 
 
 async def __sync_year_quarter_month_week(params, queue, data):
-    scope, state, end, n_bars, fail, timeout = await parse_params(params)
+    end, n_bars, fail = params.get("end"), params.get("n_bars", 1), params.get("__fail")
     frame_type = params.get("frame_type")
 
-    limit = await get_limit()
+    limit = await fetcher.max_result_size("bars")
     total = 0
     async for secs in get_secs(limit, n_bars, queue):
         bars1 = await fetch_bars(secs, end, n_bars, frame_type)
@@ -433,7 +426,7 @@ async def __sync_year_quarter_month_week(params, queue, data):
 
 @abnormal_work_report()
 async def sync_year_quarter_month_week(params):
-    scope, state, end, n_bars, fail, timeout = await parse_params(params)
+    state = params.get("__state")
     stock_queue = params.get("stock_queue")
     index_queue = params.get("index_queue")
     stock_data = params.get("stock_data")
@@ -472,7 +465,7 @@ def cron_work_report():
 @cron_work_report()
 async def sync_funds():
     """更新基金列表"""
-    secs = await AbstractQuotesFetcher.get_fund_list()
+    secs = await fetcher.get_fund_list()
     logger.info("%s secs are fetched and saved.", len(secs))
     return secs
 
@@ -484,7 +477,7 @@ async def sync_fund_net_value():
     ndays = 8
     n = 0
     while n < ndays:
-        await AbstractQuotesFetcher.get_fund_net_value(
+        await fetcher.get_fund_net_value(
             day=now - datetime.timedelta(days=n)
         )
         n += 1
@@ -500,7 +493,7 @@ async def sync_fund_share_daily():
     ndays = 8
     n = 0
     while n < ndays:
-        await AbstractQuotesFetcher.get_fund_share_daily(
+        await fetcher.get_fund_share_daily(
             day=now - datetime.timedelta(days=n)
         )
         n += 1
@@ -514,7 +507,7 @@ async def sync_fund_portfolio_stock():
     ndays = 8
     n = 0
     while n < ndays:
-        await AbstractQuotesFetcher.get_fund_portfolio_stock(
+        await fetcher.get_fund_portfolio_stock(
             pub_date=now - datetime.timedelta(days=n)
         )
         n += 1
@@ -527,7 +520,7 @@ async def sync_calendar():
 
     Returns:
     """
-    trade_days = await AbstractQuotesFetcher.get_all_trade_days()
+    trade_days = await fetcher.get_all_trade_days()
     if trade_days is None or len(trade_days) == 0:
         logger.warning("failed to fetch trade days.")
         return None
@@ -541,7 +534,7 @@ async def sync_security_list():
 
     注意证券列表在AbstractQuotesServer取得时就已保存，此处只是触发
     """
-    await AbstractQuotesFetcher.get_security_list()
+    await fetcher.get_security_list()
     logger.info("secs are fetched and saved.")
 
 

@@ -328,7 +328,7 @@ async def delete_daily_calibration_queue(stock_min, index_min, stock_day, index_
 @retry(stop_max_attempt_number=5)
 async def persist_bars(frame_type, bars1):
     logger.info(f"正在写入inflaxdb:frame_type:{frame_type}")
-    # todo
+    # todo: document this, and what does 1 mean in bars1?
     await Stock.persist_bars(frame_type, bars1)
 
     logger.info(f"已经写入inflaxdb:frame_type:{frame_type}")
@@ -358,6 +358,7 @@ async def write_dfs(
     if not data:
         return
     logger.info(f"queue_name:{queue_name},frame_type:{frame_type.value}")
+    # todo: it's better to use another variable name for i and data
     bars = [pickle.loads(i) for i in data]
     # data = pickle.loads(data)
     bars = np.concatenate(bars)
@@ -453,6 +454,7 @@ async def __daily_calibration_sync(
 
 def get_yesterday_or_pre_trade_day(now):
     """获取昨天或者上一个交易日"""
+    # todo: could be replaced by TimeFrame.day_shift(now, 0)
     if TimeFrame.date2int(now) in TimeFrame.day_frames:
         pre_trade_day = TimeFrame.day_shift(now, -1)
     else:
@@ -512,6 +514,7 @@ async def run_daily_calibration_sync(now):
 async def daily_calibration_sync():
     logger.info("每日数据校准已启动")
     now = get_now()
+    # todo: is this for debug? could we remove now?
     sys.setrecursionlimit(10000)
     return await run_daily_calibration_sync(now)
 

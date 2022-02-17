@@ -20,7 +20,7 @@ from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omega.worker import jobs as workjobs
 from omega.worker.dfs import TempStorage
 from tests import init_test_env
-from omega.core.constants import HIGH_LOW_LIMIT
+from omega.core.constants import TRADE_PRICE_LIMITS
 from coretypes import FrameType, stock_bars_dtype
 from omicron.models.stock import Stock
 from tests import test_dir
@@ -166,7 +166,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                 return pickle.loads(f.read())
 
         get_bars_batch.side_effect = get_bars_batch_mock
-        emit.register(Events.OMEGA_DO_SYNC_DAY, workjobs.sync_day_bars)
+        emit.register(Events.OMEGA_DO_SYNC_DAY, workjobs.after_hour_sync)
         ret = await syncjobs.sync_day_bars()
         self.assertTrue(ret)
         self.assertEqual(
@@ -316,7 +316,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
 
         await syncjobs.sync_high_low_limit()
         # 检查redis中有没有数据
-        resp = await cache.sys.hgetall(HIGH_LOW_LIMIT)
+        resp = await cache.sys.hgetall(TRADE_PRICE_LIMITS)
         self.assertDictEqual(
             resp,
             {

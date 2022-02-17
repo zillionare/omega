@@ -89,9 +89,10 @@ class AbstractQuotesFetcher(QuotesFetcher):
         return days
 
     @classmethod
-    async def get_high_limit_price(
-        cls, sec: Union[List, str], dt: Union[str, datetime.datetime, datetime.date]
+    async def get_trade_price_limits(
+        cls, sec: Union[List, str], dt: Union[str, Frame]
     ) -> np.ndarray:
+    # fixme: 函数名未能正确反映函数功能，建议改为get_trade_limit_price(s)
         params = {
             "sec": sec,
             "dt": dt,
@@ -103,9 +104,13 @@ class AbstractQuotesFetcher(QuotesFetcher):
         return bars
 
     @classmethod
-    async def get_quota(cls):
+    async def get_quota_spare(cls):
         quota = await cls.get_instance().get_quota()
         return quota.get("spare")
+
+    @classmethod
+    async def get_quota(cls):
+        return cls.get_instance().get_quota()
 
     @classmethod
     async def get_fund_list(
@@ -193,3 +198,7 @@ class AbstractQuotesFetcher(QuotesFetcher):
         mapping = dict(fund_net_values.dtype.descr)
         fields = [(name, mapping[name]) for name in fields]
         return rfn.require_fields(fund_net_values, fields)
+
+    @classmethod
+    def max_result_size(cls, op:str)->int:
+        return cls.get_instance().max_result_size(op)
