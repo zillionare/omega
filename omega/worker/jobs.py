@@ -69,6 +69,12 @@ def abnormal_work_report():
                         # 说明消费者消费时错误了
                         logger.exception(e)
                         await worker_exit(state, scope)
+                        await cache.sys.set(
+                            "failed_sync_bars", 0, expire=3, exist="SET_IF_NOT_EXIST"
+                        )
+                        n = await cache.sys.incr("failed_sync_bars")
+                        if n > 10:
+                            await cache.sys.set("second_data_source", "ht", expire=3600)
             except asyncio.exceptions.TimeoutError:  # pragma: no cover
                 await worker_exit(state, scope)
                 return False
