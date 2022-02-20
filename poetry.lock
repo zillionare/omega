@@ -1638,7 +1638,7 @@ doc = ["mkdocs (>=1.1.2,<2.0.0)", "mkdocs-include-markdown-plugin (>=1.0.0,<2.0.
 
 [[package]]
 name = "zillionare-omega-adaptors-jq"
-version = "1.0.10"
+version = "1.0.11"
 description = "Jqdatasdk adapter for zillionare omega"
 category = "main"
 optional = false
@@ -1674,7 +1674,7 @@ test = ["pytest", "black", "isort", "doc8", "flake8", "pytest-cov"]
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.8,<3.9"
-content-hash = "61d119a9dfc690b6a06ed1d7ed9cdd8665606ef59b8236c032c0c2a811fc1724"
+content-hash = "2e463cf0bb35c26c00291240806f3c4eb636c5e77f06c1ae8be99946751fed88"
 
 [metadata.files]
 aiocache = [
@@ -3295,8 +3295,8 @@ zillionare-core-types = [
     {file = "zillionare_core_types-0.4.0.tar.gz", hash = "sha256:32c1fb52a370b522c97136a9e519dd2a57ebb3a213ace1f0b4a1fe8f4be6c777"},
 ]
 zillionare-omega-adaptors-jq = [
-    {file = "zillionare-omega-adaptors-jq-1.0.10.tar.gz", hash = "sha256:52c99b9228a2beee644594ae31c7b3610176464a79e7c69fa4ae9463cac29e11"},
-    {file = "zillionare_omega_adaptors_jq-1.0.10-py3-none-any.whl", hash = "sha256:ed441e5b9784290685ef689e9b47fc8a8e89f9287d02d5bb7e2f18215d3adf89"},
+    {file = "zillionare-omega-adaptors-jq-1.0.11.tar.gz", hash = "sha256:d6fcd305aad1dbc1b3efff18ab79c1dd7bbe981dcdda09347876666495b63fcf"},
+    {file = "zillionare_omega_adaptors_jq-1.0.11-py3-none-any.whl", hash = "sha256:e5b604c9de4b113bef39f0598537f6bb705dcc5fd2f4d04b36cef12f95bf9825"},
 ]
 zipp = [
     {file = "zipp-3.7.0-py3-none-any.whl", hash = "sha256:b47250dd24f92b7dd6a0a8fc5244da14608f3ca90a5efcd37a3b1642fac9a375"},

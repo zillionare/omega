@@ -92,16 +92,11 @@ class AbstractQuotesFetcher(QuotesFetcher):
     async def get_trade_price_limits(
         cls, sec: Union[List, str], dt: Union[str, Frame]
     ) -> np.ndarray:
-    # fixme: 函数名未能正确反映函数功能，建议改为get_trade_limit_price(s)
         params = {
             "sec": sec,
             "dt": dt,
         }
-        bars = await cls.get_instance().get_high_limit_price(**params)
-
-        if len(bars) == 0:
-            return None
-        return bars
+        return await cls.get_instance().get_trade_price_limits(**params)
 
     @classmethod
     async def get_quota_spare(cls):
@@ -200,5 +195,5 @@ class AbstractQuotesFetcher(QuotesFetcher):
         return rfn.require_fields(fund_net_values, fields)
 
     @classmethod
-    def max_result_size(cls, op:str)->int:
+    def max_result_size(cls, op: str) -> int:
         return cls.get_instance().max_result_size(op)

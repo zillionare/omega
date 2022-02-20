@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import itertools
 import logging
 import os
 import unittest
@@ -8,12 +9,10 @@ import numpy as np
 import cfg4py
 import omicron
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from omicron import influxdb
 from omicron.dal.cache import cache
 from pyemit import emit
 import pickle
 import omega.master.jobs as syncjobs
-from omega.master.app import handle_work_heart_beat
 from omega.core import constants
 from omega.core.events import Events
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
@@ -21,9 +20,11 @@ from omega.worker import jobs as workjobs
 from omega.worker.dfs import TempStorage
 from tests import init_test_env
 from omega.core.constants import TRADE_PRICE_LIMITS
-from coretypes import FrameType, stock_bars_dtype
+from coretypes import FrameType, bars_dtype
 from omicron.models.stock import Stock
 from tests import test_dir
+from omicron.dal.influx.influxclient import InfluxClient
+from omicron.models.timeframe import TimeFrame as tf
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
@@ -35,9 +36,24 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
 
         await emit.start(engine=emit.Engine.REDIS, dsn=cfg.redis.dsn, start_server=True)
         await self.create_quotes_fetcher()
+
+        # we need init omicron and cache in two steps, due to cache contains no data
         await omicron.cache.init()
         await workjobs.cache_init()
         await omicron.init()
+
+        # create influxdb client
+        url, token, bucket, org = (
+            cfg.influxdb.url,
+            cfg.influxdb.token,
+            cfg.influxdb.bucket_name,
+            cfg.influxdb.org,
+        )
+        self.client = InfluxClient(url, token, bucket, org)
+
+        for ft in itertools.chain(tf.day_level_frames, tf.minute_level_frames):
+            name = f"stock_bars_{ft.value}"
+            await self.client.drop_measurement(name)
 
     async def asyncTearDown(self) -> None:
         await omicron.close()
@@ -49,12 +65,6 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         impl = fetcher_info["impl"]
         params = fetcher_info["workers"][0]
         await aq.create_instance(impl, **params)
-
-    async def test_job_timer(self):
-        await syncjobs._start_job_timer("unittest")
-        await asyncio.sleep(5)
-        elapsed = await syncjobs._stop_job_timer("unittest")
-        self.assertTrue(5 <= elapsed <= 7)
 
     @mock.patch("omega.master.jobs.get_timeout", return_value=10)
     @mock.patch("omicron.models.stock.Stock.batch_cache_bars")
@@ -167,7 +177,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
 
         get_bars_batch.side_effect = get_bars_batch_mock
         emit.register(Events.OMEGA_DO_SYNC_DAY, workjobs.after_hour_sync)
-        ret = await syncjobs.sync_day_bars()
+        ret = await syncjobs.after_hour_sync_job()
         self.assertTrue(ret)
         self.assertEqual(
             await cache.security.hget("bars:1m:000001.XSHE", "202201070937"),
@@ -186,7 +196,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
 
         mail_notify.side_effect = mail_notify_mock
         # 测试bars 为None
-        await syncjobs.sync_day_bars()
+        await syncjobs.after_hour_sync_job()
         self.assertIn("Got None Data", email_content)
         await Stock.reset_cache()
 
@@ -226,7 +236,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         async def clear():
             p = cache.sys.pipeline()
             p.delete(constants.BAR_SYNC_ARCHIVE_HEAD)
-            p.delete(constants.BAR_SYNC_ARCHIVE_TAIl)
+            p.delete(constants.BAR_SYNC_ARCHIVE_TAIL)
             p.delete(state)
             await p.execute()
 
@@ -268,14 +278,14 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                 "omicron.models.timeframe.TimeFrame.count_frames",
                 side_effect=count_frames(),
             ):
-                ret = await syncjobs.daily_calibration_sync()
+                ret = await syncjobs.daily_calibration_job()
                 self.assertTrue(ret)
                 # 检查redis的head 和tail
                 self.assertEqual(
                     await cache.sys.get(constants.BAR_SYNC_ARCHIVE_HEAD), "2022-01-07"
                 )
                 self.assertEqual(
-                    await cache.sys.get(constants.BAR_SYNC_ARCHIVE_TAIl), "2022-01-11"
+                    await cache.sys.get(constants.BAR_SYNC_ARCHIVE_TAIL), "2022-01-11"
                 )
                 # todo 检查influxdb 和 minio中的数据 1 5 15 30 60 1d
 
@@ -289,7 +299,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                 "omicron.models.timeframe.TimeFrame.count_frames",
                 side_effect=count_frames(),
             ):
-                ret = await syncjobs.daily_calibration_sync()
+                ret = await syncjobs.daily_calibration_job()
                 self.assertIn(f"剩余可用quota：{get_quota.return_value}", email_content)
 
     @mock.patch("omega.master.jobs.get_timeout", return_value=10)
@@ -312,9 +322,11 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
 
         get_high_limit_price.side_effect = get_high_limit_price_mock
         await cache.sys.delete("master.task.high_low_limit.state")
-        emit.register(Events.OMEGA_DO_SYNC_HIGH_LOW_LIMIT, workjobs.sync_high_low_limit)
+        emit.register(
+            Events.OMEGA_DO_SYNC_TRADE_PRICE_LIMITS, workjobs.sync_trade_price_limits
+        )
 
-        await syncjobs.sync_high_low_limit()
+        await syncjobs.sync_trade_price_limits()
         # 检查redis中有没有数据
         resp = await cache.sys.hgetall(TRADE_PRICE_LIMITS)
         self.assertDictEqual(
@@ -342,30 +354,18 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         get_high_limit_price.return_value = None
 
         # 测试bars 为None
-        await syncjobs.sync_high_low_limit()
+        await syncjobs.sync_trade_price_limits()
         self.assertIn("Got None Data", email_content)
 
         # quota为0
         get_quota.return_value = 0
-        ret = await syncjobs.sync_high_low_limit()
+        ret = await syncjobs.sync_trade_price_limits()
         self.assertIn(f"剩余可用quota：{get_quota.return_value}", email_content)
 
         # 非交易日返回false
         get_now.return_value = datetime.datetime(2022, 1, 9, 16)
-        ret = await syncjobs.sync_high_low_limit()
+        ret = await syncjobs.sync_trade_price_limits()
         self.assertFalse(ret)
-
-    @classmethod
-    async def reset_influxdb(cls):
-        bucket_name = "unittest_bucket"
-        influxdb._bucket_name = bucket_name
-        response = influxdb.client.buckets_api().find_buckets()
-        for bucket in response.buckets:
-            if bucket.name == influxdb.bucket_name:
-                influxdb.client.buckets_api().delete_bucket(bucket)
-        influxdb.client.buckets_api().create_bucket(
-            bucket_name=influxdb.bucket_name, org=influxdb.org
-        )
 
     @mock.patch("omega.master.jobs.get_timeout", return_value=10)
     @mock.patch(
@@ -390,8 +390,8 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         async def clear():
 
             p = cache.sys.pipeline()
-            p.delete(constants.BAR_SYNC_WEEK_TAIl)
-            p.delete(constants.BAR_SYNC_MONTH_TAIl)
+            p.delete(constants.BAR_SYNC_WEEK_TAIL)
+            p.delete(constants.BAR_SYNC_MONTH_TAIL)
             p.delete(week_state)
             p.delete(month_state)
             await p.execute()
@@ -442,10 +442,10 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             await syncjobs.sync_year_quarter_month_week()
             # 检查redis里的周是否是某个值
             self.assertEqual(
-                await cache.sys.get(constants.BAR_SYNC_WEEK_TAIl), "2005-01-07"
+                await cache.sys.get(constants.BAR_SYNC_WEEK_TAIL), "2005-01-07"
             )
             self.assertEqual(
-                await cache.sys.get(constants.BAR_SYNC_MONTH_TAIl), "2005-01-31"
+                await cache.sys.get(constants.BAR_SYNC_MONTH_TAIL), "2005-01-31"
             )
             # 从数据库查询出来验证对不对
             stocks = Stock.choose(["stock"])
@@ -554,10 +554,10 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
 
         await cache.sys.delete(state)
         params = {}
-        task = syncjobs.Task(
+        task = syncjobs.BarsSyncTask(
             Events.OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK, queue_name, params, 10
         )
-        task.tasks = tasks
+        task.get_secs_for_sync = tasks
         ret = await task.run()
         self.assertFalse(ret)
         # 测试获取当前时间
@@ -567,3 +567,34 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
 
         # 测试超时时发送邮件
         await task.send_email()
+
+    async def test_get_task_state(self):
+        task = syncjobs.BarsSyncTask("channel", "test_sync_queue", {})
+
+        await task.delete_state()
+
+        state = await task._get_task_state()
+        self.assertEqual(0, len(state))
+
+        is_running = await task._get_task_state("is_running")
+        self.assertIsNone(is_running)
+
+        # 测试获取任务状态
+        await task.update_state(
+            is_running=True, done_count=20, error="sync failure", worker_count=2
+        )
+
+        actual = await task._get_task_state()
+        exp = {
+            "is_running": True,
+            "done_count": 20,
+            "error": "sync failure",
+            "worker_count": 2,
+        }
+        self.assertDictEqual(exp, actual)
+
+        actual = await task._get_task_state("is_running")
+        self.assertTrue(actual)
+
+        actual = await task._get_task_state("done_count")
+        self.assertEqual(20, actual)

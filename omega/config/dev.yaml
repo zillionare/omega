@@ -1,11 +1,20 @@
 tz: Asia/Shanghai
-logreceiver:
-  klass: omega.logging.receiver.redis.RedisLogReceiver
-  dsn: redis://localhost:6379
-  channel: omega.log
-  filename: /tmp/log/zillionare/omega.log
-  backup_count: 7
-  max_bytes: 10M
+logging:
+  version: 1
+  disable_existing_loggers: false
+  formatters:
+    default:
+      format: '%(asctime)s %(levelname)-1.1s %(process)d %(name)s:%(funcName)s:%(lineno)s | %(message)s'
+  handlers:
+    console:
+      class: logging.StreamHandler
+      formatter: default
+    redis:
+      class: rlog.RedisHandler
+      formatter: default
+      host: localhost
+      port: 6379
+      channel: omega.log
 redis:
   dsn: redis://localhost:6379
 postgres:

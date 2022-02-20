@@ -4,28 +4,33 @@
 import asyncio
 import datetime
 import hashlib
-import json
+import itertools
 import logging
 import pickle
-import time
 import traceback
 from functools import wraps
-from typing import Dict, List
-import pandas as pd
+from typing import Awaitable, Dict, List
 
 import async_timeout
 import cfg4py
 import numpy as np
+import pandas as pd
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from coretypes import FrameType
+from coretypes import FrameType, SecurityType
 from omicron import cache
 from omicron.extensions.np import numpy_append_fields
 from omicron.models.stock import Stock
 from omicron.models.timeframe import TimeFrame
 from omicron.notify.mail import mail_notify
 from retrying import retry
+from tomlkit import key
 
-from omega.core.constants import TRADE_PRICE_LIMITS
+from omega.core.constants import (
+    MINIO_TEMPORAL,
+    TRADE_PRICE_LIMITS,
+    TASK_PREFIX,
+    MINIO_TEMPORAL,
+)
 from omega.worker import exception
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as fetcher
 
@@ -45,7 +50,7 @@ async def worker_exit(state, scope, error=None):
     await p.execute()
 
 
-async def push_fail_secs(secs, fail):
+async def collect_sync_failure(secs: List[str], fail: str):
     await cache.sys.lpush(fail, str(secs))
 
 
@@ -54,7 +59,11 @@ def abnormal_work_report():
         @wraps(f)
         async def decorated_function(params):
             """装饰所有worker，统一处理错误信息"""
-            scope, state, timeout = params.get("__scope"), params.get("__state"), params.get("__timeout")
+            scope, state, timeout = (
+                params.get("__scope"),
+                params.get("__state"),
+                params.get("__timeout"),
+            )
             if isinstance(timeout, int):
                 timeout -= 5  # 提前5秒退出
             try:
@@ -80,7 +89,10 @@ def abnormal_work_report():
 
 
 async def cache_init():
-    """初始化缓存 交易日历和证券代码"""
+    """初始化缓存 交易日历和证券代码
+
+    当系统第一次启动（cold boot)时，cache中并不存在证券列表和日历。而在`omicron.init`时，又依赖这些信息。因此，我们需要在Omega中加入冷启动处理的逻辑如下。
+    """
     if not await cache.security.exists(f"calendar:{FrameType.DAY.value}"):
         await fetcher.get_all_trade_days()
     if not await cache.security.exists("security:stock"):
@@ -90,14 +102,16 @@ async def cache_init():
 @retry(stop_max_attempt_number=5)
 async def fetch_bars(
     secs: List[str], end: datetime.datetime, n_bars: int, frame_type: FrameType
-)->Dict[str, np.ndarray]:
+) -> Dict[str, np.ndarray]:
     # todo: omicron可以保存dict[code->bars],无需进行转换。这里的转换只是为了适应底层逻辑，没有特别的功能，在底层可以修改的情况下，可以不做不必要的转换。
     return await fetcher.get_bars_batch(
         secs, end=end, n_bars=n_bars, frame_type=frame_type
     )
 
 
-async def fetch_min_bars(secs: List[str], end: datetime.datetime, n_bars: int)->Dict[str, np.ndarray]:
+async def fetch_min_bars(
+    secs: List[str], end: datetime.datetime, n_bars: int
+) -> Dict[str, np.ndarray]:
     """
     从远端获取分钟线数据
     Args:
@@ -182,13 +196,15 @@ async def fetch_day_bars(secs: List[str], end: datetime.datetime):
         return result
 
 
-async def get_secs(limit: int, n_bars: int, scope: str):
-    """
-    从redis遍历取任务执行
+async def get_secs_for_sync(limit: int, n_bars: int, name: str):
+    """计算并获取可在一批次中进行同步的股票代码
+
+    master将本次参与同步的证券代码存入redis中的一个list，该list的名字为`name`。各个worker从该lister中分批获取证券代码，用以同步。
+
     Args:
         limit: 调用接口限制条数
         n_bars: 每支股票需要取多少条
-        scope: 从那个队列取
+        name: 队列名称
 
     Returns:
 
@@ -196,8 +212,8 @@ async def get_secs(limit: int, n_bars: int, scope: str):
     while True:
         step = limit // n_bars  # 根据 单次api允许获取的条数 和一共多少根k线 计算每次最多可以获取多少个股票的
         p = cache.sys.pipeline()
-        p.lrange(scope, 0, step - 1)
-        p.ltrim(scope, step, -1)
+        p.lrange(name, 0, step - 1)
+        p.ltrim(name, step, -1)
         secs, _ = await p.execute()
         if not len(secs):
             break
@@ -205,17 +221,22 @@ async def get_secs(limit: int, n_bars: int, scope: str):
 
 
 @abnormal_work_report()
-async def sync_high_low_limit(params):
+async def sync_trade_price_limits(params: Dict):
     """同步涨跌停worker"""
-    scope, state, end, fail = params.get("scope"), params.get("state"), params.get("end"), params.get("fail")
+    scope, state, end, fail = (
+        params.get("scope"),
+        params.get("state"),
+        params.get("end"),
+        params.get("fail"),
+    )
 
     limit = await fetcher.max_result_size("bars")
-    hashmap = [] # todo: bad name
+    hashmap = []  # todo: bad name
     total = 0
-    async for secs in get_secs(limit, 1, scope):
+    async for secs in get_secs_for_sync(limit, 1, scope):
         bars = await get_trade_price_limits(secs, end)
         if bars is None:
-            await push_fail_secs(secs, fail)
+            await collect_sync_failure(secs, fail)
             raise exception.GotNoneData()
         for sec in bars:
             name = sec["code"]
@@ -238,205 +259,190 @@ async def sync_high_low_limit(params):
     await cache.sys.hincrby(state, "done_count", total)
     return True
 
-
-async def __sync_min_bars(params):
-    """同步分支线数据并写缓存"""
-    # todo: add unittest
-    limit = await fetcher.max_result_size("bars")
-    scope, end, n_bars, fail = params.get("__scope"), params.get("end"), params.get("n_bars", 1), params.get("__fail")
-    secs_done = []
-    async for secs in get_secs(limit, n_bars, scope):
-        bars = await fetch_min_bars(secs, end, n_bars)
-        if len(bars) == 0:
-            await push_fail_secs(secs, fail)
-            raise exception.GotNoneData()
-        
-        await Stock.batch_cache_bars(FrameType.MIN1, bars)
-        secs_done.extend(secs)
-    return secs_done
-
-
 @abnormal_work_report()
 async def sync_minute_bars(params):
-    """
-    盘中同步分钟
+    """盘中同步分钟
     Args:
         params:
 
     Returns:
 
     """
-    state = params.get("__state")
-    total, tasks = await __sync_min_bars(params)
+    assert "timeout" in params
 
-    await cache.sys.hincrby(state, "done_count", total)
+    ft = FrameType.MIN1
+    tasks = []
+    for typ in [SecurityType.STOCK, SecurityType.INDEX]:
+        tasks.append(_sync_to_cache(typ, ft, params))
 
+    timeout = params["timeout"]
+    await asyncio.wait(tasks, timeout)
 
-async def parse_params(params):
-    # todo: remove me
-    logger.info(params)
-    return (
-        params.get("__state"),
-        params.get("end"),
-        params.get("__fail"),
-        params.get("__scope"),
-        params.get("n_bars", 1),
-        params.get("__timeout"),
-    )
-
-
-@abnormal_work_report()
-async def after_hour_sync(params):
-    """这是下午三点收盘后的同步，仅写cache，同步分钟线和日线"""
-    state, end, fail = params.get("__state"), params.get("end"), params.get("__fail")
-    limit = await fetcher.max_result_size("bars")
-
-    secs = await __sync_min_bars(params)
-
-    for i in range(0, len(secs), limit):
-        batch = secs[i : i + limit]
-        bars = await fetch_day_bars(batch, end)
-        if len(bars) == 0:
-            await push_fail_secs(batch, fail)
-            raise exception.GotNoneData()
-        
-        await Stock.batch_cache_bars(FrameType.DAY, bars)
-
-    await cache.sys.hincrby(state, "done_count", len(secs))
+    name = params.get("name")
+    for t in tasks:
+        try:
+            t.result()
+        except BaseException as e:
+            logger.warning("when execute %s, got exception %s", name, e)
+            logger.exception(e)
+            former_error = await cache.sys.hmget(key, "error")
+            await cache.sys.hmset(key, "error", former_error + "\n" + str(e))
 
 
-async def checksum(value1, value2):
-    return hashlib.md5(value1).hexdigest() == hashlib.md5(value2).hexdigest()
-
-
-async def handle_dfs_data(bars1, bars2, queue_name):
+async def _sync_to_cache(typ: SecurityType, ft: FrameType, params: Dict):
     """
-    检查两次数据的md5
+    同步收盘后的数据
     Args:
-        bars1:
-        bars2:
-        queue_name: 检查通过后把数据放进redis
-
-    Returns: bool
-
-    """
-    value1 = pickle.dumps(bars1, protocol=cfg.pickle.ver)
-    value2 = pickle.dumps(bars2, protocol=cfg.pickle.ver)
-    if await checksum(value1, value2):
-        await cache.temp.lpush(queue_name, value1)
-        return True
-    else:
-        return False
-
-
-@retry(stop_max_attempt_number=5)
-async def persist_bars(frame_type: FrameType, bars: pd.DataFrame):
-    logger.info(f"正在写入influxdb:frame_type:{frame_type}")
-    # todo
-    await Stock.persist_bars(frame_type, bars)
-
-    logger.info(f"已经写入inflaxdb:frame_type:{frame_type}")
-
-
-async def persistence_daily_calibration(bars1, bars2, secs, fail, queue, frame_type):
-    # 将数据持久化
-    if bars1 is None or bars2 is None:
-        await push_fail_secs(secs, fail)
-        raise exception.GotNoneData()
-    # 校验通过，持久化
-    if not await handle_dfs_data(bars1, bars2, queue):
-        await push_fail_secs(secs, fail)
-        raise exception.ChecksumFail()
-    if frame_type != FrameType.MIN1 and isinstance(bars1, np.ndarray):
-        await persist_bars(frame_type, bars1)
-    return len(secs)
-
-
-async def __sync_daily_calibration(
-    scope: str, queue_min: str, queue_day: str, params: dict
-):
-    """
-    Args:
-        scope: 从那个队列中取任务执行，队列名
-        queue_min: 分钟线队列名
-        queue_day: 日线队列名
-        params: master发送过来的所有参数
+        typ:
+        ft:
+        params:
 
     Returns:
 
     """
-    end, n_bars, fail = params.get("end"), params.get("n_bars", 1), params.get("__fail")
+    task_name = params.get("name")
+    queue = f"{TASK_PREFIX}.{task_name}.scope.{typ}"
+    done_queue = f"{TASK_PREFIX}.{task_name}.scope.{typ}.done"
 
+    n = 240 if ft == FrameType.MIN1 else 1
     limit = await fetcher.max_result_size("bars")
-    done = 0
-    for_day_bars = []
-    async for secs in get_secs(limit, n_bars, scope):
-        for_day_bars.extend(secs)
-        min_bars1 = await fetch_min_bars(secs, end, n_bars)
-        min_bars2 = await fetch_min_bars(secs, end, n_bars)
-        done += await persistence_daily_calibration(
-            min_bars1, min_bars2, secs, fail, queue_min, FrameType.MIN1
-        )
 
-    for i in range(0, len(for_day_bars), limit):
-        temp = for_day_bars[i : i + limit]
-        bars1 = await fetch_day_bars(temp, end)
-        bars2 = await fetch_day_bars(temp, end)
-        done += await persistence_daily_calibration(
-            bars1, bars2, temp, fail, queue_day, FrameType.DAY
-        )
+    async for secs in get_secs_for_sync(limit, n, queue):
+        bars = await fetch_bars(secs, params.get("end"), n, ft)
+        await Stock.batch_cache_bars(ft, bars)
 
-    return done // 2
+        # 记录已完成的证券
+        await cache.temp.lpush(done_queue, secs)
+
+async def _daily_sync_impl(impl: Awaitable, params: Dict):
+    """after-hour 与daily calibration有相似的实现逻辑。
+
+    Args:
+        params:
+
+    Returns:
+
+    """
+    tasks = []
+    for typ, ft in itertools.product(
+        [SecurityType.STOCK, SecurityType.INDEX], FrameType.MIN1, FrameType.DAY
+    ):
+        tasks.append(asyncio.create_task(impl(typ, ft, params)))
+
+    assert "timeout" in params
+    await asyncio.wait(tasks, timeout=params.get("timeout"))
+
+    name = params.get("name")
+    key = f"{TASK_PREFIX}.{name}.scope.state"
+
+    for t in tasks:
+        try:
+            t.result()
+        except BaseException as e:
+            logger.warning("when execute %s, got exception %s", name, e)
+            logger.exception(e)
+            former_error = await cache.sys.hmget(key, "error")
+            await cache.sys.hmset(key, "error", former_error + "\n" + str(e))
+
+@abnormal_work_report()
+async def after_hour_sync(params):
+    """这是下午三点收盘后的同步，仅写cache，同步分钟线和日线"""
+    await _daily_sync_impl(_sync_to_cache, params)
+
+
+async def checksum(data: bytes) -> str:
+    return hashlib.md5(data).hexdigest()
+
+
+async def _sync_for_persist(typ: SecurityType, ft: FrameType, params: Dict):
+    """校准同步实现，用以分钟线、日线、周线、月线、年线等
+
+    Args:
+        typ : _description_
+        ft : _description_
+        params : _description_
+
+    Returns:
+        _description_
+    """
+    task_name = params.get("name")
+    queue = f"{TASK_PREFIX}.{task_name}.scope.{typ}"
+    done_queue = f"{TASK_PREFIX}.{task_name}.scope.{typ}.done"
+
+    n = 240 if ft == FrameType.MIN1 else 1
+    limit = await fetcher.max_result_size("bars")
+
+    async for secs in get_secs_for_sync(limit, n, queue):
+        # todo: is there better way to do the check?
+        bars1 = await fetch_bars(secs, params.get("end"), n, ft)
+        bars2 = await fetch_bars(secs, params.get("end"), n, ft)
+
+        if checksum(bars1) == checksum(bars2):
+            await Stock.persist_bars(ft, bars1)
+            await _cache_bars_for_aggregation(typ, ft, bars1)
+
+            # 记录已完成的证券
+            await cache.temp.lpush(done_queue, secs)
+
+
+async def _cache_bars_for_aggregation(
+    typ: SecurityType, ft: FrameType, bars: Dict[str, np.ndarray]
+):
+    """将bars临时存入redis，以备聚合之用
+
+    行情数据除了需要保存到时序数据库外，还要以块存储的方式，保存到minio中。
+
+    minio中存储的行情数据是按index/stock和frame_type进行分组的。在有多个worker存在的情况下，每个worker都只能拿到这些分组的部分品种数据。因此，我们需要将其写入redis中，由master来执行往minio的的写入工作。
+
+    Args:
+        typ: SecurityType of Stock or Index
+        ft: FrameType of DAY or MIN1
+        bars: dict of bars
+
+    Returns:
+        None
+    """
+    queue = f"{MINIO_TEMPORAL}.{typ.value}.{ft.value}"
+    data = pickle.dumps(bars, protocol=cfg.pickle.ver)
+    await cache.temp.lpush(queue, data)
 
 
 @abnormal_work_report()
-async def sync_daily_calibration(params):
-    """凌晨2点的数据校准，
-    同步分钟线 持久化
-    同步日线 持久化"""
-    state = params.get("__state")
+async def sync_daily_calibration(params: dict):
+    """校准同步。在数据经上游服务器核对，本地两次同步比较后，分别存入时序数据库和minio中。
 
-    stock_min = params.get("stock_min")
-    index_min = params.get("index_min")
-    stock_day = params.get("stock_day")
-    index_day = params.get("index_day")
+    Args:
+        params: contains start, end, name, timeout
 
-    stock_queue = params.get("stock_queue")
-    index_queue = params.get("index_queue")
-    total = 0
-    total += await __sync_daily_calibration(stock_queue, stock_min, stock_day, params)
-    total += await __sync_daily_calibration(index_queue, index_min, index_day, params)
+    Returns:
 
-    await cache.sys.hincrby(state, "done_count", total)
-
-
-async def __sync_year_quarter_month_week(params, queue, data):
-    end, n_bars, fail = params.get("end"), params.get("n_bars", 1), params.get("__fail")
-    frame_type = params.get("frame_type")
-
-    limit = await fetcher.max_result_size("bars")
-    total = 0
-    async for secs in get_secs(limit, n_bars, queue):
-        bars1 = await fetch_bars(secs, end, n_bars, frame_type)
-        bars2 = await fetch_bars(secs, end, n_bars, frame_type)
-        await persistence_daily_calibration(bars1, bars2, secs, fail, data, frame_type)
-        total += len(secs)
-    return total
-
+    """
+    await _daily_sync_impl(_sync_for_persist, params)
 
 @abnormal_work_report()
 async def sync_year_quarter_month_week(params):
-    state = params.get("__state")
-    stock_queue = params.get("stock_queue")
-    index_queue = params.get("index_queue")
-    stock_data = params.get("stock_data")
-    index_data = params.get("index_data")
-    total = 0
-    total += await __sync_year_quarter_month_week(params, stock_queue, stock_data)
-    total += await __sync_year_quarter_month_week(params, index_queue, index_data)
+    assert "frame_type" in params
+    assert "timeout" in params
+    timeout = params.get("timeout")
 
-    await cache.sys.hincrby(state, "done_count", total)
+    ft = FrameType(params.get("frame_type"))
+    tasks = []
+    for typ in (SecurityType.INDEX, SecurityType.STOCK):
+        tasks.append(asyncio.create_task(_sync_for_persist(typ, ft, params)))
 
+    await asyncio.wait(tasks, timeout=params.get("timeout"))
+
+    name = params.get("name")
+    key = f"{TASK_PREFIX}.{name}.scope.state"
+
+    for t in tasks:
+        try:
+            t.result()
+        except BaseException as e:
+            logger.warning("when execute %s, got exception %s", name, e)
+            logger.exception(e)
+            former_error = await cache.sys.hmget(key, "error")
+            await cache.sys.hmset(key, "error", former_error + "\n" + str(e))
 
 def cron_work_report():
     def inner(f):
@@ -477,9 +483,7 @@ async def sync_fund_net_value():
     ndays = 8
     n = 0
     while n < ndays:
-        await fetcher.get_fund_net_value(
-            day=now - datetime.timedelta(days=n)
-        )
+        await fetcher.get_fund_net_value(day=now - datetime.timedelta(days=n))
         n += 1
         if n > 2:
             break
@@ -493,9 +497,7 @@ async def sync_fund_share_daily():
     ndays = 8
     n = 0
     while n < ndays:
-        await fetcher.get_fund_share_daily(
-            day=now - datetime.timedelta(days=n)
-        )
+        await fetcher.get_fund_share_daily(day=now - datetime.timedelta(days=n))
         n += 1
     return True
 

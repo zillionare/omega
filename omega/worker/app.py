@@ -92,7 +92,7 @@ def start(impl: str, cfg: dict = None, **fetcher_params):
         cfg: the cfg in json string
         fetcher_params: contains info required by creating quotes worker
     """
-    emit.register(Events.OMEGA_DO_SYNC_HIGH_LOW_LIMIT, jobs.sync_high_low_limit)
+    emit.register(Events.OMEGA_DO_SYNC_TRADE_PRICE_LIMITS, jobs.sync_trade_price_limits)
     emit.register(Events.OMEGA_DO_SYNC_DAILY_CALIBRATION, jobs.sync_daily_calibration)
     emit.register(Events.OMEGA_DO_SYNC_DAY, jobs.after_hour_sync)
     emit.register(Events.OMEGA_DO_SYNC_MIN, jobs.sync_minute_bars)

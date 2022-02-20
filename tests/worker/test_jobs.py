@@ -36,12 +36,6 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         params = fetcher_info["workers"][0]
         await aq.create_instance(impl, **params)
 
-    async def test_job_timer(self):
-        await master_job._start_job_timer("unittest")
-        await asyncio.sleep(5)
-        elapsed = await master_job._stop_job_timer("unittest")
-        self.assertTrue(5 <= elapsed <= 7)
-
     async def test_load_cron_task(self):
         scheduler = AsyncIOScheduler(timezone=cfg.tz)
 

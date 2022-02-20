@@ -5704,15 +5704,11 @@ async def init_test_env():
     # enable postgres for unittest
     cfg.postgres.enabled = True
 
-    os.environ[cfg4py.envar] = "DEV"
-
     handler = logging.StreamHandler()
     fmt = "%(asctime)s %(levelname)-1.1s %(name)s:%(funcName)s:%(lineno)s | %(message)s"
     formatter = logging.Formatter(fmt=fmt)
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-    cfg.omega.sync.bars.exclude = "000002.XSHE"
-    # cfg.omega.sync.bars.include = "000001.XSHE"
     redis = await aioredis.create_redis(cfg.redis.dsn, db=1)
 
     try:
