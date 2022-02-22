@@ -195,5 +195,5 @@ class AbstractQuotesFetcher(QuotesFetcher):
         return rfn.require_fields(fund_net_values, fields)
 
     @classmethod
-    def max_result_size(cls, op: str) -> int:
+    async def max_result_size(cls, op: str) -> int:
         return cls.get_instance().max_result_size(op)

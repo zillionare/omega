@@ -20,7 +20,7 @@ from omega.worker import jobs as workjobs
 from omega.worker.dfs import TempStorage
 from tests import init_test_env
 from omega.core.constants import TRADE_PRICE_LIMITS
-from coretypes import FrameType, bars_dtype
+from coretypes import FrameType, bars_dtype, stock_bars_dtype
 from omicron.models.stock import Stock
 from tests import test_dir
 from omicron.dal.influx.influxclient import InfluxClient
@@ -439,7 +439,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             "omicron.models.timeframe.TimeFrame.count_frames",
             side_effect=count_frames(),
         ):
-            await syncjobs.sync_year_quarter_month_week()
+            await syncjobs.sync_week_bars()
             # 检查redis里的周是否是某个值
             self.assertEqual(
                 await cache.sys.get(constants.BAR_SYNC_WEEK_TAIL), "2005-01-07"
@@ -494,7 +494,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             "omicron.models.timeframe.TimeFrame.count_frames",
             side_effect=count_frames(),
         ):
-            await syncjobs.sync_year_quarter_month_week()
+            await syncjobs.sync_week_bars()
             self.assertIn("Got None Data", email_content)
 
         await cache.sys.hset(week_state, "is_running", 1)
@@ -505,7 +505,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             "omicron.models.timeframe.TimeFrame.count_frames",
             side_effect=count_frames(),
         ):
-            ret = await syncjobs.sync_year_quarter_month_week()
+            ret = await syncjobs.sync_week_bars()
             self.assertFalse(ret)
         await clear()
 
@@ -515,7 +515,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             "omicron.models.timeframe.TimeFrame.count_frames",
             side_effect=count_frames(),
         ):
-            ret = await syncjobs.sync_year_quarter_month_week()
+            ret = await syncjobs.sync_week_bars()
             self.assertIn(f"剩余可用quota：{get_quota.return_value}", email_content)
         # await clear()
         # 测试超时

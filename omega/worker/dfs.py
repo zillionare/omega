@@ -9,7 +9,7 @@ from typing import AnyStr, Dict, Union
 
 import cfg4py
 import numpy as np
-from coretypes import FrameType
+from coretypes import FrameType, SecurityType
 from minio import Minio, error
 from omicron.models.timeframe import TimeFrame
 from retrying import retry
@@ -40,17 +40,21 @@ class AbstractStorage(ABC):
 
     @staticmethod
     def get_filename(
-        prefix: str,
+        prefix: SecurityType,
         dt: Union[datetime, date, AnyStr],
         frame_type: Union[FrameType, AnyStr],
     ) -> AnyStr:  # pragma: no cover
         """拼接文件名"""
         filename = []
-        if isinstance(prefix, str) and prefix in ("stock", "index"):
-            if prefix != "":
-                filename.append(prefix)
+        if isinstance(prefix, SecurityType) and prefix in (
+            SecurityType.STOCK,
+            SecurityType.INDEX,
+        ):
+            filename.append(prefix.value)
         else:
-            raise TypeError("prefix must be type str and in ('stock 'index')")
+            raise TypeError(
+                "prefix must be type SecurityType and in (SecurityType.STOCK, SecurityType.INDEX)"
+            )
 
         if isinstance(frame_type, FrameType):
             filename.append(frame_type.value)
@@ -121,7 +125,7 @@ class TempStorage:
 class Storage:
     __instance = None
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls, *args, **kwargs) -> Union[AbstractStorage, None]:
         if cls.__instance is not None:
             return cls.__instance
 
@@ -169,7 +173,7 @@ class MinioStorage(AbstractStorage):
     async def write(
         self,
         bar: bytes,
-        prefix,
+        prefix: SecurityType,
         dt: Union[datetime, date, AnyStr],
         frame_type: Union[FrameType, AnyStr],
     ):

@@ -9,12 +9,11 @@ import logging
 import pickle
 import traceback
 from functools import wraps
-from typing import Awaitable, Dict, List
+from typing import Awaitable, Callable, Dict, List
 
 import async_timeout
 import cfg4py
 import numpy as np
-import pandas as pd
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from coretypes import FrameType, SecurityType
 from omicron import cache
@@ -23,14 +22,8 @@ from omicron.models.stock import Stock
 from omicron.models.timeframe import TimeFrame
 from omicron.notify.mail import mail_notify
 from retrying import retry
-from tomlkit import key
 
-from omega.core.constants import (
-    MINIO_TEMPORAL,
-    TRADE_PRICE_LIMITS,
-    TASK_PREFIX,
-    MINIO_TEMPORAL,
-)
+from omega.core.constants import MINIO_TEMPORAL, TASK_PREFIX, TRADE_PRICE_LIMITS
 from omega.worker import exception
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as fetcher
 
@@ -42,11 +35,13 @@ logger = logging.getLogger(__name__)
 async def worker_exit(state, scope, error=None):
     if error is None:  # pragma: no cover
         error = traceback.format_exc()
+        print(error)
     # 删除is_running 并写上错误堆栈信息
+    former_error = await cache.sys.hmget(state, "error")
     p = cache.sys.pipeline()
+    p.hmset(state, "error", former_error + "\n" + error)
     p.hdel(state, "is_running")
-    p.hmset(state, "error", error)
-    p.delete(scope)  # 删除任务队列，让其他没退出的消费者也退出，错误上报至master
+    p.delete(*scope)  # 删除任务队列，让其他没退出的消费者也退出，错误上报至master
     await p.execute()
 
 
@@ -60,9 +55,9 @@ def abnormal_work_report():
         async def decorated_function(params):
             """装饰所有worker，统一处理错误信息"""
             scope, state, timeout = (
-                params.get("__scope"),
-                params.get("__state"),
-                params.get("__timeout"),
+                params.get("scope"),
+                params.get("state"),
+                params.get("timeout"),
             )
             if isinstance(timeout, int):
                 timeout -= 5  # 提前5秒退出
@@ -107,38 +102,6 @@ async def fetch_bars(
     return await fetcher.get_bars_batch(
         secs, end=end, n_bars=n_bars, frame_type=frame_type
     )
-
-
-async def fetch_min_bars(
-    secs: List[str], end: datetime.datetime, n_bars: int
-) -> Dict[str, np.ndarray]:
-    """
-    从远端获取分钟线数据
-    Args:
-        secs: 股票的列表 ["00001.XSHG", ...]
-        end:  时间
-        n_bars: 多少根bar
-
-    Returns:
-
-    """
-    # todo: 这个封装的必要性？
-    return await fetch_bars(secs, end, n_bars, FrameType.MIN1)
-
-
-async def fetch_week_bars(secs: List[str], end: datetime.datetime, n_bars: int):
-    """
-    从远端获取分钟线数据
-    Args:
-        secs: 股票的列表 ["00001.XSHG", ...]
-        end:  时间
-        n_bars: 多少根bar
-
-    Returns:
-
-    """
-    # todo: 这个封装的必要性？
-    return await fetch_bars(secs, end, n_bars, FrameType.WEEK)
 
 
 @retry(stop_max_attempt_number=5)
@@ -194,6 +157,66 @@ async def fetch_day_bars(secs: List[str], end: datetime.datetime):
         return np.concatenate(result)
     else:
         return result
+
+
+async def _sync_params_analysis(typ: SecurityType, ft: FrameType, params: Dict):
+    name = params.get("name")
+    n = params.get("n_bars")
+    queue = f"{TASK_PREFIX}.{name}.scope.{typ.value}.{ft.value}"
+    done_queue = f"{TASK_PREFIX}.{name}.scope.{typ.value}.{ft.value}.done"
+    # f"{constants.TASK_PREFIX}.{self.name}.scope.{typ.value}.done"
+    # limit = await fetcher.max_result_size("bars")
+    limit = 3000
+    return name, n, queue, done_queue, limit
+
+
+async def _sync_to_cache(typ: SecurityType, ft: FrameType, params: Dict):
+    """
+    同步收盘后的数据
+    Args:
+        typ:
+        ft:
+        params:
+
+    Returns:
+
+    """
+    name, n, queue, done_queue, limit = await _sync_params_analysis(typ, params)
+
+    async for secs in get_secs_for_sync(limit, n, queue):
+        # todo 如果是日线，需要调用获取日线的方法，其他的不用变
+        bars = await fetch_bars(secs, params.get("end"), n, ft)
+        await Stock.batch_cache_bars(ft, bars)
+
+        # 记录已完成的证券
+        await cache.sys.lpush(done_queue, secs)
+
+
+async def _sync_for_persist(typ: SecurityType, ft: FrameType, params: Dict):
+    """校准同步实现，用以分钟线、日线、周线、月线、年线等
+
+    Args:
+        typ : _description_
+        ft : _description_
+        params : _description_
+
+    Returns:
+        _description_
+    """
+    name, n, queue, done_queue, limit = await _sync_params_analysis(typ, ft, params)
+
+    async for secs in get_secs_for_sync(limit, n, queue):
+        # todo: is there better way to do the check? 校验和数据类型问题
+        bars1 = await fetch_bars(secs, params.get("end"), n, ft)
+        bars2 = await fetch_bars(secs, params.get("end"), n, ft)
+
+        if await checksum(pickle.dumps(bars1, protocol=4)) == await checksum(
+            pickle.dumps(bars2, protocol=4)
+        ):
+            # await Stock.persist_bars(ft, bars1)
+            await _cache_bars_for_aggregation(typ, ft, bars1)
+            # 记录已完成的证券
+            await cache.sys.lpush(done_queue, *secs)
 
 
 async def get_secs_for_sync(limit: int, n_bars: int, name: str):
@@ -259,6 +282,7 @@ async def sync_trade_price_limits(params: Dict):
     await cache.sys.hincrby(state, "done_count", total)
     return True
 
+
 @abnormal_work_report()
 async def sync_minute_bars(params):
     """盘中同步分钟
@@ -268,53 +292,10 @@ async def sync_minute_bars(params):
     Returns:
 
     """
-    assert "timeout" in params
-
-    ft = FrameType.MIN1
-    tasks = []
-    for typ in [SecurityType.STOCK, SecurityType.INDEX]:
-        tasks.append(_sync_to_cache(typ, ft, params))
-
-    timeout = params["timeout"]
-    await asyncio.wait(tasks, timeout)
-
-    name = params.get("name")
-    for t in tasks:
-        try:
-            t.result()
-        except BaseException as e:
-            logger.warning("when execute %s, got exception %s", name, e)
-            logger.exception(e)
-            former_error = await cache.sys.hmget(key, "error")
-            await cache.sys.hmset(key, "error", former_error + "\n" + str(e))
+    await _daily_sync_impl(_sync_to_cache, params)
 
 
-async def _sync_to_cache(typ: SecurityType, ft: FrameType, params: Dict):
-    """
-    同步收盘后的数据
-    Args:
-        typ:
-        ft:
-        params:
-
-    Returns:
-
-    """
-    task_name = params.get("name")
-    queue = f"{TASK_PREFIX}.{task_name}.scope.{typ}"
-    done_queue = f"{TASK_PREFIX}.{task_name}.scope.{typ}.done"
-
-    n = 240 if ft == FrameType.MIN1 else 1
-    limit = await fetcher.max_result_size("bars")
-
-    async for secs in get_secs_for_sync(limit, n, queue):
-        bars = await fetch_bars(secs, params.get("end"), n, ft)
-        await Stock.batch_cache_bars(ft, bars)
-
-        # 记录已完成的证券
-        await cache.temp.lpush(done_queue, secs)
-
-async def _daily_sync_impl(impl: Awaitable, params: Dict):
+async def _daily_sync_impl(impl: Callable, params: Dict):
     """after-hour 与daily calibration有相似的实现逻辑。
 
     Args:
@@ -324,25 +305,16 @@ async def _daily_sync_impl(impl: Awaitable, params: Dict):
 
     """
     tasks = []
+    assert "frame_type" in params
+    frame_type = params.get("frame_type")
     for typ, ft in itertools.product(
-        [SecurityType.STOCK, SecurityType.INDEX], FrameType.MIN1, FrameType.DAY
+        [SecurityType.STOCK, SecurityType.INDEX], frame_type
     ):
         tasks.append(asyncio.create_task(impl(typ, ft, params)))
 
     assert "timeout" in params
     await asyncio.wait(tasks, timeout=params.get("timeout"))
 
-    name = params.get("name")
-    key = f"{TASK_PREFIX}.{name}.scope.state"
-
-    for t in tasks:
-        try:
-            t.result()
-        except BaseException as e:
-            logger.warning("when execute %s, got exception %s", name, e)
-            logger.exception(e)
-            former_error = await cache.sys.hmget(key, "error")
-            await cache.sys.hmset(key, "error", former_error + "\n" + str(e))
 
 @abnormal_work_report()
 async def after_hour_sync(params):
@@ -350,39 +322,27 @@ async def after_hour_sync(params):
     await _daily_sync_impl(_sync_to_cache, params)
 
 
-async def checksum(data: bytes) -> str:
-    return hashlib.md5(data).hexdigest()
-
-
-async def _sync_for_persist(typ: SecurityType, ft: FrameType, params: Dict):
-    """校准同步实现，用以分钟线、日线、周线、月线、年线等
+@abnormal_work_report()
+async def sync_daily_calibration(params: dict):
+    """校准同步。在数据经上游服务器核对，本地两次同步比较后，分别存入时序数据库和minio中。
 
     Args:
-        typ : _description_
-        ft : _description_
-        params : _description_
+        params: contains start, end, name, timeout
 
     Returns:
-        _description_
+
     """
-    task_name = params.get("name")
-    queue = f"{TASK_PREFIX}.{task_name}.scope.{typ}"
-    done_queue = f"{TASK_PREFIX}.{task_name}.scope.{typ}.done"
+    await _daily_sync_impl(_sync_for_persist, params)
 
-    n = 240 if ft == FrameType.MIN1 else 1
-    limit = await fetcher.max_result_size("bars")
 
-    async for secs in get_secs_for_sync(limit, n, queue):
-        # todo: is there better way to do the check?
-        bars1 = await fetch_bars(secs, params.get("end"), n, ft)
-        bars2 = await fetch_bars(secs, params.get("end"), n, ft)
+@abnormal_work_report()
+async def sync_year_quarter_month_week(params):
+    """同步周月线"""
+    await _daily_sync_impl(_sync_for_persist, params)
 
-        if checksum(bars1) == checksum(bars2):
-            await Stock.persist_bars(ft, bars1)
-            await _cache_bars_for_aggregation(typ, ft, bars1)
 
-            # 记录已完成的证券
-            await cache.temp.lpush(done_queue, secs)
+async def checksum(data: bytes) -> str:
+    return hashlib.md5(data).hexdigest()
 
 
 async def _cache_bars_for_aggregation(
@@ -406,43 +366,6 @@ async def _cache_bars_for_aggregation(
     data = pickle.dumps(bars, protocol=cfg.pickle.ver)
     await cache.temp.lpush(queue, data)
 
-
-@abnormal_work_report()
-async def sync_daily_calibration(params: dict):
-    """校准同步。在数据经上游服务器核对，本地两次同步比较后，分别存入时序数据库和minio中。
-
-    Args:
-        params: contains start, end, name, timeout
-
-    Returns:
-
-    """
-    await _daily_sync_impl(_sync_for_persist, params)
-
-@abnormal_work_report()
-async def sync_year_quarter_month_week(params):
-    assert "frame_type" in params
-    assert "timeout" in params
-    timeout = params.get("timeout")
-
-    ft = FrameType(params.get("frame_type"))
-    tasks = []
-    for typ in (SecurityType.INDEX, SecurityType.STOCK):
-        tasks.append(asyncio.create_task(_sync_for_persist(typ, ft, params)))
-
-    await asyncio.wait(tasks, timeout=params.get("timeout"))
-
-    name = params.get("name")
-    key = f"{TASK_PREFIX}.{name}.scope.state"
-
-    for t in tasks:
-        try:
-            t.result()
-        except BaseException as e:
-            logger.warning("when execute %s, got exception %s", name, e)
-            logger.exception(e)
-            former_error = await cache.sys.hmget(key, "error")
-            await cache.sys.hmset(key, "error", former_error + "\n" + str(e))
 
 def cron_work_report():
     def inner(f):

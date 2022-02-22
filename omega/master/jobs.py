@@ -9,6 +9,7 @@ import pickle
 import sys
 import time
 import traceback
+from collections.abc import Iterable
 from functools import wraps
 from typing import Any, Dict, List, Tuple, Union
 
@@ -26,6 +27,7 @@ from pyemit import emit
 from retrying import retry
 
 from omega.core import constants
+from omega.core.constants import MINIO_TEMPORAL
 from omega.core.errors import QuotaExceededError
 from omega.core.events import Events
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
@@ -67,10 +69,13 @@ class BarsSyncTask:
         self,
         event: str,
         name: str,
-        params: dict,
+        *,
+        start: datetime.datetime,
+        end: datetime.datetime,
+        frame_type: List[FrameType],
         timeout: int = 60,
+        n_bars: int = 240,
         recs_per_sec: int = 240,
-        expire_time: int = None,
     ):
         """
         Args:
@@ -79,35 +84,51 @@ class BarsSyncTask:
             params: 发送给emit的参数
             timeout: run需要等待的超时时间
             recs_per_sec: 每支证券将要同步的记录数。
-            expire_time: 如果设置，则在任务开始执行后的`expire_time`秒内，自动清除redis中保存的任务状态，以便下次重新启动任务。
+            # expire_time: 如果设置，则在任务开始执行后的`expire_time`秒内，自动清除redis中保存的任务状态，以便下次重新启动任务。
         """
         # 读取待同步证券品种的队列名惟一，因此也可以作为任务的唯一标识名
         self.name = name
         self.event = event
-        self.params = params
+        self.params = {}
         self.timeout = timeout
-
+        self.n_bars = n_bars
+        self.start = start
+        self.end = end
+        # if not isinstance(frame_type, Iterable):
+        #     frame_type = [frame_type]
+        self.frame_type = frame_type
         self._stock_scope = self.parse_bars_sync_scope(SecurityType.STOCK)
         self._index_scope = self.parse_bars_sync_scope(SecurityType.INDEX)
 
         self._recs_per_sec = recs_per_sec
-        self.expire_time = expire_time
 
-        self.params.update({"timeout": self.timeout, "name": self.name})
+        self.params = {
+            "timeout": self.timeout,
+            "name": self.name,
+            "frame_type": self.frame_type,
+            "start": self.start,
+            "end": self.end,
+            "n_bars": self.n_bars,
+        }
 
     def _state_key_name(self):
         # review: 最初这些名字被保存为成员变量。成员变量一般用来记录对象的状态和属性。如果只是一些可以通过计算得出来的中间属性，可应该考虑使用函数计算的方式（如果没有性能问题）。
         return f"{constants.TASK_PREFIX}.{self.name}.state"
 
-    def _scope_key_name(self, typ: str, is_done: bool):
+    def _scope_key_name(self, typ: SecurityType, ft: FrameType, is_done: bool):
         if is_done:
-            return f"{constants.TASK_PREFIX}.{self.name}.scope.{typ}.done"
+            return (
+                f"{constants.TASK_PREFIX}.{self.name}.scope.{typ.value}.{ft.value}.done"
+            )
 
-        return f"{constants.TASK_PREFIX}.{self.name}.scope.{typ}"
+        return f"{constants.TASK_PREFIX}.{self.name}.scope.{typ.value}.{ft.value}"
 
     async def delete_state(self):
         key = self._state_key_name()
         await cache.sys.delete(key)
+
+    async def delete_done(self):
+        await cache.sys.delete(*self.params.get("done", []))
 
     @property
     def recs_per_sec(self):
@@ -117,6 +138,13 @@ class BarsSyncTask:
     @recs_per_sec.setter
     def recs_per_sec(self, value):
         self._recs_per_sec = value
+
+    @classmethod
+    def get_quota(cls):
+        quota = 0
+        for worker in work_state.values():
+            quota += worker.get("quota", 0)
+        return quota
 
     async def is_running(self) -> bool:
         """检查同类任务是否有一个实例正在运行。
@@ -147,7 +175,7 @@ class BarsSyncTask:
                 # 如果值存在，则表明已在运行，不关心具体取值
                 "is_running": state.get("is_running") is not None,
                 "done_count": int(state.get("done_count", 0)),
-                "error": state.get("error", ""),
+                "error": state.get("error"),
                 "worker_count": int(state.get("worker_count", 0)),
             }
 
@@ -157,7 +185,7 @@ class BarsSyncTask:
             return state
 
     @classmethod
-    def parse_bars_sync_scope(cls, _type: str):
+    def parse_bars_sync_scope(cls, _type: SecurityType):
         """生成待同步行情数据的证券列表
 
         该列表由以下方式生成：
@@ -175,7 +203,7 @@ class BarsSyncTask:
                     exclude: 000001.XSHE 000002.XSHE
         ```
         """
-        codes = Stock.choose([_type])
+        codes = Stock.choose([_type.value])
         exclude = getattr(cfg.omega.sync.bars, "exclude", "")
         if exclude:
             exclude = map(lambda x: x, exclude.split(" "))
@@ -201,8 +229,8 @@ class BarsSyncTask:
         # review: 因为报告机制特别重要，所以不能因为读redis失败而导致发送失败。
         try:
             body += f"{await self.get_sync_failed_secs()}"
-        except Exception as e:
-            body += "获取失败的证券列表时发生异常：" + str(e)
+        except Exception as e:  # noqa
+            body += "获取失败的证券列表时发生异常：" + traceback.format_exc()
 
         logger.info(f"发送邮件subject:{subject}, body: {body}")
         await mail_notify(subject, body, html=True)
@@ -218,10 +246,10 @@ class BarsSyncTask:
         pl = cache.sys.pipeline()
         pl.hmset_dict(key, kwargs)
         # todo: 是使用expire还是timeout?或者使用auto_expire?
-        if self.expire_time is not None:
-            pl.expire(key, self.expire_time)
-
+        # if self.expire_time is not None:
+        pl.expire(key, self.timeout * 2)  # 自动设置超时时间
         await pl.execute()
+        self.params.update({"state": key})
 
     def check_quota(self) -> Tuple:
         """检查quota是否足够完成本次同步
@@ -229,37 +257,48 @@ class BarsSyncTask:
         Returns:
             返回Tuple(isok, spare quota, required quota)
         """
-        count = len(self._index_scope + self._stock_scope)
+        # 只相加len的值应该快一点
+        count = len(self._index_scope) + len(self._stock_scope)
         assert count > 0
         # 检查quota，通过证券数据 * 每支证券待同步的条数
         quota = self.get_quota()
         need = count * self._recs_per_sec
-        return quota < need, quota, need
+        return need < quota, quota, need
 
     async def update_sync_scope(self):
         """将待同步的证券代码列表写入redis队列，以便worker获取"""
+        # todo 不同的frame_type 和 SecurityType的队列不一样，但是只写了一个队列，这样worker同步第二个frame_type时 就获取不到数据了
         pl = cache.sys.pipeline()
-        for typ in ["index", "stock"]:
-            key = self._scope_key_name(typ, False)
-
+        keys = []
+        keys_done = []
+        for typ, ft in itertools.product(
+            [SecurityType.STOCK, SecurityType.INDEX], self.frame_type
+        ):
+            key = self._scope_key_name(typ, ft, is_done=False)
+            keys.append(key)
             # 记录成功完成同步的证券代码
-            key_done = self._scope_key_name(typ, True)
+            key_done = self._scope_key_name(typ, ft, is_done=True)
             pl.delete(key)
             pl.delete(key_done)
-
-        pl.lpush(key, *self._index_scope)
-        pl.lpush(key, *self._stock_scope)
+            keys_done.append(key_done)
+            if typ == SecurityType.STOCK:
+                pl.lpush(key, *self._stock_scope)
+            elif typ == SecurityType.INDEX:
+                pl.lpush(key, *self._index_scope)
 
         await pl.execute()
+        # 将队列名放进参数，worker需要用到
+        self.params.update({"scope": keys})
+        self.params.update({"done": keys_done})
 
     async def cleanup(self, success: bool = True):
         """在任务结束时（成功或失败）的清理操作"""
 
-        if success:
-            await self.delete_state()
-        else:
+        if not success:
             state = await self._get_task_state()
             await self.send_email(state.get("error"))
+        await self.delete_state()
+        await self.delete_done()
 
     async def run(self):
         """分配任务并发送emit通知worker开始执行，然后阻塞等待"""
@@ -270,17 +309,15 @@ class BarsSyncTask:
         ok, spare, required = self.check_quota()
         if not ok:
             msg = f"quota不足，剩余quota：{spare}, 需要quota：{required}"
-            await mail_notify(msg)
+            await self.send_email(msg)
             return False
 
-        await self.update_state(is_running=1)
+        await self.update_state(is_running=1, worker_count=0)
         await self.update_sync_scope()
 
-        # worker在同步中，会将bars追加到下面的队列中，因此在同步前需要清空队列
-        await delete_temporal_bars(
-            [SecurityType.STOCK, SecurityType.INDEX],
-            [*TimeFrame.minute_level_frames, TimeFrame.day],
-        )
+        # todo worker在同步中，会将bars追加到下面的队列中，因此在同步前需要清空队列，清空队列时仅清空本次需要用到的队列，根据frame_type和name
+
+        await delete_temporal_bars(self.frame_type)
 
         await emit.emit(self.event, self.params)
         ret = await self.check_done()
@@ -294,80 +331,89 @@ class BarsSyncTask:
         """
         # review: 一般我们可以用t0来标识计时的起点
         t0 = time.time()
+        ret = False
         try:
             async with async_timeout.timeout(self.timeout):
                 while True:
                     state = await self._get_task_state()
                     is_running, error = state.get("is_running"), state.get("error")
-
                     if error is not None or not is_running:
                         # 异常退出
                         ret = False
                         break
                     # 如果所有证券已完成同步，则退出
-                    done_index = await self.get_sync_done_secs("index")
-                    if set(done_index) != set(self._index_scope):
+                    for ft in self.frame_type:
+                        # 当for循环检查没有任何一次break时，则说明任务全部完成了。有任何一次
                         await asyncio.sleep(0.5)
-                        continue
-
-                    done_stock = await self.get_sync_done_secs("stock")
-                    if set(done_stock) != set(self._stock_scope):
-                        await asyncio.sleep(0.5)
-                        continue
-
-                    logger.info(
-                        f"{self.scope}, params:{self.params},耗时：{time.time() - t0}"
-                    )
-
-                    ret = True
-                    break
+                        done_index = await self.get_sync_done_secs(
+                            SecurityType.INDEX, ft
+                        )
+                        if set(done_index) != set(self._index_scope):
+                            break
+                        done_stock = await self.get_sync_done_secs(
+                            SecurityType.STOCK, ft
+                        )
+                        if set(done_stock) != set(self._stock_scope):
+                            break
+                    else:
+                        # 说明执行完了
+                        logger.info(f"params:{self.params},耗时：{time.time() - t0}")
+                        print(f"params:{self.params},耗时：{time.time() - t0}")
+                        ret = True
+                        break
         except asyncio.exceptions.TimeoutError:
             # review: 这里有一个pragma: nocover. 对异常分支不进行单元测试的问题是，万一这些异常真的出现，它们可能引起二次异常，从而最终导致程序崩溃 -- 这也许并不是我们想要的 -- 单元测试可以排除掉未处理的二次异常。
             logger.info("消费者超时退出")
             ret = False
         finally:
-            self.cleanup(ret)
+            await self.cleanup(ret)
 
         return ret
 
-    async def get_sync_done_secs(self, typ: str) -> List:
-        key = self._scope_key_name(typ, True)
+    async def get_sync_done_secs(
+        self,
+        typ: SecurityType,
+        ft: FrameType,
+    ) -> List:
+        key = self._scope_key_name(typ, ft, is_done=True)
         return await cache.sys.lrange(key, 0, -1)
 
     async def get_sync_failed_secs(self) -> List[str]:
         """获取本次同步中失败的证券"""
-        done_index = await self.get_sync_done_secs("index")
-        done_stock = await self.get_sync_done_secs("stock")
+        failed = []
+        for ft in self.frame_type:
+            done_index = await self.get_sync_done_secs(SecurityType.INDEX, ft)
+            done_stock = await self.get_sync_done_secs(SecurityType.STOCK, ft)
 
-        failed = set(self._index_scope) - set(done_index) | set(
-            self._stock_scope
-        ) - set(done_stock)
+            failed += list(
+                set(self._index_scope) - set(done_index)
+                | set(self._stock_scope) - set(done_stock)
+            )
 
-        return list(failed)
+        return list(set(failed))
 
 
 async def write_dfs(
-    dt: datetime.datetime,
-    resample: bool = False,
+    dt: datetime.datetime, frame_type: List[FrameType], resample: bool = False
 ):
     """将校准同步/追赶同步时下载的数据写入块存储 - minio
 
     Args:
         dt: 日期
         resample: 是否需要重采样  只重采样分钟线 到 5 15 30 60
+        frame_type: k线类型
     Returns:
 
     """
-    prefix = "daily_calibration"
 
     dfs = Storage()
     if dfs is None:  # pragma: no cover
         return
 
     for typ, ft in itertools.product(
-        ["stock", "index"], [FrameType.MIN1, FrameType.DAY]
+        [SecurityType.STOCK, SecurityType.INDEX], frame_type
     ):
-        queue_name = f"{prefix}.{typ}.{ft.value}"
+        queue_name = f"{MINIO_TEMPORAL}.{typ.value}.{ft.value}"
 
         # todo: structure/fields of the data? does it contains frametye or code?
         data = await cache.temp.lrange(queue_name, 0, -1, encoding=None)
@@ -384,7 +430,7 @@ async def write_dfs(
             all_bars.update(bars)
 
         # todo: now resmaple is disabled
-        binary = pickle.dumps(bars, protocol=cfg.pickle.ver)
+        binary = pickle.dumps(all_bars, protocol=cfg.pickle.ver)
         await dfs.write(binary, typ, dt, ft)
 
         # todo: let worker do the resample
@@ -396,9 +442,9 @@ async def write_dfs(
                 FrameType.MIN60,
             ):
                 # we need to support batch resample here
-                resampled = Stock.resample(bars, FrameType.MIN1, to_frame)
+                resampled = Stock.resample(all_bars, FrameType.MIN1, to_frame)
                 resampled_binary = pickle.dumps(resampled, protocol=cfg.pickle.ver)
-                await dfs.write(resampled_binary, prefix, dt, to_frame)
+                await dfs.write(resampled_binary, typ, dt, to_frame)
 
         await cache.temp.delete(queue_name)
 
@@ -420,33 +466,36 @@ async def __daily_calibration_sync(
     end = sync_dt.replace(hour=15, minute=0, microsecond=0, second=0)
     # 检查 end 是否在交易日
 
-    params = {"start": start, "end": end, "to_cache": False}
-
+    name = "calibration_sync"
+    frame_type = [FrameType.MIN1, FrameType.DAY]
     task = BarsSyncTask(
-        Events.OMEGA_DO_SYNC_DAILY_CALIBRATION,
-        "calibration_sync",
-        params,
-        60 * 60 * 6,
-        recs_per_sec=(240 * 2 + 4) // 0.75,
+        event=Events.OMEGA_DO_SYNC_DAILY_CALIBRATION,
+        name=name,
+        start=start,
+        end=end,
+        frame_type=frame_type,  # 需要同步的类型
+        n_bars=240,
+        timeout=60 * 60 * 6,
+        recs_per_sec=int((240 * 2 + 4) // 0.75),
     )
 
     ret = await task.run()
     # 如果运行中出现错误，则中止本次同步
     if not ret:
         return ret
-    logger.info(f"daily_calibration -- params:{params} 已执行完毕，准备进行持久化")
+    logger.info(f"daily_calibration -- params:{task.params} 已执行完毕，准备进行持久化")
 
     # 将raw数据写入块存储--minio
     # todo: disable resample for now
-    await write_dfs(end, resample=False)
+    await write_dfs(end, frame_type, resample=False)
 
     # 成功同步了`sync_dt`这一天的数据，更新 head 和 tail
     if head is not None:
         await cache.sys.set(constants.BAR_SYNC_ARCHIVE_HEAD, head.strftime("%Y-%m-%d"))
     if tail is not None:
         await cache.sys.set(constants.BAR_SYNC_ARCHIVE_TAIL, tail.strftime("%Y-%m-%d"))
-
-    logger.info("%s(%s)同步完成,参数为%s", self.name, sync_dt, self.params)
+    logger.info(f"{name}({sync_dt})同步完成,参数为{task.params}")
+    return True
 
 
 def get_yesterday_or_pre_trade_day(now):
@@ -533,8 +582,8 @@ async def daily_calibration_job():
         if sync_dt is None:
             break
 
-        sucess = await __daily_calibration_sync(sync_dt, head=head, tail=tail)
-        if not sucess:
+        success = await __daily_calibration_sync(sync_dt, head=head, tail=tail)
+        if not success:
             break
         else:
             now = arrow.now().date()
@@ -579,6 +628,7 @@ async def sync_minute_bars():
     first = end.replace(hour=9, minute=30, second=0, microsecond=0)
     timeout = 60
     # 检查当前时间是否在交易时间内
+    # todo time frool
     if end.hour * 60 + end.minute not in TimeFrame.ticks[FrameType.MIN1]:
         if 11 <= end.hour < 13:
             end = end.replace(hour=11, minute=30)
@@ -649,21 +699,21 @@ async def delete_year_quarter_month_week_queue(stock, index):
     await p.execute()
 
 
-async def delete_temporal_bars(typ: List[str], frame_types: List[FrameType]):
+async def delete_temporal_bars(frame_types: List[FrameType]):
     """清理临时存储在redis中的行情数据
 
     这部分数据使用list来存储，因此，在每次同步之前，必须先清理redis中的list，防止数据重复。
 
     Args:
-        typ: 品种类型，如SecurityType.STOCK
         frame_types: 帧类型，如FrameType.MIN1
     """
-    assert isinstance(typ, list)
     assert isinstance(frame_types, list)
 
     p = cache.temp.pipeline()
-    for t, ft in itertools.product(typ, frame_types):
-        key = f"{constants.MINIO_TEMPORAL}.{t}.{ft.value}"
+    for t, ft in itertools.product(
+        [SecurityType.STOCK, SecurityType.INDEX], frame_types
+    ):
+        key = f"{constants.MINIO_TEMPORAL}.{t.value}.{ft.value}"
         p.delete(key)
     await p.execute()
 
@@ -722,6 +772,7 @@ async def __sync_year_quarter_month_week(tail_key, frame_type):
                 f"同步{frame_type.value}时退出，count_frame：{count_frame}, params:{params}"
             )
             return False
+        # todo 这里需要调整，因为同步月线周线也需要持久化
         await write_dfs(stock_data, frame_type, "stock", tail)
         await write_dfs(index_data, frame_type, "index", tail)
         await delete_year_quarter_month_week_queue(stock_data, index_data)
@@ -731,36 +782,76 @@ async def __sync_year_quarter_month_week(tail_key, frame_type):
     return False
 
 
-async def run_sync_year_quarter_month_week(week=True, month=True):
-    # 检查周线 tail
-    logger.info("sync_year_quarter_month_week 启动")
-
-    if week:
-        week = await __sync_year_quarter_month_week(
-            constants.BAR_SYNC_WEEK_TAIL, FrameType.WEEK
-        )
-        logger.info(f"执行{FrameType.WEEK.value}完毕")
-
-    if month:
-        month = await __sync_year_quarter_month_week(
-            constants.BAR_SYNC_MONTH_TAIL, FrameType.MONTH
-        )
-        logger.info(f"执行{FrameType.MONTH.value}完毕")
-
-        # return False
-    if not week and not month:
-        logger.info("同步周、月完毕")
+async def run_sync_year_quarter_month_week(
+    sync_date: datetime.datetime, frame_type: FrameType
+):
+    name = frame_type.value
+    params = {
+        "end": sync_date,
+        "frame_type": FrameType.WEEK,
+    }
+    task = BarsSyncTask(
+        Events.OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK,
+        name,
+        params,
+        60 * 10,
+    )
+    task.recs_per_sec = 2
+    ret = await task.run()
+    if not ret:
+        # todo 执行失败需要删除数据队列
         return False
-    await run_sync_year_quarter_month_week(week, month)
+    # todo 持久化到dfs
+    await cache.sys.set(constants.BAR_SYNC_WEEK_TAIL, sync_date.strftime("%Y-%m-%d"))
+    return True
+
+
+async def get_month_week_sync_date(tail_key: str, frame_type: FrameType):
+    """获取周月的同步日期，通常情况下，周月数据相对较少，一天的quota足够同步完所有的数据，所以直接从2005年开始同步至今"""
+    year_quarter_month_week_calendar = {
+        FrameType.WEEK: TimeFrame.int2date(TimeFrame.week_frames[0]),
+        FrameType.MONTH: TimeFrame.int2date(TimeFrame.month_frames[0]),
+    }
+    tail = await cache.sys.get(tail_key)
+    now = arrow.now()
+    if not tail:
+        tail = year_quarter_month_week_calendar.get(frame_type)
+    else:
+        tail = datetime.datetime.strptime(tail, "%Y-%m-%d")
+        tail = TimeFrame.shift(tail, 1, frame_type)
+    count_frame = TimeFrame.count_frames(
+        tail,
+        now.replace(hour=0, minute=0, second=0, microsecond=0),
+        frame_type,
+    )
+    if count_frame >= 1:
+        return tail
 
 
 @abnormal_master_report()
-async def sync_year_quarter_month_week():
-    """同步年月日周"""
+async def sync_week_bars():
+    """同步周线"""
     # 检查周线 tail
-    logger.info("sync_year_quarter_month_week 启动")
-    sys.setrecursionlimit(10000)
-    await run_sync_year_quarter_month_week()
+    logger.info("sync_week_bars 启动")
+    while sync_date := await get_month_week_sync_date(
+        constants.BAR_SYNC_WEEK_TAIL, FrameType.WEEK
+    ):
+        success = await run_sync_year_quarter_month_week(sync_date, FrameType.WEEK)
+        if not success:
+            break
+
+
+@abnormal_master_report()
+async def sync_month_bars():
+    """同步月线"""
+    # 检查周线 tail
+    logger.info("sync_month_bars 启动")
+    while sync_date := await get_month_week_sync_date(
+        constants.BAR_SYNC_MONTH_TAIL, FrameType.MONTH
+    ):
+        success = await run_sync_year_quarter_month_week(sync_date, FrameType.MONTH)
+        if not success:
+            break
 
 
 async def load_cron_task(scheduler):
@@ -811,7 +902,7 @@ async def load_cron_task(scheduler):
         name="sync_day_bars",
     )
     scheduler.add_job(
-        sync_year_quarter_month_week,
+        sync_week_bars,
         "cron",
         hour=2,
         minute=5,
