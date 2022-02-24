@@ -9,7 +9,7 @@ import logging
 import pickle
 import traceback
 from functools import wraps
-from typing import Awaitable, Callable, Dict, List
+from typing import Awaitable, Callable, Dict, List, Union
 
 import async_timeout
 import cfg4py
@@ -37,9 +37,13 @@ async def worker_exit(state, scope, error=None):
         error = traceback.format_exc()
         print(error)
     # 删除is_running 并写上错误堆栈信息
-    former_error = await cache.sys.hmget(state, "error")
+    former_error = await cache.sys.hget(state, "error")
     p = cache.sys.pipeline()
-    p.hmset(state, "error", former_error + "\n" + error)
+    if former_error:
+        p.hmset(state, "error", former_error + "\n" + error)
+    else:
+        p.hmset(state, "error", error)
+
     p.hdel(state, "is_running")
     p.delete(*scope)  # 删除任务队列，让其他没退出的消费者也退出，错误上报至master
     await p.execute()
@@ -97,18 +101,24 @@ async def cache_init():
 @retry(stop_max_attempt_number=5)
 async def fetch_bars(
     secs: List[str], end: datetime.datetime, n_bars: int, frame_type: FrameType
-) -> Dict[str, np.ndarray]:
+) -> Union[Dict[str, np.ndarray], np.ndarray]:
     # todo: omicron可以保存dict[code->bars],无需进行转换。这里的转换只是为了适应底层逻辑，没有特别的功能，在底层可以修改的情况下，可以不做不必要的转换。
-    return await fetcher.get_bars_batch(
+    bars = await fetcher.get_bars_batch(
         secs, end=end, n_bars=n_bars, frame_type=frame_type
     )
+    if bars is None:
+        raise exception.GotNoneData()
+    return bars
 
 
 @retry(stop_max_attempt_number=5)
 async def get_trade_price_limits(secs, end):
     """获取涨跌停价"""
     # todo: 可以重命名为get_trade_limit_price
-    return await fetcher.get_trade_price_limits(secs, end)
+    bars = await fetcher.get_trade_price_limits(secs, end)
+    bars["low_limit"] = np.nan_to_num(bars["low_limit"])
+    bars["high_limit"] = np.nan_to_num(bars["high_limit"])
+    return bars
 
 
 def get_remnant_s():
@@ -120,53 +130,17 @@ def get_remnant_s():
     return int((end - now).total_seconds())
 
 
-@retry(stop_max_attempt_number=5)
-async def fetch_day_bars(secs: List[str], end: datetime.datetime):
-    """
-    获取日线数据
-    从get_bars中取到标准数据
-    从get_price中取到涨跌停
-    Args:
-        secs: 股票的列表
-        end: 时间
-
-    Returns: 返回np数组
-
-    """
-    dtypes = [("high_limit", "<f8"), ("low_limit", "<f8"), ("code", "O")]
-    """获取日线数据，和 今日的涨跌停并合并"""
-    bars = await fetcher.get_bars_batch(
-        secs, end=end, n_bars=1, frame_type=FrameType.DAY
-    )
-    high_low_limit = await get_trade_price_limits(secs, end)
-    result = []
-    end_str = end.strftime("%Y-%m-%d")
-    for sec in high_low_limit:
-        date = sec["time"].astype("M8[ms]").astype("O").strftime("%Y-%m-%d")
-        if date != end_str:
-            continue
-        name = sec[1]
-        bar = numpy_append_fields(
-            bars[name],
-            ("high_limit", "low_limit", "code"),
-            [sec["high_limit"], sec["low_limit"], name],
-            dtypes,
-        )
-        result.append(bar)
-    if result:
-        return np.concatenate(result)
-    else:
-        return result
-
-
 async def _sync_params_analysis(typ: SecurityType, ft: FrameType, params: Dict):
     name = params.get("name")
     n = params.get("n_bars")
+    if not n:
+        if ft != FrameType.MIN1:
+            n = 1
+        else:
+            n = 240
     queue = f"{TASK_PREFIX}.{name}.scope.{typ.value}.{ft.value}"
     done_queue = f"{TASK_PREFIX}.{name}.scope.{typ.value}.{ft.value}.done"
-    # f"{constants.TASK_PREFIX}.{self.name}.scope.{typ.value}.done"
-    # limit = await fetcher.max_result_size("bars")
-    limit = 3000
+    limit = await fetcher.result_size_limit("bars")
     return name, n, queue, done_queue, limit
 
 
@@ -181,15 +155,15 @@ async def _sync_to_cache(typ: SecurityType, ft: FrameType, params: Dict):
     Returns:
 
     """
-    name, n, queue, done_queue, limit = await _sync_params_analysis(typ, params)
-
+    print("_sync_to_cache 被调用", ft)
+    name, n, queue, done_queue, limit = await _sync_params_analysis(typ, ft, params)
+    print(done_queue)
     async for secs in get_secs_for_sync(limit, n, queue):
         # todo 如果是日线，需要调用获取日线的方法，其他的不用变
         bars = await fetch_bars(secs, params.get("end"), n, ft)
         await Stock.batch_cache_bars(ft, bars)
-
         # 记录已完成的证券
-        await cache.sys.lpush(done_queue, secs)
+        await cache.sys.lpush(done_queue, *secs)
 
 
 async def _sync_for_persist(typ: SecurityType, ft: FrameType, params: Dict):
@@ -204,7 +178,7 @@ async def _sync_for_persist(typ: SecurityType, ft: FrameType, params: Dict):
         _description_
     """
     name, n, queue, done_queue, limit = await _sync_params_analysis(typ, ft, params)
-
+    print(await _sync_params_analysis(typ, ft, params))
     async for secs in get_secs_for_sync(limit, n, queue):
         # todo: is there better way to do the check? 校验和数据类型问题
         bars1 = await fetch_bars(secs, params.get("end"), n, ft)
@@ -213,9 +187,13 @@ async def _sync_for_persist(typ: SecurityType, ft: FrameType, params: Dict):
         if await checksum(pickle.dumps(bars1, protocol=4)) == await checksum(
             pickle.dumps(bars2, protocol=4)
         ):
-            # await Stock.persist_bars(ft, bars1)
-            await _cache_bars_for_aggregation(typ, ft, bars1)
+            # try:
+            await Stock.persist_bars(ft, bars1)
+            # except Exception as e:
+            #     print(e)
+            await _cache_bars_for_aggregation(name, typ, ft, bars1)
             # 记录已完成的证券
+            print(secs, ft)
             await cache.sys.lpush(done_queue, *secs)
 
 
@@ -246,41 +224,20 @@ async def get_secs_for_sync(limit: int, n_bars: int, name: str):
 @abnormal_work_report()
 async def sync_trade_price_limits(params: Dict):
     """同步涨跌停worker"""
-    scope, state, end, fail = (
-        params.get("scope"),
-        params.get("state"),
-        params.get("end"),
-        params.get("fail"),
-    )
-
-    limit = await fetcher.max_result_size("bars")
-    hashmap = []  # todo: bad name
-    total = 0
-    async for secs in get_secs_for_sync(limit, 1, scope):
-        bars = await get_trade_price_limits(secs, end)
-        if bars is None:
-            await collect_sync_failure(secs, fail)
-            raise exception.GotNoneData()
-        for sec in bars:
-            name = sec["code"]
-            high_limit = sec["high_limit"]
-            low_limit = sec["low_limit"]
-            hashmap.extend(
-                [
-                    f"{name}.high_limit",
-                    str(high_limit),
-                    f"{name}.low_limit",
-                    str(low_limit),
-                ]
-            )
-            total += 1
-    if hashmap:
-        await cache.sys.hmset(TRADE_PRICE_LIMITS, *hashmap)
-        # 取到到晚上12点还有多少秒
-        # fixme: 为什么是到晚上12点？这个数据会等到calibration_sync时才会写入到persistent db中
-        await cache.sys.expire(TRADE_PRICE_LIMITS, get_remnant_s())
-    await cache.sys.hincrby(state, "done_count", total)
-    return True
+    # 涨跌停价目前还是纯数组，需要改成dict的结构
+    end = params.get("end")
+    for typ in [SecurityType.STOCK, SecurityType.INDEX]:
+        name, n, queue, done_queue, limit = await _sync_params_analysis(
+            typ, FrameType.DAY, params
+        )
+        async for secs in get_secs_for_sync(limit, n, queue):
+            bars = await get_trade_price_limits(secs, end)
+            if bars is None:
+                raise exception.GotNoneData()
+            await _cache_bars_for_aggregation(name, typ, FrameType.DAY, bars)
+            await Stock.save_trade_price_limits(bars, to_cache=False)
+            await cache.sys.lpush(done_queue, *secs)
+            # 取到到晚上12点还有多少秒
 
 
 @abnormal_work_report()
@@ -310,10 +267,11 @@ async def _daily_sync_impl(impl: Callable, params: Dict):
     for typ, ft in itertools.product(
         [SecurityType.STOCK, SecurityType.INDEX], frame_type
     ):
+        # todo 因为一个worker会同步多种类型的k线，通常情况下，除了分钟线，其他类型的k
         tasks.append(asyncio.create_task(impl(typ, ft, params)))
 
     assert "timeout" in params
-    await asyncio.wait(tasks, timeout=params.get("timeout"))
+    await asyncio.gather(*tasks)
 
 
 @abnormal_work_report()
@@ -346,7 +304,10 @@ async def checksum(data: bytes) -> str:
 
 
 async def _cache_bars_for_aggregation(
-    typ: SecurityType, ft: FrameType, bars: Dict[str, np.ndarray]
+    name: str,
+    typ: SecurityType,
+    ft: FrameType,
+    bars: Union[Dict[str, np.ndarray], np.ndarray],
 ):
     """将bars临时存入redis，以备聚合之用
 
@@ -362,7 +323,7 @@ async def _cache_bars_for_aggregation(
     Returns:
         None
     """
-    queue = f"{MINIO_TEMPORAL}.{typ.value}.{ft.value}"
+    queue = f"{MINIO_TEMPORAL}.{name}.{typ.value}.{ft.value}"
     data = pickle.dumps(bars, protocol=cfg.pickle.ver)
     await cache.temp.lpush(queue, data)
 

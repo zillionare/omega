@@ -6,7 +6,7 @@ import datetime
 import importlib
 import logging
 import random
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import arrow
 import cfg4py
@@ -77,7 +77,7 @@ class AbstractQuotesFetcher(QuotesFetcher):
         n_bars: int,
         frame_type: FrameType,
         include_unclosed=True,
-    ) -> np.ndarray:
+    ) -> Dict[str, np.ndarray]:
         return await cls.get_instance().get_bars_batch(
             secs, end, n_bars, frame_type.value, include_unclosed
         )
@@ -195,5 +195,5 @@ class AbstractQuotesFetcher(QuotesFetcher):
         return rfn.require_fields(fund_net_values, fields)
 
     @classmethod
-    async def max_result_size(cls, op: str) -> int:
-        return cls.get_instance().max_result_size(op)
+    async def result_size_limit(cls, op: str) -> int:
+        return cls.get_instance().result_size_limit(op)

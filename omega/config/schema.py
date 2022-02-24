@@ -96,6 +96,8 @@ class Config(object):
 
         bucket_name: Optional[str] = None
 
+        enable_compress: Optional[bool] = None
+
     class notify:
         mail_from: Optional[str] = None
 

@@ -25,7 +25,7 @@ PGPASSWORD=$POSTGRES_PASSWORD psql -U $POSTGRES_USER -h localhost --dbname=$POST
 echo "初始化influxdb容器"
 sudo docker run -d -p 8086:8086 --name tox-influxdb influxdb
 sleep 3
-sudo docker exec -i tox-influxdb bash -c 'influx setup --username my-user --password my-password --org my-org --bucket my-bucket --retention 168d --token my-token --force'
+sudo docker exec -i tox-influxdb bash -c 'influx setup --username my-user --password my-password --org my-org --bucket my-bucket --token my-token --force'
 
 echo "初始化minio容器"
 sudo docker run -d -p 9000:9000 -p 9001:9001 --name tox-minio minio/minio server /tmp --console-address ":9001"
