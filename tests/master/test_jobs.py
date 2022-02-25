@@ -516,3 +516,25 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                 await generator.__anext__()
             except Exception as e:
                 self.assertIsInstance(e, StopAsyncIteration)
+            else:
+                self.assertEqual(1, 0)
+
+    async def test_get_month_week_day_sync_date(self):
+        tail_key = "test_sync_tail"
+        await cache.sys.delete(tail_key)
+        with mock.patch("arrow.now", return_value=arrow.get("2005-01-05 02:05:00")):
+            generator = syncjobs.get_month_week_day_sync_date(tail_key, FrameType.DAY)
+            tail = await generator.__anext__()
+            await cache.sys.set(tail_key, tail.strftime("%Y-%m-%d"))
+            tail = await generator.__anext__()
+            await cache.sys.set(tail_key, tail.strftime("%Y-%m-%d"))
+            self.assertEqual(tail.strftime("%Y-%m-%d"), "2005-01-05")
+
+        with mock.patch("arrow.now", return_value=arrow.get("2005-01-05 02:05:00")):
+            generator = syncjobs.get_month_week_day_sync_date(tail_key, FrameType.DAY)
+            try:
+                await generator.__anext__()
+            except Exception as e:
+                self.assertIsInstance(e, StopAsyncIteration)
+            else:
+                self.assertEqual(1, 0)

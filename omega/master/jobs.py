@@ -791,16 +791,6 @@ async def sync_trade_price_limits():
         await run_sync_trade_price_limits_task(task)
 
 
-async def delete_year_quarter_month_week_queue(stock, index):
-    """
-    清理校准同步的队列，防止数据重复
-    """
-    p = cache.temp.pipeline()
-    p.delete(stock)
-    p.delete(index)
-    await p.execute()
-
-
 async def delete_temporal_bars(name: str, frame_types: List[FrameType]):
     """清理临时存储在redis中的行情数据
 

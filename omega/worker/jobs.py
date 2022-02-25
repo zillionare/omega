@@ -47,10 +47,6 @@ async def worker_exit(state, scope, error=None):
     await p.execute()
 
 
-async def collect_sync_failure(secs: List[str], fail: str):
-    await cache.sys.lpush(fail, str(secs))
-
-
 def abnormal_work_report():
     def inner(f):
         @wraps(f)
@@ -105,7 +101,7 @@ async def fetch_bars(
     bars = await fetcher.get_bars_batch(
         secs, end=end, n_bars=n_bars, frame_type=frame_type
     )
-    if bars is None:
+    if bars is None:  # pragma: no cover
         raise exception.GotNoneData()
     return bars
 
@@ -118,15 +114,6 @@ async def get_trade_price_limits(secs, end):
     bars["low_limit"] = np.nan_to_num(bars["low_limit"])
     bars["high_limit"] = np.nan_to_num(bars["high_limit"])
     return bars
-
-
-def get_remnant_s():
-    """获取从现在开始到晚上12点还剩多少秒"""
-    # todo: 内部函数，建议使用_get_x
-    now = datetime.datetime.now()
-    end = datetime.datetime(year=now.year, month=now.month, day=now.day + 1)
-    # 当前时间秒数
-    return int((end - now).total_seconds())
 
 
 async def _sync_params_analysis(typ: SecurityType, ft: FrameType, params: Dict):
