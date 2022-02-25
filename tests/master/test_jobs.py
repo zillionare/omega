@@ -154,21 +154,23 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             await dfs.delete(syncjobs.get_bars_filename(typ, end.naive, ft))
 
         with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
-            await syncjobs.daily_calibration_job()
-            print(task.status)
-            base_dir = os.path.join(test_dir(), "data", "test_daily_calibration_sync")
-            for typ, ft in itertools.product(
-                [SecurityType.STOCK, SecurityType.INDEX],
-                [FrameType.MIN1, FrameType.DAY],
-            ):
-                # dfs读出来
-                filename = syncjobs.get_bars_filename(typ, end.naive, ft)
-                data = await dfs.read(filename)
-                with open(
-                    os.path.join(base_dir, f"dfs_{typ.value}_{ft.value}.pik"), "rb"
-                ) as f:
-                    local_data = f.read()
-                self.assertEqual(data, local_data)
+            with mock.patch("arrow.now", return_value=end.naive):
+                await syncjobs.daily_calibration_job()
+                base_dir = os.path.join(
+                    test_dir(), "data", "test_daily_calibration_sync"
+                )
+                for typ, ft in itertools.product(
+                    [SecurityType.STOCK, SecurityType.INDEX],
+                    [FrameType.MIN1, FrameType.DAY],
+                ):
+                    # dfs读出来
+                    filename = syncjobs.get_bars_filename(typ, end.naive, ft)
+                    data = await dfs.read(filename)
+                    with open(
+                        os.path.join(base_dir, f"dfs_{typ.value}_{ft.value}.pik"), "rb"
+                    ) as f:
+                        local_data = f.read()
+                    self.assertEqual(data, local_data)
 
     @mock.patch(
         "omega.master.jobs.BarsSyncTask.get_quota",
@@ -393,7 +395,14 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
     )
     @mock.patch("omega.master.jobs.mail_notify")
     async def test_after_hour_sync_job(self, mail_notify, *args):
+        email_content = ""
 
+        async def mail_notify_mock(subject, body, **kwargs):
+            nonlocal email_content
+            email_content = body
+            print(body)
+
+        mail_notify.side_effect = mail_notify_mock
         emit.register(Events.OMEGA_DO_SYNC_DAY, workjobs.after_hour_sync)
         end = arrow.get("2022-02-23 15:05:00")
         task = syncjobs.BarsSyncTask(
@@ -428,14 +437,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(bars1, bars2)
 
         # 测试数据为None 时邮件是否正常
-        email_content = ""
 
-        async def mail_notify_mock(subject, body, **kwargs):
-            nonlocal email_content
-            email_content = body
-            print(body)
-
-        mail_notify.side_effect = mail_notify_mock
         with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
             with mock.patch(
                 "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher.get_bars_batch",
@@ -445,3 +447,72 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                     await syncjobs.after_hour_sync_job()
                     self.assertFalse(task.status)
                     self.assertIn("Got None Data", email_content)
+
+        # 测试quota不够
+        email_content = ""
+        with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
+            with mock.patch("arrow.now", return_value=end):
+                task.timeout = 5.1
+                await syncjobs.after_hour_sync_job()
+                print(email_content)
+                self.assertFalse(task.status)
+                self.assertIn("超时", email_content)
+
+        # 测试quota不够
+        email_content = ""
+        task.recs_per_sec = 1e9
+        with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
+            with mock.patch("arrow.now", return_value=end):
+                await syncjobs.after_hour_sync_job()
+                self.assertFalse(task.status)
+                self.assertIn("quota不足", email_content)
+
+        # 测试重复运行
+        await task.update_state(is_running=1, worker_count=0)
+        task.status = None
+        with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
+            with mock.patch("arrow.now", return_value=end):
+                await syncjobs.after_hour_sync_job()
+                self.assertFalse(task.status)
+
+    async def test_get_sync_date(self):
+        await cache.sys.delete(constants.BAR_SYNC_ARCHIVE_HEAD)
+        await cache.sys.delete(constants.BAR_SYNC_ARCHIVE_TAIL)
+        with mock.patch("arrow.now", return_value=arrow.get("2022-02-18 15:05:00")):
+            generator = syncjobs.get_sync_date()
+            sync_dt, head, tail = await generator.__anext__()
+            print(sync_dt, head, tail)
+            await cache.sys.set(
+                constants.BAR_SYNC_ARCHIVE_HEAD, head.strftime("%Y-%m-%d")
+            )
+            await cache.sys.set(
+                constants.BAR_SYNC_ARCHIVE_TAIL, tail.strftime("%Y-%m-%d")
+            )
+
+        with mock.patch("arrow.now", return_value=arrow.get("2022-02-22 02:05:00")):
+            generator = syncjobs.get_sync_date()
+            sync_dt, head, tail = await generator.__anext__()
+            print(sync_dt, head, tail)
+            self.assertIsNone(head)
+            self.assertEqual(tail.strftime("%Y-%m-%d"), "2022-02-18")
+
+            await cache.sys.set(
+                constants.BAR_SYNC_ARCHIVE_TAIL, tail.strftime("%Y-%m-%d")
+            )
+            sync_dt, head, tail = await generator.__anext__()
+            self.assertEqual(tail.strftime("%Y-%m-%d"), "2022-02-21")
+            await cache.sys.set(
+                constants.BAR_SYNC_ARCHIVE_TAIL, tail.strftime("%Y-%m-%d")
+            )
+
+            sync_dt, head, tail = await generator.__anext__()
+            self.assertEqual(head.strftime("%Y-%m-%d"), "2022-02-16")
+
+        await cache.sys.delete(constants.BAR_SYNC_ARCHIVE_HEAD)
+        await cache.sys.delete(constants.BAR_SYNC_ARCHIVE_TAIL)
+        with mock.patch("arrow.now", return_value=arrow.get("2005-01-05 02:05:00")):
+            generator = syncjobs.get_sync_date()
+            try:
+                await generator.__anext__()
+            except Exception as e:
+                self.assertIsInstance(e, StopAsyncIteration)

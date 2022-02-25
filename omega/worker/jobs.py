@@ -35,7 +35,6 @@ logger = logging.getLogger(__name__)
 async def worker_exit(state, scope, error=None):
     if error is None:  # pragma: no cover
         error = traceback.format_exc()
-        print(error)
     # 删除is_running 并写上错误堆栈信息
     former_error = await cache.sys.hget(state, "error")
     p = cache.sys.pipeline()
@@ -43,7 +42,6 @@ async def worker_exit(state, scope, error=None):
         p.hmset(state, "error", former_error + "\n" + error)
     else:
         p.hmset(state, "error", error)
-
     p.hdel(state, "is_running")
     p.delete(*scope)  # 删除任务队列，让其他没退出的消费者也退出，错误上报至master
     await p.execute()
@@ -63,8 +61,9 @@ def abnormal_work_report():
                 params.get("state"),
                 params.get("timeout"),
             )
-            if isinstance(timeout, int):
-                timeout -= 5  # 提前5秒退出
+            # if isinstance(timeout, int):
+            timeout -= 5  # 提前5秒退出
+            print("timeout", timeout)
             try:
                 async with async_timeout.timeout(timeout):
                     # 执行之前，将状态中的worker_count + 1，以确保生产者能知道有多少个worker收到了消息
@@ -79,7 +78,7 @@ def abnormal_work_report():
                         logger.exception(e)
                         await worker_exit(state, scope)
             except asyncio.exceptions.TimeoutError:  # pragma: no cover
-                await worker_exit(state, scope)
+                await worker_exit(state, scope, error="消费者超时")
                 return False
 
         return decorated_function
