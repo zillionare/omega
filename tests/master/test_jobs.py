@@ -69,12 +69,57 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         await aq.create_instance(impl, **params)
 
     @mock.patch(
-        "omega.master.jobs.Task.get_quota",
+        "omega.master.jobs.BarsSyncTask.get_quota",
         return_value=1000000,
     )
     @mock.patch("omega.master.jobs.mail_notify")
     async def test_sync_minute_bars(self, mail_notify, *args):
-        pass
+        emit.register(Events.OMEGA_DO_SYNC_MIN, workjobs.sync_minute_bars)
+        name = "minute"
+        timeout = 60
+        end = arrow.get("2022-02-18 09:31:00")
+        await Stock.reset_cache()
+        task = syncjobs.BarsSyncTask(
+            event=Events.OMEGA_DO_SYNC_MIN,
+            name=name,
+            frame_type=[FrameType.MIN1],
+            end=end.naive,
+            n_bars=1,
+            timeout=timeout,
+        )
+        await task.cleanup(success=True)
+        await cache.sys.delete(constants.BAR_SYNC_MINUTE_TAIL)
+        with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task, task]):
+            with mock.patch("arrow.now", return_value=end):
+                await syncjobs.sync_minute_bars()
+                self.assertTrue(task.status)
+                self.assertEqual(
+                    await cache.sys.get(constants.BAR_SYNC_MINUTE_TAIL),
+                    "2022-02-18 09:31:00",
+                )
+                base_dir = os.path.join(test_dir(), "data", "test_sync_minute_bars")
+                bars = pickle.dumps(
+                    await Stock.batch_get_bars(
+                        codes=["000001.XSHE", "300001.XSHE", "000001.XSHG"],
+                        n=1,
+                        frame_type=FrameType.MIN1,
+                        end=end.naive,
+                    ),
+                    protocol=cfg.pickle.ver,
+                )
+                with open(os.path.join(base_dir, "min_data.pik"), "rb") as f:
+                    self.assertEqual(bars, f.read())
+            end = arrow.get("2022-02-18 09:32:00")
+            task.status = None
+            task.end = end.naive
+            with mock.patch("arrow.now", return_value=end):
+                # 第二次调用 redis有tail
+                await syncjobs.sync_minute_bars()
+                self.assertTrue(task.status)
+                self.assertEqual(
+                    await cache.sys.get(constants.BAR_SYNC_MINUTE_TAIL),
+                    "2022-02-18 09:32:00",
+                )
 
     @mock.patch("omega.master.jobs.mail_notify")
     @mock.patch("omega.master.jobs.BarsSyncTask.get_quota", return_value=1000000)
@@ -235,7 +280,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                         codes=["000001.XSHE", "300001.XSHE", "000001.XSHG"],
                         n=1,
                         frame_type=FrameType.WEEK,
-                        end=end,
+                        end=end.naive,
                     ),
                     protocol=cfg.pickle.ver,
                 )
@@ -304,7 +349,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                         codes=["000001.XSHE", "300001.XSHE", "000001.XSHG"],
                         n=1,
                         frame_type=FrameType.MONTH,
-                        end=end,
+                        end=end.naive,
                     ),
                     protocol=cfg.pickle.ver,
                 )
@@ -329,15 +374,15 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
 
         await syncjobs.load_cron_task(scheduler)
         base = {
-            "1m:11:0-30",
-            "sync_year_quarter_month_week",
-            "daily_calibration_sync",
-            "1m:15:00",
-            "1m:9:31-59",
-            "1m:10:*",
-            "1m:13-14:*",
-            "sync_high_low_limit",
             "sync_day_bars",
+            "1m:10:*",
+            "daily_calibration_sync",
+            "1m:13-14:*",
+            "1m:9:31-59",
+            "1m:11:0-31",
+            "sync_year_quarter_month_week",
+            "1m:15:00",
+            "sync_trade_price_limits",
         }
         print(set([job.name for job in scheduler.get_jobs()]))
         self.assertSetEqual(base, set([job.name for job in scheduler.get_jobs()]))

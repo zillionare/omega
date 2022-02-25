@@ -6,9 +6,10 @@ import logging
 import unittest
 import asyncio
 import cfg4py
-from coretypes import FrameType
+from coretypes import FrameType, SecurityType
 
 from omega.worker.dfs import Storage, MinioStorage
+from omega.master.jobs import get_bars_filename
 from omega.config.schema import Config
 from tests import init_test_env
 
@@ -30,15 +31,15 @@ class TestDFS(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(minio.client.bucket_exists(cfg.dfs.minio.bucket))
         # 读写测试
         content = b"123"
-        prefix = "stock"
         dt = datetime.datetime.now()
-        await minio.write(content, prefix, dt, FrameType.MIN1)
+        filename = get_bars_filename(SecurityType.STOCK, dt, FrameType.MIN1)
+        await minio.write(filename, content)
         await asyncio.sleep(1)
-        self.assertEqual(await minio.read(prefix, dt, FrameType.MIN1), content)
+        self.assertEqual(await minio.read(filename), content)
 
         Storage.reset()
         minio = Storage(bucket=cfg.dfs.minio.bucket)
-        await minio.delete(prefix, dt, FrameType.MIN1)
+        await minio.delete(filename)
         await minio.delete_bucket()
         minio = Storage()
         self.assertIsInstance(minio, MinioStorage)

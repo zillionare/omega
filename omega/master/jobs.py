@@ -669,7 +669,7 @@ async def get_sync_minute_date():
     """获取这次同步分钟线的时间和n_bars
     如果redis记录的是11：30
     """
-    end = datetime.datetime.now().replace(second=0, microsecond=0)
+    end = arrow.now().naive.replace(second=0, microsecond=0)
     first = end.replace(hour=9, minute=30, second=0, microsecond=0)
     # 检查当前时间是否在交易时间内
     if not TimeFrame.is_trade_day(end):
@@ -680,7 +680,7 @@ async def get_sync_minute_date():
         return False
 
     end = TimeFrame.floor(end, FrameType.MIN1)
-    tail = await cache.sys.hget(constants.BAR_SYNC_STATE_MINUTE, "tail")
+    tail = await cache.sys.get(constants.BAR_SYNC_MINUTE_TAIL)
     # tail = "2022-02-22 13:29:00"
     if tail:
         # todo 如果有，这个时间最早只能是今天的9点31分,因为有可能是昨天执行完的最后一次
@@ -693,7 +693,6 @@ async def get_sync_minute_date():
     # 取上次同步截止时间+1 计算出n_bars
     tail = TimeFrame.floor(tail + datetime.timedelta(minutes=1), FrameType.MIN1)
     n_bars = TimeFrame.count_frames(tail, end, FrameType.MIN1)  # 获取到一共有多少根k线
-    print(tail, end, n_bars)
     return end, n_bars
 
 
@@ -722,9 +721,8 @@ async def run_sync_minute_bars_task(task: BarsSyncTask):
     flag = await task.run()
     if flag:
         # 说明正常执行完的
-        await cache.sys.hset(
-            constants.BAR_SYNC_STATE_MINUTE,
-            "tail",
+        await cache.sys.set(
+            constants.BAR_SYNC_MINUTE_TAIL,
             task.end.strftime("%Y-%m-%d %H:%M:00"),
         )
 
@@ -739,8 +737,6 @@ async def sync_minute_bars():
     """
     task = await get_sync_minute_bars_task()
     await run_sync_minute_bars_task(task)
-
-    return task.status
 
 
 async def write_trade_price_limits_to_dfs(name: str, dt: datetime.datetime):
