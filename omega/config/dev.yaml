@@ -68,5 +68,5 @@ influxdb:
 notify:
     mail_from: ${MAIL_FROM}
     mail_to:
-        - ${MAIL_TO}
+        - shaohu.chen@qq.com
     mail_server: ${MAIL_SERVER}

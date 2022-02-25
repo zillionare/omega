@@ -79,7 +79,7 @@ livereload = {version = "^2.6.3", optional = true}
 minio = "^7.1.2"
 zillionare-core-types = "^0.4"
 msgpack = {version = "^1.0.3", optional = true}
-zillionare-omega-adaptors-jq = "^1.0.11"
+zillionare-omega-adaptors-jq = "^1.0.12"
 APScheduler = "^3.8.1"
 [tool.poetry.extras]
 test = [
