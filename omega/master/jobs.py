@@ -70,8 +70,9 @@ class BarsSyncTask:
         Args:
             event: 发给worker的消息名
             name: 分配给worker的从redis中取数据的队列名
-            params: 发送给emit的参数
+            frame_type: K线类型
             timeout: run需要等待的超时时间
+            n_bars: 需要同步多少根K线，如果为None 则默认 分钟线取240根，其他所有类型取1根
             recs_per_sec: 每支证券将要同步的记录数。
             # expire_time: 如果设置，则在任务开始执行后的`expire_time`秒内，自动清除redis中保存的任务状态，以便下次重新启动任务。
         """
@@ -102,10 +103,12 @@ class BarsSyncTask:
         return f"{constants.TASK_PREFIX}.{self.name}.scope.{typ.value}.{ft.value}"
 
     async def delete_state(self):
+        """将任务状态进行删除"""
         key = self._state_key_name()
         await cache.sys.delete(key)
 
     async def delete_done(self):
+        """删除已经完成的任务队列"""
         keys = []
         for typ, ft in itertools.product(
             [SecurityType.STOCK, SecurityType.INDEX], self.frame_type
@@ -125,6 +128,7 @@ class BarsSyncTask:
 
     @classmethod
     def get_quota(cls):
+        """获取quota的数量"""
         quota = 0
         for worker in work_state.values():
             quota += worker.get("quota", 0)
@@ -397,7 +401,10 @@ def get_bars_filename(
     dt: Union[datetime.datetime, datetime.date, AnyStr],
     frame_type: Union[FrameType, AnyStr],
 ) -> AnyStr:  # pragma: no cover
-    """拼接文件名"""
+    """拼接bars的文件名
+    如 get_bars_filename(SecurityType.Stock, datetime.datetime(2022,2,18), FrameType.MIN)
+    Return: stock/1m/20220218
+    """
     filename = []
     if isinstance(prefix, SecurityType) and prefix in (
         SecurityType.STOCK,
@@ -440,10 +447,12 @@ async def write_dfs(
     frame_type: List[FrameType],
     resample: bool = False,
 ):
-    """将校准同步/追赶同步时下载的数据写入块存储 - minio
+    """
+    将校准同步/追赶同步时下载的数据写入块存储 - minio
+    从redis 3号库 temp中读取出worker写入的数据并处理到一起写入dfs，因为如果不用master写的话，会导致文件成多个文件。
 
     Args:
-        name： 任务名
+        name: 任务名
         dt: 日期
         resample: 是否需要重采样  只重采样分钟线 到 5 15 30 60
         frame_type: k线类型
@@ -586,6 +595,14 @@ async def get_sync_date():
 async def get_daily_calibration_job_task(
     sync_dt: datetime.datetime,
 ):
+    """
+    获取凌晨校准同步的task实例
+    Args:
+        sync_dt: 需要同步的时间
+
+    Returns:
+
+    """
     end = sync_dt.replace(hour=15, minute=0, microsecond=0, second=0)
     # 检查 end 是否在交易日
 
@@ -740,7 +757,16 @@ async def sync_minute_bars():
 
 
 async def write_trade_price_limits_to_dfs(name: str, dt: datetime.datetime):
-    """将涨跌停写入dfs"""
+    """
+    将涨跌停写入dfs
+
+    Args:
+        name: task的名字
+        dt: 写入dfs的日期，用来作为文件名
+
+    Returns:
+
+    """
     dfs = Storage()
     if dfs is None:  # pragma: no cover
         return
@@ -765,6 +791,7 @@ async def write_trade_price_limits_to_dfs(name: str, dt: datetime.datetime):
 
 
 async def run_sync_trade_price_limits_task(task: BarsSyncTask):
+    """用来启动涨跌停的方法，接收一个task实例"""
     ret = await task.run()
     if not ret:
         # 执行失败需要删除数据队列
@@ -810,7 +837,16 @@ async def delete_temporal_bars(name: str, frame_types: List[FrameType]):
     await p.execute()
 
 
-async def run_month_week_sync_task(tail_key: str, task):
+async def run_month_week_sync_task(tail_key: str, task: BarsSyncTask):
+    """
+    运行周月线task实例的方法
+    Args:
+        tail_key: 记录周月线在redis最后一天的日期 如redis记录 2010-10-10 则说明 2005-01-01至-2010-10-10的数据已经同步完毕
+        task: task的实例
+
+    Returns:
+
+    """
     ret = await task.run()
     if not ret:
         return False
@@ -849,6 +885,16 @@ async def get_month_week_day_sync_date(tail_key: str, frame_type: FrameType):
 async def get_month_week_sync_task(
     event: str, sync_date: datetime.datetime, frame_type: FrameType
 ) -> BarsSyncTask:
+    """
+
+    Args:
+        event: 事件名称，emit通过这个key发布消息到worker
+        sync_date: 同步的时间
+        frame_type: 同步的K线类型
+
+    Returns:
+
+    """
     name = frame_type.value
 
     task = BarsSyncTask(
@@ -940,14 +986,21 @@ async def load_cron_task(scheduler):
         "cron",
         hour="15",
         minute=5,
-        name="sync_day_bars",
+        name="after_hour_sync_job",
     )
     scheduler.add_job(
         sync_week_bars,
         "cron",
         hour=2,
         minute=5,
-        name="sync_year_quarter_month_week",
+        name="sync_week_bars",
+    )
+    scheduler.add_job(
+        sync_month_bars,
+        "cron",
+        hour=2,
+        minute=5,
+        name="sync_month_bars",
     )
     scheduler.add_job(
         daily_calibration_job,

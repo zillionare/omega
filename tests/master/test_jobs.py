@@ -376,15 +376,16 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
 
         await syncjobs.load_cron_task(scheduler)
         base = {
-            "sync_day_bars",
-            "1m:10:*",
-            "daily_calibration_sync",
-            "1m:13-14:*",
-            "1m:9:31-59",
-            "1m:11:0-31",
-            "sync_year_quarter_month_week",
             "1m:15:00",
+            "after_hour_sync_job",
+            "1m:11:0-31",
+            "1m:10:*",
+            "sync_month_bars",
+            "sync_week_bars",
+            "1m:13-14:*",
             "sync_trade_price_limits",
+            "daily_calibration_sync",
+            "1m:9:31-59",
         }
         print(set([job.name for job in scheduler.get_jobs()]))
         self.assertSetEqual(base, set([job.name for job in scheduler.get_jobs()]))

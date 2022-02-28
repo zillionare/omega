@@ -9,7 +9,7 @@ import logging
 import pickle
 import traceback
 from functools import wraps
-from typing import Awaitable, Callable, Dict, List, Union
+from typing import Callable, Dict, List, Tuple, Union
 
 import async_timeout
 import cfg4py
@@ -48,6 +48,12 @@ async def worker_exit(state, scope, error=None):
 
 
 def abnormal_work_report():
+    """装饰所有worker的装饰器，主要功能有
+    1.处理worker的异常，并写入错误信息到redis，由master统一发送邮件上报
+    2.统计worker的执行时间，总是比master给的超时时间少5秒，以便于确保worker比master提前退出
+    3.处理worker自定义的移除状态
+    """
+
     def inner(f):
         @wraps(f)
         async def decorated_function(params):
@@ -97,7 +103,19 @@ async def cache_init():
 async def fetch_bars(
     secs: List[str], end: datetime.datetime, n_bars: int, frame_type: FrameType
 ) -> Union[Dict[str, np.ndarray], np.ndarray]:
+    """
+    从上游获取k线数据
+    Args:
+        secs:待获取的股票代码列表
+        end:需要获取的截止时间
+        n_bars: 需要获取k线根数
+        frame_type:需要获取的k线类型
+
+    Returns:
+        返回k线数据，为dict
+    """
     # todo: omicron可以保存dict[code->bars],无需进行转换。这里的转换只是为了适应底层逻辑，没有特别的功能，在底层可以修改的情况下，可以不做不必要的转换。
+
     bars = await fetcher.get_bars_batch(
         secs, end=end, n_bars=n_bars, frame_type=frame_type
     )
@@ -108,7 +126,9 @@ async def fetch_bars(
 
 @retry(stop_max_attempt_number=5)
 async def get_trade_price_limits(secs, end):
-    """获取涨跌停价"""
+    """获取涨跌停价
+    由于inflaxdb无法处理浮点数 nan 所以需要提前将nan转换为0
+    """
     # todo: 可以重命名为get_trade_limit_price
     bars = await fetcher.get_trade_price_limits(secs, end)
     bars["low_limit"] = np.nan_to_num(bars["low_limit"])
@@ -116,7 +136,19 @@ async def get_trade_price_limits(secs, end):
     return bars
 
 
-async def _sync_params_analysis(typ: SecurityType, ft: FrameType, params: Dict):
+async def _sync_params_analysis(
+    typ: SecurityType, ft: FrameType, params: Dict
+) -> Tuple:
+    """
+    解析同步的参数
+    Args:
+        typ: 证券类型 如 stock  index
+        ft: k线类型
+        params: master发过来的参数
+
+    Returns: Tuple(任务名称，k线根数，任务队列名，完成的队列名，限制单单次查询的数量)
+
+    """
     name = params.get("name")
     n = params.get("n_bars")
     if not n:
@@ -134,9 +166,9 @@ async def _sync_to_cache(typ: SecurityType, ft: FrameType, params: Dict):
     """
     同步收盘后的数据
     Args:
-        typ:
-        ft:
-        params:
+        typ: 证券类型 如 stock  index
+        ft: k线类型
+        params: master发过来的参数
 
     Returns:
 
@@ -154,14 +186,16 @@ async def _sync_to_cache(typ: SecurityType, ft: FrameType, params: Dict):
 
 async def _sync_for_persist(typ: SecurityType, ft: FrameType, params: Dict):
     """校准同步实现，用以分钟线、日线、周线、月线、年线等
+    1. 同步完成之后，对两次的bars数据计算做校验和验算，避免数据出错
+    2. 校验通过之后将数据写入influxdb
+    3. 缓存至redis的3号temp库中，以备master使用写入dfs中
+    4. 将完成的证券代码写入完成队列，让master可以知道那些完成了
 
     Args:
-        typ : _description_
-        ft : _description_
-        params : _description_
+        typ: 证券类型 如 stock  index
+        ft: k线类型
+        params: master发过来的参数
 
-    Returns:
-        _description_
     """
     name, n, queue, done_queue, limit = await _sync_params_analysis(typ, ft, params)
     print(await _sync_params_analysis(typ, ft, params))
@@ -209,7 +243,9 @@ async def get_secs_for_sync(limit: int, n_bars: int, name: str):
 
 @abnormal_work_report()
 async def sync_trade_price_limits(params: Dict):
-    """同步涨跌停worker"""
+    """同步涨跌停worker
+    分别遍历股票和指数，获取涨跌停之后，缓存至temp库中，写入influxdb
+    """
     # 涨跌停价目前还是纯数组，需要改成dict的结构
     end = params.get("end")
     for typ in [SecurityType.STOCK, SecurityType.INDEX]:
