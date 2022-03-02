@@ -83,6 +83,16 @@ class AbstractQuotesFetcher(QuotesFetcher):
         )
 
     @classmethod
+    async def get_price(
+        cls,
+        secs: List[str],
+        end: Frame,
+        n_bars: int,
+        frame_type: FrameType,
+    ) -> Dict[str, np.recarray]:
+        return await cls.get_instance().get_price(secs, end, n_bars, frame_type.value)
+
+    @classmethod
     async def get_all_trade_days(cls):
         days = await cls.get_instance().get_all_trade_days()
         await TimeFrame.save_calendar(days)

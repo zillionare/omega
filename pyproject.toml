@@ -77,9 +77,9 @@ idna = "2.5"
 mkdocs-autorefs = {version = "0.1.1", optional = true}
 livereload = {version = "^2.6.3", optional = true}
 minio = "^7.1.2"
-zillionare-core-types = "^0.4"
+zillionare-core-types = "^0.4.1"
 msgpack = {version = "^1.0.3", optional = true}
-zillionare-omega-adaptors-jq = "^1.0.12"
+zillionare-omega-adaptors-jq = "^1.0.13"
 APScheduler = "^3.8.1"
 [tool.poetry.extras]
 test = [

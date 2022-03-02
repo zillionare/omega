@@ -17,7 +17,6 @@ import numpy as np
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from coretypes import FrameType, SecurityType
 from omicron import cache
-from omicron.extensions.np import numpy_append_fields
 from omicron.models.stock import Stock
 from omicron.models.timeframe import TimeFrame
 from omicron.notify.mail import mail_notify
@@ -35,6 +34,7 @@ logger = logging.getLogger(__name__)
 async def worker_exit(state, scope, error=None):
     if error is None:  # pragma: no cover
         error = traceback.format_exc()
+        print(error)
     # 删除is_running 并写上错误堆栈信息
     former_error = await cache.sys.hget(state, "error")
     p = cache.sys.pipeline()
@@ -100,8 +100,41 @@ async def cache_init():
 
 
 @retry(stop_max_attempt_number=5)
+async def fetch_price(
+    secs: List[str],
+    end: datetime.datetime,
+    n_bars: int,
+    frame_type: FrameType,
+) -> Union[Dict[str, np.ndarray], np.ndarray]:
+    """
+    从上游获取k线数据
+    Args:
+        secs:待获取的股票代码列表
+        end:需要获取的截止时间
+        n_bars: 需要获取k线根数
+        frame_type:需要获取的k线类型
+        impl: 需要用什么方法取获取
+
+    Returns:
+        返回k线数据，为dict
+    """
+    # todo: omicron可以保存dict[code->bars],无需进行转换。这里的转换只是为了适应底层逻辑，没有特别的功能，在底层可以修改的情况下，可以不做不必要的转换。
+
+    bars = await fetcher.get_price(secs, end=end, n_bars=n_bars, frame_type=frame_type)
+    if bars is None:  # pragma: no cover
+        raise exception.GotNoneData()
+    for k in list(bars.keys()):
+        if not len(bars[k]):
+            del bars[k]
+    return bars
+
+
+@retry(stop_max_attempt_number=5)
 async def fetch_bars(
-    secs: List[str], end: datetime.datetime, n_bars: int, frame_type: FrameType
+    secs: List[str],
+    end: datetime.datetime,
+    n_bars: int,
+    frame_type: FrameType,
 ) -> Union[Dict[str, np.ndarray], np.ndarray]:
     """
     从上游获取k线数据
@@ -121,6 +154,9 @@ async def fetch_bars(
     )
     if bars is None:  # pragma: no cover
         raise exception.GotNoneData()
+    for k in list(bars.keys()):
+        if not len(bars[k]):
+            del bars[k]
     return bars
 
 
@@ -201,20 +237,18 @@ async def _sync_for_persist(typ: SecurityType, ft: FrameType, params: Dict):
     print(await _sync_params_analysis(typ, ft, params))
     async for secs in get_secs_for_sync(limit, n, queue):
         # todo: is there better way to do the check? 校验和数据类型问题
-        bars1 = await fetch_bars(secs, params.get("end"), n, ft)
-        bars2 = await fetch_bars(secs, params.get("end"), n, ft)
-
-        if await checksum(pickle.dumps(bars1, protocol=4)) == await checksum(
-            pickle.dumps(bars2, protocol=4)
-        ):
-            # try:
-            await Stock.persist_bars(ft, bars1)
-            # except Exception as e:
-            #     print(e)
-            await _cache_bars_for_aggregation(name, typ, ft, bars1)
-            # 记录已完成的证券
-            print(secs, ft)
-            await cache.sys.lpush(done_queue, *secs)
+        bars1 = await fetch_bars(secs, params.get("end"), n, ft)  # get_bars
+        if ft in (FrameType.MIN1, FrameType.DAY):
+            bars2 = await fetch_price(secs, params.get("end"), n, ft)  # get_price
+            if not checksum(bars1, bars2):
+                raise exception.ChecksumFail()
+        await Stock.persist_bars(ft, bars1)
+        # except Exception as e:
+        #     print(e)
+        await _cache_bars_for_aggregation(name, typ, ft, bars1)
+        # 记录已完成的证券
+        print(secs, ft)
+        await cache.sys.lpush(done_queue, *secs)
 
 
 async def get_secs_for_sync(limit: int, n_bars: int, name: str):
@@ -321,8 +355,27 @@ async def sync_year_quarter_month_week(params):
     await _daily_sync_impl(_sync_for_persist, params)
 
 
-async def checksum(data: bytes) -> str:
-    return hashlib.md5(data).hexdigest()
+def checksum(bars1, bars2) -> bool:
+    for code in bars1:
+        bar1 = bars1[code]
+        bar2 = bars2[code]
+        if len(bar1) != len(bar2):
+            print("长度不相等，错误")
+            break
+        for item1, item2 in zip(bar1, bar2):
+            # 判断字段是否相等
+            for field in ["frame", "open", "high", "low", "close", "volume", "amount"]:
+                if field == "frame":
+                    if item1[field].strftime("%Y-%m-%d") != item2[field].strftime(
+                        "%Y-%m-%d"
+                    ):
+                        print(f"不相等 item1:{item1}, item2:{item2}, field:{field}")
+                        return False
+                elif item1[field] != item2[field]:
+                    print(f"不相等 item1:{item1}, item2:{item2}, field:{field}")
+                    return False
+
+    return True
 
 
 async def _cache_bars_for_aggregation(

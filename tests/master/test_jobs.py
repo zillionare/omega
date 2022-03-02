@@ -7,7 +7,6 @@ import unittest
 from unittest import mock
 
 import arrow
-import numpy as np
 import cfg4py
 import omicron
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -21,8 +20,7 @@ from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omega.worker import jobs as workjobs
 from omega.worker.dfs import Storage
 from tests import init_test_env
-from omega.core.constants import TRADE_PRICE_LIMITS
-from coretypes import FrameType, bars_dtype, SecurityType
+from coretypes import FrameType, SecurityType
 from omicron.models.stock import Stock
 from tests import test_dir
 from omicron.dal.influx.influxclient import InfluxClient
@@ -128,7 +126,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         emit.register(
             Events.OMEGA_DO_SYNC_DAILY_CALIBRATION, workjobs.sync_daily_calibration
         )
-        end = arrow.get("2022-02-18")
+        end = arrow.get("2022-02-18 15:00:00")
 
         async def get_sync_date_mock(*args, **kwargs):
             for item in [(end.naive, end.naive, end.naive)]:
@@ -166,11 +164,29 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                     # dfs读出来
                     filename = syncjobs.get_bars_filename(typ, end.naive, ft)
                     data = await dfs.read(filename)
+
                     with open(
                         os.path.join(base_dir, f"dfs_{typ.value}_{ft.value}.pik"), "rb"
                     ) as f:
                         local_data = f.read()
                     self.assertEqual(data, local_data)
+                # todo 从inflaxdb读取分钟线做校验
+                # for ft, n_bars in zip((FrameType.MIN1, FrameType.DAY), (240, 1)):
+                #     # 从dfs查询 并对比
+                #     influx_bars = await Stock.batch_get_bars(
+                #         codes=["000001.XSHE", "300001.XSHE", "000001.XSHG"],
+                #         n=n_bars,
+                #         frame_type=ft,
+                #         end=end.naive,
+                #     )
+                #
+                #     influx_bars = pickle.dumps(
+                #         influx_bars,
+                #         protocol=cfg.pickle.ver
+                #     )
+                #     with open(os.path.join(base_dir, f"influx_{ft.value}.pik"), "wb") as f:
+                #         f.write(influx_bars)
+                # self.assertEqual(influx_bars, f.read())
 
     @mock.patch(
         "omega.master.jobs.BarsSyncTask.get_quota",
@@ -421,13 +437,14 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                 await syncjobs.after_hour_sync_job()
                 self.assertTrue(task.status)
                 # 将redis数据读出来，并序列化之后和准备的文件做对比
+                influx_bars = await Stock.batch_get_bars(
+                    codes=["000001.XSHE", "300001.XSHE", "000001.XSHG"],
+                    n=240,
+                    frame_type=FrameType.MIN1,
+                    end=end.naive.replace(minute=0),
+                )
                 bars1 = pickle.dumps(
-                    await Stock.batch_get_bars(
-                        codes=["000001.XSHE", "300001.XSHE", "000001.XSHG"],
-                        n=240,
-                        frame_type=FrameType.MIN1,
-                        end=end.naive.replace(minute=0),
-                    ),
+                    influx_bars,
                     protocol=cfg.pickle.ver,
                 )
                 with open(

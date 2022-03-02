@@ -172,8 +172,7 @@ class BarsSyncTask:
         else:
             return state
 
-    @classmethod
-    def parse_bars_sync_scope(cls, _type: SecurityType):
+    def parse_bars_sync_scope(self, _type: SecurityType):
         """生成待同步行情数据的证券列表
 
         该列表由以下方式生成：
@@ -191,7 +190,7 @@ class BarsSyncTask:
                     exclude: 000001.XSHE 000002.XSHE
         ```
         """
-        codes = Stock.choose([_type.value])
+        codes = Stock.choose_listed(self.end.date(), [_type.value])
         exclude = getattr(cfg.omega.sync.bars, "exclude", "")
         if exclude:
             exclude = map(lambda x: x, exclude.split(" "))
@@ -728,6 +727,7 @@ async def get_sync_minute_bars_task() -> Optional[BarsSyncTask]:
         frame_type=[FrameType.MIN1],
         end=end,
         timeout=timeout * n_bars,
+        n_bars=n_bars,
         recs_per_sec=n_bars,
     )
     return task
