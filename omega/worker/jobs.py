@@ -360,7 +360,7 @@ def checksum(bars1, bars2) -> bool:
         bar1 = bars1[code]
         bar2 = bars2[code]
         if len(bar1) != len(bar2):
-            print("长度不相等，错误")
+            logger.error("长度不相等，错误")
             break
         for item1, item2 in zip(bar1, bar2):
             # 判断字段是否相等
@@ -369,10 +369,10 @@ def checksum(bars1, bars2) -> bool:
                     if item1[field].strftime("%Y-%m-%d") != item2[field].strftime(
                         "%Y-%m-%d"
                     ):
-                        print(f"不相等 item1:{item1}, item2:{item2}, field:{field}")
+                        logger.error(f"不相等 item1:{item1}, item2:{item2}, field:{field}")
                         return False
                 elif item1[field] != item2[field]:
-                    print(f"不相等 item1:{item1}, item2:{item2}, field:{field}")
+                    logger.error(f"不相等 item1:{item1}, item2:{item2}, field:{field}")
                     return False
 
     return True

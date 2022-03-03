@@ -171,22 +171,21 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                         local_data = f.read()
                     self.assertEqual(data, local_data)
                 # todo 从inflaxdb读取分钟线做校验
-                # for ft, n_bars in zip((FrameType.MIN1, FrameType.DAY), (240, 1)):
-                #     # 从dfs查询 并对比
-                #     influx_bars = await Stock.batch_get_bars(
-                #         codes=["000001.XSHE", "300001.XSHE", "000001.XSHG"],
-                #         n=n_bars,
-                #         frame_type=ft,
-                #         end=end.naive,
-                #     )
-                #
-                #     influx_bars = pickle.dumps(
-                #         influx_bars,
-                #         protocol=cfg.pickle.ver
-                #     )
-                #     with open(os.path.join(base_dir, f"influx_{ft.value}.pik"), "wb") as f:
-                #         f.write(influx_bars)
-                # self.assertEqual(influx_bars, f.read())
+                for ft, n_bars in zip((FrameType.MIN1, FrameType.DAY), (240, 1)):
+                    # 从dfs查询 并对比
+                    influx_bars = await Stock.batch_get_bars(
+                        codes=["000001.XSHE", "300001.XSHE", "000001.XSHG"],
+                        n=n_bars,
+                        frame_type=ft,
+                        end=end.naive,
+                    )
+
+                    influx_bars = pickle.dumps(influx_bars, protocol=cfg.pickle.ver)
+                    with open(
+                        os.path.join(base_dir, f"influx_{ft.value}.pik"), "rb"
+                    ) as f:
+                        local_influx_bars = f.read()
+                self.assertEqual(influx_bars, local_influx_bars)
 
     @mock.patch(
         "omega.master.jobs.BarsSyncTask.get_quota",

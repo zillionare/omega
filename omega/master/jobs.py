@@ -190,7 +190,10 @@ class BarsSyncTask:
                     exclude: 000001.XSHE 000002.XSHE
         ```
         """
-        codes = Stock.choose_listed(self.end.date(), [_type.value])
+        end = self.end
+        if isinstance(self.end, datetime.datetime):
+            end = self.end.date()
+        codes = Stock.choose_listed(end, [_type.value])
         exclude = getattr(cfg.omega.sync.bars, "exclude", "")
         if exclude:
             exclude = map(lambda x: x, exclude.split(" "))
