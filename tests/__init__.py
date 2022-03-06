@@ -5821,23 +5821,6 @@ async def is_local_archive_server_alive(port):
     return False
 
 
-async def start_archive_server(timeout=30):
-    port = find_free_port()
-    cfg.omega.urls.archive = f"http://localhost:{port}"
-    _dir = os.path.join(os.path.dirname(__file__), "data")
-
-    process = subprocess.Popen(
-        [sys.executable, "-m", "http.server", "-d", _dir, str(port)]
-    )
-
-    for i in range(timeout, 0, -1):
-        await asyncio.sleep(1)
-        if await is_local_archive_server_alive(port):
-            return process
-
-    raise TimeoutError("Archieved Bars server not started")
-
-
 def find_free_port():
     with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
         s.bind(("localhost", 0))

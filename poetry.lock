@@ -1620,7 +1620,7 @@ multidict = ">=4.0"
 
 [[package]]
 name = "zillionare-core-types"
-version = "0.4.0"
+version = "0.4.1"
 description = "core types definition shared by zillionare."
 category = "main"
 optional = false
@@ -1638,7 +1638,7 @@ doc = ["mkdocs (>=1.1.2,<2.0.0)", "mkdocs-include-markdown-plugin (>=1.0.0,<2.0.
 
 [[package]]
 name = "zillionare-omega-adaptors-jq"
-version = "1.0.11"
+version = "1.0.14"
 description = "Jqdatasdk adapter for zillionare omega"
 category = "main"
 optional = false
@@ -1674,7 +1674,7 @@ test = ["pytest", "black", "isort", "doc8", "flake8", "pytest-cov"]
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.8,<3.9"
-content-hash = "2e463cf0bb35c26c00291240806f3c4eb636c5e77f06c1ae8be99946751fed88"
+content-hash = "314be893f1bcc938c4c4cc9296c2157cdbaf1c4c11ad8204d8e7b104505c25b7"
 
 [metadata.files]
 aiocache = [
@@ -3291,12 +3291,12 @@ yarl = [
     {file = "yarl-1.7.2.tar.gz", hash = "sha256:45399b46d60c253327a460e99856752009fcee5f5d3c80b2f7c0cae1c38d56dd"},
 ]
 zillionare-core-types = [
-    {file = "zillionare_core_types-0.4.0-py3-none-any.whl", hash = "sha256:81b39e96f7f29b4e19b8d318961fbcb256147a7875dfdd17f1e656081dfbcc42"},
-    {file = "zillionare_core_types-0.4.0.tar.gz", hash = "sha256:32c1fb52a370b522c97136a9e519dd2a57ebb3a213ace1f0b4a1fe8f4be6c777"},
+    {file = "zillionare_core_types-0.4.1-py3-none-any.whl", hash = "sha256:d38f03d196e528a523f102f19e97f0041f6c64295f885ea1484dd180e8e26316"},
+    {file = "zillionare_core_types-0.4.1.tar.gz", hash = "sha256:096eb62669ac5853f2b6b5753f420c07e506fe5d0aa64af8c3647fc3cf163555"},
 ]
 zillionare-omega-adaptors-jq = [
-    {file = "zillionare-omega-adaptors-jq-1.0.11.tar.gz", hash = "sha256:d6fcd305aad1dbc1b3efff18ab79c1dd7bbe981dcdda09347876666495b63fcf"},
-    {file = "zillionare_omega_adaptors_jq-1.0.11-py3-none-any.whl", hash = "sha256:e5b604c9de4b113bef39f0598537f6bb705dcc5fd2f4d04b36cef12f95bf9825"},
+    {file = "zillionare-omega-adaptors-jq-1.0.14.tar.gz", hash = "sha256:1b9f19409163b9fb5ae211a1e10bc1bc2dca653d62a236a8006ed7b83bb887af"},
+    {file = "zillionare_omega_adaptors_jq-1.0.14-py3-none-any.whl", hash = "sha256:0c054850a3c57babe7d8a437ffead93e4a2f86217832ad2ef1a3e7d80fa91e93"},
 ]
 zipp = [
     {file = "zipp-3.7.0-py3-none-any.whl", hash = "sha256:b47250dd24f92b7dd6a0a8fc5244da14608f3ca90a5efcd37a3b1642fac9a375"},

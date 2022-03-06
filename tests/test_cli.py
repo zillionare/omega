@@ -11,13 +11,24 @@ from omega import cli
 from omega.config import get_config_dir
 from pyemit import emit
 from ruamel.yaml import YAML
-from tests import init_test_env, start_archive_server, start_omega
+from tests import init_test_env, start_omega
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 
 
 class TestCLI(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         self.cfg = await init_test_env()
+
+        # setup need these info
+        os.environ["TZ"] = "Asia/Shanghai"
+        os.environ["REDIS_HOST"] = "127.0.0.1"
+        os.environ["REDIS_PORT"] = "6379"
+        os.environ["POSTGRES_USER"] = "zillionare"
+        os.environ["POSTGRES_PASSWORD"] = "123456"
+        os.environ["POSTGRES_HOST"] = "127.0.0.1"
+        os.environ["POSTGRES_PORT"] = "5432"
+        os.environ["POSTGRES_DB"] = "zillionare"
+        os.environ["POSTGRES_ENABLED"] = "True"
 
         # disable catch up sync, since test_cli, jobs will be launched many times and cache might by empty
         redis = await aioredis.create_redis(self.cfg.redis.dsn)
@@ -38,18 +49,11 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
     async def _start_servers(self):
         # 将server启动独立出来，加快单元测试速度
         self.omega = await start_omega()
-        self.archive = await start_archive_server()
 
     async def _stop_servers(self):
         try:
             if self.omega:
                 self.omega.kill()
-        except AttributeError:
-            pass
-
-        try:
-            if self.archive:
-                self.archive.kill()
         except AttributeError:
             pass
 
@@ -243,7 +247,6 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
         def save_config(settings):
             os.rename(origin, bak)
             with open(origin, "w") as f:
-                settings["omega"]["urls"]["archive"] = self.cfg.omega.urls.archive
                 f.writelines(self.yaml_dumps(settings))
 
         with mock.patch("omega.cli.save_config", save_config):
@@ -264,16 +267,12 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
                     os.environ.get("POSTGRES_USER"),
                     os.environ.get("POSTGRES_PASSWORD"),
                     os.environ.get("POSTGRES_DB"),
-                    "1",  # download one month archive
                 ],
             ):
                 try:
-                    self.archive = await start_archive_server()
                     self.omega = await start_omega()
                     await cli.setup(force=True)
                 finally:
-                    if self.archive:
-                        self.archive.kill()
 
                     if self.omega:
                         self.omega.kill()
