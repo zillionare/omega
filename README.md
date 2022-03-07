@@ -25,14 +25,10 @@ Omega为大富翁(Zillionare)智能量化交易平台提供数据服务。它是
 
 4. 自带数据(Battery included)。我们提供了从2015年以来的30分钟k线以上数据，并且通过CDN进行高速分发。安装好Omega之后，您可以最快在十多分钟内将这样巨量的数据同步到本地数据库。
 
-
 [帮助文档](https://zillionare-omega.readthedocs.io)
 
 鸣谢
 =========
 
 Zillionare-Omega采用以下技术构建:
-
-[Pycharm开源项目支持计划](https://www.jetbrains.com/?from=zillionare-omega)
-
-![](_static/jetbrains-variant-3.svg)
+- ![JetBrains Black Box Logo logo](https://resources.jetbrains.com/storage/products/company/brand/logos/jb_square.svg) [Pycharm开源项目支持计划](https://www.jetbrains.com/?from=zillionare-omega)
