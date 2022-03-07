@@ -656,6 +656,9 @@ async def daily_calibration_job():
 async def get_after_hour_sync_job_task() -> Optional[BarsSyncTask]:
     """获取盘后同步的task实例"""
     now = arrow.now().naive
+    if not TimeFrame.is_trade_day(now):  # pragma: no cover
+        print("非交易日，不同步")
+        return
     end = TimeFrame.last_min_frame(now, FrameType.MIN1)
     if now < end:  # pragma: no cover
         logger.info("当天未收盘，禁止同步")
@@ -680,6 +683,8 @@ async def after_hour_sync_job():
     收盘之后同步今天的日线和分钟线
     """
     task = await get_after_hour_sync_job_task()
+    if not task:
+        return
     await task.run()
     return task
 
@@ -756,6 +761,8 @@ async def sync_minute_bars():
     2. 计算开始和结束时间
     """
     task = await get_sync_minute_bars_task()
+    if not task:
+        return
     await run_sync_minute_bars_task(task)
 
 
