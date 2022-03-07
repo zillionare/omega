@@ -1,29 +1,30 @@
 import asyncio
 import datetime
+import itertools
 import logging
 import os
 import unittest
 from unittest import mock
-import numpy as np
+
+import arrow
 import cfg4py
 import omicron
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from omicron import influxdb
 from omicron.dal.cache import cache
 from pyemit import emit
 import pickle
 import omega.master.jobs as syncjobs
-from omega.master.app import handle_work_heart_beat
 from omega.core import constants
 from omega.core.events import Events
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omega.worker import jobs as workjobs
-from omega.worker.dfs import TempStorage
+from omega.worker.dfs import Storage
 from tests import init_test_env
-from omega.core.constants import HIGH_LOW_LIMIT
-from coretypes import FrameType, stock_bars_dtype
+from coretypes import FrameType, SecurityType
 from omicron.models.stock import Stock
 from tests import test_dir
+from omicron.dal.influx.influxclient import InfluxClient
+from omicron.models.timeframe import TimeFrame as tf
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
@@ -35,9 +36,24 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
 
         await emit.start(engine=emit.Engine.REDIS, dsn=cfg.redis.dsn, start_server=True)
         await self.create_quotes_fetcher()
+
+        # we need init omicron and cache in two steps, due to cache contains no data
         await omicron.cache.init()
         await workjobs.cache_init()
         await omicron.init()
+
+        # create influxdb client
+        url, token, bucket, org = (
+            cfg.influxdb.url,
+            cfg.influxdb.token,
+            cfg.influxdb.bucket_name,
+            cfg.influxdb.org,
+        )
+        self.client = InfluxClient(url, token, bucket, org)
+
+        for ft in itertools.chain(tf.day_level_frames, tf.minute_level_frames):
+            name = f"stock_bars_{ft.value}"
+            await self.client.drop_measurement(name)
 
     async def asyncTearDown(self) -> None:
         await omicron.close()
@@ -50,520 +66,492 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         params = fetcher_info["workers"][0]
         await aq.create_instance(impl, **params)
 
-    async def test_job_timer(self):
-        await syncjobs._start_job_timer("unittest")
-        await asyncio.sleep(5)
-        elapsed = await syncjobs._stop_job_timer("unittest")
-        self.assertTrue(5 <= elapsed <= 7)
-
-    @mock.patch("omega.master.jobs.get_timeout", return_value=10)
-    @mock.patch("omicron.models.stock.Stock.batch_cache_bars")
     @mock.patch(
-        "omega.master.jobs.Task.get_quota",
+        "omega.master.jobs.BarsSyncTask.get_quota",
         return_value=1000000,
     )
     @mock.patch("omega.master.jobs.mail_notify")
-    @mock.patch(
-        "omega.master.jobs.get_now", return_value=datetime.datetime(2022, 1, 11, 16)
-    )
-    @mock.patch(
-        "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher.get_bars_batch"
-    )
-    async def test_sync_minute_bars(self, get_bars_batch, get_now, mail_notify, *args):
-        async def clear():
-            state = f"{constants.TASK_PREFIX}.minute.state"
-            await cache.sys.delete(state)
-            await cache.sys.delete(constants.BAR_SYNC_STATE_MINUTE)
-
-        await clear()
-
-        async def get_bars_batch_mock(*args, **kwargs):
-            """聚宽的数据被序列化到文件里了，mock读出来  根据帧类型mock"""
-            frame_type = kwargs["frame_type"]
-            with open(f"{test_dir()}/data/{frame_type.value}.pick", "rb") as f:
-                return pickle.loads(f.read())
-
-        get_bars_batch.side_effect = get_bars_batch_mock
-        await cache.sys.hset(
-            constants.BAR_SYNC_STATE_MINUTE, "tail", "2022-01-10 15:00:00"
-        )
-
+    async def test_sync_minute_bars(self, mail_notify, *args):
         emit.register(Events.OMEGA_DO_SYNC_MIN, workjobs.sync_minute_bars)
-        ret = await syncjobs.sync_minute_bars()
-        self.assertTrue(ret)
-        self.assertEqual(
-            await cache.sys.hget(constants.BAR_SYNC_STATE_MINUTE, "tail"),
-            "2022-01-11 15:00:00",
-        )
-        await clear()
-
-        # 非交易日
-        await clear()
-        get_now.return_value = datetime.datetime(2022, 1, 9)
-        ret = await syncjobs.sync_minute_bars()
-        self.assertFalse(ret)
-
-        # 中午11点40 执行时
-        # 非交易时间 重置到11点30
-        await clear()
-        get_now.return_value = datetime.datetime(2022, 1, 11, 11, 40)
-        ret = await syncjobs.sync_minute_bars()
-        self.assertTrue(ret)
-        self.assertEqual(
-            await cache.sys.hget(constants.BAR_SYNC_STATE_MINUTE, "tail"),
-            "2022-01-11 11:30:00",
-        )
-
-        await clear()
-        # 测试数据为None
-        get_bars_batch.side_effect = None
-        get_bars_batch.return_value = None
-
-        email_content = ""
-
-        async def mail_notify_mock(subject, body, **kwargs):
-            nonlocal email_content
-            email_content = body
-            print(body)
-
-        mail_notify.side_effect = mail_notify_mock
-        # 测试bars 为None
-        await syncjobs.sync_minute_bars()
-        self.assertIn("Got None Data", email_content)
-
-    @mock.patch("omega.master.jobs.get_timeout", return_value=10)
-    # @mock.patch("omicron.models.stock.Stock.batch_cache_bars")
-    @mock.patch(
-        "omega.master.jobs.Task.get_quota",
-        return_value=1000000,
-    )
-    @mock.patch("omega.master.jobs.mail_notify")
-    @mock.patch(
-        "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher.get_bars_batch"
-    )
-    @mock.patch(
-        "omega.master.jobs.get_now", return_value=datetime.datetime(2022, 1, 11, 16)
-    )
-    async def test_sync_day_bars(self, get_now, get_bars_batch, mail_notify, *args):
-        async def clear():
-            state = f"{constants.TASK_PREFIX}.day.state"
-            await cache.sys.delete(state)
-
-        await clear()
-        email_content = ""
-
-        async def mail_notify_mock(subject, body, **kwargs):
-            nonlocal email_content
-            email_content = body
-            print(body)
-
-        mail_notify.side_effect = mail_notify_mock
-
-        async def get_bars_batch_mock(*args, **kwargs):
-            """聚宽的数据被序列化到文件里了，mock读出来  根据帧类型mock"""
-            frame_type = kwargs["frame_type"]
-            with open(f"{test_dir()}/data/{frame_type.value}.pick", "rb") as f:
-                return pickle.loads(f.read())
-
-        get_bars_batch.side_effect = get_bars_batch_mock
-        emit.register(Events.OMEGA_DO_SYNC_DAY, workjobs.sync_day_bars)
-        ret = await syncjobs.sync_day_bars()
-        self.assertTrue(ret)
-        self.assertEqual(
-            await cache.security.hget("bars:1m:000001.XSHE", "202201070937"),
-            "202201070937,17.22,17.22,17.18,17.18,910900.0,15668048.0,121.71913",
-        )
-        # 测试数据为None
-        get_bars_batch.side_effect = None
-        get_bars_batch.return_value = None
-
-        email_content = ""
-
-        async def mail_notify_mock(subject, body, **kwargs):
-            nonlocal email_content
-            email_content = body
-            # print(body)
-
-        mail_notify.side_effect = mail_notify_mock
-        # 测试bars 为None
-        await syncjobs.sync_day_bars()
-        self.assertIn("Got None Data", email_content)
+        name = "minute"
+        timeout = 60
+        end = arrow.get("2022-02-18 09:31:00")
         await Stock.reset_cache()
+        task = syncjobs.BarsSyncTask(
+            event=Events.OMEGA_DO_SYNC_MIN,
+            name=name,
+            frame_type=[FrameType.MIN1],
+            end=end.naive,
+            n_bars=1,
+            timeout=timeout,
+        )
+        await task.cleanup(success=True)
+        await cache.sys.delete(constants.BAR_SYNC_MINUTE_TAIL)
+        with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task, task]):
+            with mock.patch("arrow.now", return_value=end):
+                await syncjobs.sync_minute_bars()
+                self.assertTrue(task.status)
+                self.assertEqual(
+                    await cache.sys.get(constants.BAR_SYNC_MINUTE_TAIL),
+                    "2022-02-18 09:31:00",
+                )
+                base_dir = os.path.join(test_dir(), "data", "test_sync_minute_bars")
+                bars = pickle.dumps(
+                    await Stock.batch_get_bars(
+                        codes=["000001.XSHE", "300001.XSHE", "000001.XSHG"],
+                        n=1,
+                        frame_type=FrameType.MIN1,
+                        end=end.naive,
+                    ),
+                    protocol=cfg.pickle.ver,
+                )
+                with open(os.path.join(base_dir, "min_data.pik"), "rb") as f:
+                    self.assertEqual(bars, f.read())
+            end = arrow.get("2022-02-18 09:32:00")
+            task.status = None
+            task.end = end.naive
+            with mock.patch("arrow.now", return_value=end):
+                # 第二次调用 redis有tail
+                await syncjobs.sync_minute_bars()
+                self.assertTrue(task.status)
+                self.assertEqual(
+                    await cache.sys.get(constants.BAR_SYNC_MINUTE_TAIL),
+                    "2022-02-18 09:32:00",
+                )
 
-    @mock.patch("omega.master.jobs.get_timeout", return_value=20)
-    @mock.patch(
-        "omega.master.jobs.get_now", return_value=datetime.datetime(2022, 1, 11, 16)
-    )
-    @mock.patch(
-        "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher.get_bars_batch"
-    )
     @mock.patch("omega.master.jobs.mail_notify")
-    @mock.patch(
-        "omega.master.jobs.Task.get_quota",
-        return_value=1000000,
-    )
-    async def test_daily_calibration_sync(
-        self, get_quota, mail_notify, get_bars_batch, *args
-    ):
-        state = f"{constants.TASK_PREFIX}.daily_calibration.state"
-        email_content = ""
-        await self.reset_influxdb()
-
-        async def mail_notify_mock(subject, body, **kwargs):
-            nonlocal email_content
-            email_content = body
-
-        mail_notify.side_effect = mail_notify_mock
-
-        async def get_bars_batch_mock(*args, **kwargs):
-            """聚宽的数据被序列化到文件里了，mock读出来  根据帧类型mock"""
-            frame_type = kwargs["frame_type"]
-            with open(f"{test_dir()}/data/{frame_type.value}.pick", "rb") as f:
-                return pickle.loads(f.read())
-
-        get_bars_batch.side_effect = get_bars_batch_mock
-
-        async def clear():
-            p = cache.sys.pipeline()
-            p.delete(constants.BAR_SYNC_ARCHIVE_HEAD)
-            p.delete(constants.BAR_SYNC_ARCHIVE_TAIl)
-            p.delete(state)
-            await p.execute()
-
-        await clear()
-
+    @mock.patch("omega.master.jobs.BarsSyncTask.get_quota", return_value=1000000)
+    @mock.patch("omega.master.jobs.get_sync_date")
+    async def test_daily_calibration_sync(self, get_sync_date, *args):
         emit.register(
             Events.OMEGA_DO_SYNC_DAILY_CALIBRATION, workjobs.sync_daily_calibration
         )
+        end = arrow.get("2022-02-18 15:00:00")
 
-        def count_frames():
-            """mock 计算帧间隔的方法"""
-            i = 3
+        async def get_sync_date_mock(*args, **kwargs):
+            for item in [(end.naive, end.naive, end.naive)]:
+                yield item
 
-            def inner(*args, **kwargs):
-                nonlocal i
-                i -= 1
-                return i
-
-            return inner
-
-        def day_frame_mock():
-            i = 3
-
-            def inner():
-                nonlocal i
-                if i > 1:
-                    temp = 20050101
-                else:
-                    temp = 20220107
-                i -= 1
-                return temp
-
-            return inner
-
-        with mock.patch(
-            "omega.master.jobs.get_first_day_frame", side_effect=day_frame_mock()
-        ):
-            with mock.patch(
-                "omicron.models.timeframe.TimeFrame.count_frames",
-                side_effect=count_frames(),
-            ):
-                ret = await syncjobs.daily_calibration_sync()
-                self.assertTrue(ret)
-                # 检查redis的head 和tail
-                self.assertEqual(
-                    await cache.sys.get(constants.BAR_SYNC_ARCHIVE_HEAD), "2022-01-07"
-                )
-                self.assertEqual(
-                    await cache.sys.get(constants.BAR_SYNC_ARCHIVE_TAIl), "2022-01-11"
-                )
-                # todo 检查influxdb 和 minio中的数据 1 5 15 30 60 1d
-
-        await clear()
-        get_quota.return_value = 0
-        # 测试quota 不够
-        with mock.patch(
-            "omega.master.jobs.get_first_day_frame", side_effect=day_frame_mock()
-        ):
-            with mock.patch(
-                "omicron.models.timeframe.TimeFrame.count_frames",
-                side_effect=count_frames(),
-            ):
-                ret = await syncjobs.daily_calibration_sync()
-                self.assertIn(f"剩余可用quota：{get_quota.return_value}", email_content)
-
-    @mock.patch("omega.master.jobs.get_timeout", return_value=10)
-    @mock.patch(
-        "omega.master.jobs.Task.get_quota",
-        return_value=1000000,
-    )
-    @mock.patch(
-        "omega.master.jobs.get_now", return_value=datetime.datetime(2022, 1, 11, 16)
-    )
-    @mock.patch("omega.master.jobs.mail_notify")
-    @mock.patch(
-        "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher.get_high_limit_price"
-    )
-    async def test_sync_high_low_limit(
-        self, get_high_limit_price, mail_notify, get_now, get_quota, *args
-    ):
-        async def get_high_limit_price_mock(*args, **kwargs):
-            return np.load(f"{test_dir()}/data/high_low_limit.npy", allow_pickle=True)
-
-        get_high_limit_price.side_effect = get_high_limit_price_mock
-        await cache.sys.delete("master.task.high_low_limit.state")
-        emit.register(Events.OMEGA_DO_SYNC_HIGH_LOW_LIMIT, workjobs.sync_high_low_limit)
-
-        await syncjobs.sync_high_low_limit()
-        # 检查redis中有没有数据
-        resp = await cache.sys.hgetall(HIGH_LOW_LIMIT)
-        self.assertDictEqual(
-            resp,
-            {
-                "000001.XSHE.high_limit": "18.91",
-                "000001.XSHE.low_limit": "15.47",
-                "300001.XSHE.high_limit": "27.43",
-                "300001.XSHE.low_limit": "18.29",
-                "600000.XSHG.high_limit": "9.59",
-                "600000.XSHG.low_limit": "7.85",
-            },
+        get_sync_date.side_effect = get_sync_date_mock
+        name = "calibration_sync"
+        frame_type = [FrameType.MIN1, FrameType.DAY]
+        task = syncjobs.BarsSyncTask(
+            event=Events.OMEGA_DO_SYNC_DAILY_CALIBRATION,
+            name=name,
+            end=end.naive,
+            frame_type=frame_type,  # 需要同步的类型
+            timeout=60,
+            recs_per_sec=int((240 * 2 + 4) // 0.75),
         )
+        await task.cleanup(success=True)
+        # 清楚dfs数据
+        dfs = Storage()
+        for typ, ft in itertools.product(
+            [SecurityType.STOCK, SecurityType.INDEX], [FrameType.DAY, FrameType.MIN1]
+        ):
+            await dfs.delete(syncjobs.get_bars_filename(typ, end.naive, ft))
 
-        email_content = ""
+        with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
+            with mock.patch("arrow.now", return_value=end.naive):
+                await syncjobs.daily_calibration_job()
+                base_dir = os.path.join(
+                    test_dir(), "data", "test_daily_calibration_sync"
+                )
+                for typ, ft in itertools.product(
+                    [SecurityType.STOCK, SecurityType.INDEX],
+                    [FrameType.MIN1, FrameType.DAY],
+                ):
+                    # dfs读出来
+                    filename = syncjobs.get_bars_filename(typ, end.naive, ft)
+                    data = await dfs.read(filename)
 
-        async def mail_notify_mock(subject, body, **kwargs):
-            nonlocal email_content
-            email_content = body
+                    with open(
+                        os.path.join(base_dir, f"dfs_{typ.value}_{ft.value}.pik"), "rb"
+                    ) as f:
+                        local_data = f.read()
+                    self.assertEqual(data, local_data)
+                # todo 从inflaxdb读取分钟线做校验
+                for ft, n_bars in zip((FrameType.MIN1, FrameType.DAY), (240, 1)):
+                    # 从dfs查询 并对比
+                    influx_bars = await Stock.batch_get_bars(
+                        codes=["000001.XSHE", "300001.XSHE", "000001.XSHG"],
+                        n=n_bars,
+                        frame_type=ft,
+                        end=end.naive,
+                    )
 
-        mail_notify.side_effect = mail_notify_mock
+                    influx_bars = pickle.dumps(influx_bars, protocol=cfg.pickle.ver)
+                    with open(
+                        os.path.join(base_dir, f"influx_{ft.value}.pik"), "rb"
+                    ) as f:
+                        local_influx_bars = f.read()
+                self.assertEqual(influx_bars, local_influx_bars)
 
-        # 测试数据为None
-        get_high_limit_price.side_effect = None
-        get_high_limit_price.return_value = None
-
-        # 测试bars 为None
-        await syncjobs.sync_high_low_limit()
-        self.assertIn("Got None Data", email_content)
-
-        # quota为0
-        get_quota.return_value = 0
-        ret = await syncjobs.sync_high_low_limit()
-        self.assertIn(f"剩余可用quota：{get_quota.return_value}", email_content)
-
-        # 非交易日返回false
-        get_now.return_value = datetime.datetime(2022, 1, 9, 16)
-        ret = await syncjobs.sync_high_low_limit()
-        self.assertFalse(ret)
-
-    @classmethod
-    async def reset_influxdb(cls):
-        bucket_name = "unittest_bucket"
-        influxdb._bucket_name = bucket_name
-        response = influxdb.client.buckets_api().find_buckets()
-        for bucket in response.buckets:
-            if bucket.name == influxdb.bucket_name:
-                influxdb.client.buckets_api().delete_bucket(bucket)
-        influxdb.client.buckets_api().create_bucket(
-            bucket_name=influxdb.bucket_name, org=influxdb.org
-        )
-
-    @mock.patch("omega.master.jobs.get_timeout", return_value=10)
     @mock.patch(
-        "omega.master.jobs.get_now", return_value=datetime.datetime(2022, 1, 11, 16)
-    )
-    @mock.patch("omega.master.jobs.Storage", side_effect=TempStorage)
-    @mock.patch(
-        "omega.master.jobs.Task.get_quota",
+        "omega.master.jobs.BarsSyncTask.get_quota",
         return_value=1000000,
     )
     @mock.patch("omega.master.jobs.mail_notify")
+    @mock.patch("omega.master.jobs.get_month_week_day_sync_date")
+    async def test_sync_trade_price_limits(self, get_day_sync_date, *args):
+        emit.register(
+            Events.OMEGA_DO_SYNC_TRADE_PRICE_LIMITS, workjobs.sync_trade_price_limits
+        )
+        end = arrow.get("2022-02-18")
+
+        async def get_week_sync_date_mock(*args, **kwargs):
+            for sync_date in [end.naive]:
+                yield sync_date
+
+        get_day_sync_date.side_effect = get_week_sync_date_mock
+        # sync_week_bars
+        task = syncjobs.BarsSyncTask(
+            event=Events.OMEGA_DO_SYNC_TRADE_PRICE_LIMITS,
+            name="trader_limit_test",
+            frame_type=[FrameType.DAY],
+            end=end.naive,
+            timeout=30,
+            recs_per_sec=2,
+        )
+        await task.cleanup(success=True)
+        dfs = Storage()
+        await dfs.delete(
+            syncjobs.get_trade_limit_filename(SecurityType.INDEX, end.naive)
+        )
+        await dfs.delete(
+            syncjobs.get_trade_limit_filename(SecurityType.STOCK, end.naive)
+        )
+        with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
+            # with mock.patch("arrow.now", return_value=end):
+            await syncjobs.sync_trade_price_limits()
+            self.assertTrue(task.status)
+            self.assertEqual(
+                await cache.sys.get(constants.BAR_SYNC_TRADE_PRICE_TAIL), "2022-02-18"
+            )
+            # todo inflaxdb读出来看对不对
+            base_dir = os.path.join(test_dir(), "data", "test_sync_trade_price_limits")
+            # 从dfs查询 并对比
+            bars = await Stock.get_trade_price_limits(
+                code="000001.XSHE", begin=end.naive.date(), end=end.naive.date()
+            )
+            influx_bars = pickle.dumps(bars, protocol=cfg.pickle.ver)
+            with open(os.path.join(base_dir, "influx.pik"), "rb") as f:
+                self.assertEqual(influx_bars, f.read())
+
+            # dfs读出来
+            for typ in [SecurityType.STOCK, SecurityType.INDEX]:
+                filename = syncjobs.get_trade_limit_filename(typ, end.naive)
+                data = await dfs.read(filename)
+                with open(os.path.join(base_dir, f"dfs_{typ.value}.pik"), "rb") as f:
+                    local_data = f.read()
+                self.assertEqual(data, local_data)
+
     @mock.patch(
-        "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher.get_bars_batch"
+        "omega.master.jobs.BarsSyncTask.get_quota",
+        return_value=1000000,
     )
-    async def test_sync_year_quarter_month_week(
-        self, get_bars_batch, mail_notify, get_quota, *args
-    ):
-        week_state = f"{constants.TASK_PREFIX}.{FrameType.WEEK.value}.state"
-        month_state = f"{constants.TASK_PREFIX}.{FrameType.MONTH.value}.state"
-        await self.reset_influxdb()
+    @mock.patch("omega.master.jobs.get_month_week_day_sync_date")
+    @mock.patch("omega.master.jobs.mail_notify")
+    async def test_sync_week_bars(self, mail_notify, get_week_sync_date, *args):
+        emit.register(
+            Events.OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK,
+            workjobs.sync_year_quarter_month_week,
+        )
+        end = arrow.get("2022-02-18")
 
-        async def clear():
+        async def get_week_sync_date_mock(*args, **kwargs):
+            for sync_date in [end.naive]:
+                yield sync_date
 
-            p = cache.sys.pipeline()
-            p.delete(constants.BAR_SYNC_WEEK_TAIl)
-            p.delete(constants.BAR_SYNC_MONTH_TAIl)
-            p.delete(week_state)
-            p.delete(month_state)
-            await p.execute()
+        get_week_sync_date.side_effect = get_week_sync_date_mock
 
-        await clear()
+        # sync_week_bars
+        task = syncjobs.BarsSyncTask(
+            event=Events.OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK,
+            name="week_test",
+            frame_type=[FrameType.WEEK],
+            end=end.naive,
+            timeout=30,
+            recs_per_sec=2,
+        )
+        await task.cleanup(success=True)
+        dfs = Storage()
+        await dfs.delete(
+            syncjobs.get_bars_filename(SecurityType.INDEX, end.naive, FrameType.WEEK)
+        )
+        await dfs.delete(
+            syncjobs.get_bars_filename(SecurityType.STOCK, end.naive, FrameType.WEEK)
+        )
+        with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
+            with mock.patch("arrow.now", return_value=end):
+                await syncjobs.sync_week_bars()
+                self.assertTrue(task.status)
+                self.assertEqual(
+                    await cache.sys.get(constants.BAR_SYNC_WEEK_TAIL), "2022-02-18"
+                )
+                base_dir = os.path.join(test_dir(), "data", "test_sync_week_bars")
+
+                # 从dfs查询 并对比
+                influx_bars = pickle.dumps(
+                    await Stock.batch_get_bars(
+                        codes=["000001.XSHE", "300001.XSHE", "000001.XSHG"],
+                        n=1,
+                        frame_type=FrameType.WEEK,
+                        end=end.naive,
+                    ),
+                    protocol=cfg.pickle.ver,
+                )
+                with open(os.path.join(base_dir, "influx_1w.pik"), "rb") as f:
+                    self.assertEqual(influx_bars, f.read())
+                for typ, ft in itertools.product(
+                    [SecurityType.STOCK, SecurityType.INDEX], [FrameType.WEEK]
+                ):
+                    filename = syncjobs.get_bars_filename(typ, end.naive, ft)
+                    data = await dfs.read(filename)
+                    with open(
+                        os.path.join(base_dir, f"dfs_{typ.value}.pik"), "rb"
+                    ) as f:
+                        local_data = f.read()
+                    self.assertEqual(data, local_data)
+
+    @mock.patch(
+        "omega.master.jobs.BarsSyncTask.get_quota",
+        return_value=1000000,
+    )
+    @mock.patch("omega.master.jobs.get_month_week_day_sync_date")
+    @mock.patch("omega.master.jobs.mail_notify")
+    async def test_sync_month_bars(self, mail_notify, get_week_sync_date, *args):
         emit.register(
             Events.OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK,
             workjobs.sync_year_quarter_month_week,
         )
 
-        async def get_bars_batch_mock(*args, **kwargs):
-            """聚宽的数据被序列化到文件里了，mock读出来"""
-            frame_type = kwargs.get("frame_type")
-            filename = f"{test_dir()}/data"
+        # todo 测试同步月线 周线 写，minio inflaxdb 并读出来对比数据是否正确
+        end = arrow.get("2022-01-28")
 
-            if frame_type == FrameType.WEEK:
-                filename = os.path.join(filename, "1WEEK.pick")
-            elif frame_type == FrameType.MONTH:
-                filename = os.path.join(filename, "1MONTH.pick")
-            with open(filename, "rb") as f:
-                return pickle.loads(f.read())
+        async def get_week_sync_date_mock(*args, **kwargs):
+            for sync_date in [end.naive]:
+                yield sync_date
 
-        get_bars_batch.side_effect = get_bars_batch_mock
+        get_week_sync_date.side_effect = get_week_sync_date_mock
+        frame_type = FrameType.MONTH
+        # sync_week_bars
+        task = syncjobs.BarsSyncTask(
+            event=Events.OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK,
+            name="month_test",
+            frame_type=[frame_type],
+            end=end.naive,
+            timeout=30,
+            recs_per_sec=2,
+        )
+        await task.cleanup(success=True)
+        dfs = Storage()
+        await dfs.delete(
+            syncjobs.get_bars_filename(SecurityType.INDEX, end.naive, FrameType.MONTH)
+        )
+        await dfs.delete(
+            syncjobs.get_bars_filename(SecurityType.STOCK, end.naive, FrameType.MONTH)
+        )
+        with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
+            with mock.patch("arrow.now", return_value=end):
+                await syncjobs.sync_month_bars()
+                self.assertTrue(task.status)
+                self.assertEqual(
+                    await cache.sys.get(constants.BAR_SYNC_MONTH_TAIL), "2022-01-28"
+                )
+                base_dir = os.path.join(test_dir(), "data", "test_sync_month_bars")
+                # 从dfs查询 并对比
+                influx_bars = pickle.dumps(
+                    await Stock.batch_get_bars(
+                        codes=["000001.XSHE", "300001.XSHE", "000001.XSHG"],
+                        n=1,
+                        frame_type=FrameType.MONTH,
+                        end=end.naive,
+                    ),
+                    protocol=cfg.pickle.ver,
+                )
+                with open(os.path.join(base_dir, "influx_1M.pik"), "rb") as f:
+                    self.assertEqual(influx_bars, f.read())
 
-        def count_frames():
-            """mock 计算帧间隔的方法"""
-            i = 3
-
-            def inner(*args, **kwargs):
-                nonlocal i
-                i -= 1
-                return i
-
-            return inner
-
-        email_content = ""
-
-        async def mail_notify_mock(subject, body, **kwargs):
-            nonlocal email_content
-            email_content = body
-
-        mail_notify.side_effect = mail_notify_mock
-
-        with mock.patch(
-            "omicron.models.timeframe.TimeFrame.count_frames",
-            side_effect=count_frames(),
-        ):
-            await syncjobs.sync_year_quarter_month_week()
-            # 检查redis里的周是否是某个值
-            self.assertEqual(
-                await cache.sys.get(constants.BAR_SYNC_WEEK_TAIl), "2005-01-07"
-            )
-            self.assertEqual(
-                await cache.sys.get(constants.BAR_SYNC_MONTH_TAIl), "2005-01-31"
-            )
-            # 从数据库查询出来验证对不对
-            stocks = Stock.choose(["stock"])
-            stocks.remove("300001.XSHE")
-            week_bars = await Stock.batch_get_bars(
-                stocks, 1, FrameType.WEEK, datetime.datetime(2005, 1, 7)
-            )
-            bars1 = np.concatenate([week_bars["000001.XSHE"], week_bars["600000.XSHG"]])
-            self.assertTrue(
-                (
-                    bars1
-                    == np.array(
-                        [
-                            (
-                                datetime.datetime(2005, 1, 7),
-                                6.59,
-                                6.6,
-                                6.35,
-                                6.51,
-                                9535540.0,
-                                61820855.0,
-                                27.242,
-                            ),
-                            (
-                                datetime.datetime(2005, 1, 7),
-                                6.9799995,
-                                6.9799995,
-                                6.63,
-                                6.7,
-                                17695146.0,
-                                1.19499146e08,
-                                1.557,
-                            ),
-                        ],
-                        dtype=stock_bars_dtype,
-                    )
-                ).all()
-            )
-
-        await clear()
-        # 测试上游返回None值
-        get_bars_batch.return_value = None
-        get_bars_batch.side_effect = None
-        # mock 写dfs的方法
-        with mock.patch(
-            "omicron.models.timeframe.TimeFrame.count_frames",
-            side_effect=count_frames(),
-        ):
-            await syncjobs.sync_year_quarter_month_week()
-            self.assertIn("Got None Data", email_content)
-
-        await cache.sys.hset(week_state, "is_running", 1)
-        await cache.sys.hset(month_state, "is_running", 1)
-
-        # 测试已经在运行了 重复启动
-        with mock.patch(
-            "omicron.models.timeframe.TimeFrame.count_frames",
-            side_effect=count_frames(),
-        ):
-            ret = await syncjobs.sync_year_quarter_month_week()
-            self.assertFalse(ret)
-        await clear()
-
-        get_quota.return_value = 0
-        # 测试quota 不够
-        with mock.patch(
-            "omicron.models.timeframe.TimeFrame.count_frames",
-            side_effect=count_frames(),
-        ):
-            ret = await syncjobs.sync_year_quarter_month_week()
-            self.assertIn(f"剩余可用quota：{get_quota.return_value}", email_content)
-        # await clear()
-        # 测试超时
+                # with open(os.path.join(base_dir, "influx_1M.pik"), "rb") as f:
+                #     f.write(pickle.dumps(influx_bars, protocol=4))
+                for typ, ft in itertools.product(
+                    [SecurityType.STOCK, SecurityType.INDEX], [FrameType.MONTH]
+                ):
+                    filename = syncjobs.get_bars_filename(typ, end.naive, ft)
+                    data = await dfs.read(filename)
+                    with open(
+                        os.path.join(base_dir, f"dfs_{typ.value}.pik"), "rb"
+                    ) as f:
+                        local_data = f.read()
+                    self.assertEqual(data, local_data)
 
     async def test_load_cron_task(self):
         scheduler = AsyncIOScheduler(timezone=cfg.tz)
 
         await syncjobs.load_cron_task(scheduler)
         base = {
-            "1m:11:0-30",
-            "sync_year_quarter_month_week",
-            "daily_calibration_sync",
             "1m:15:00",
-            "1m:9:31-59",
+            "after_hour_sync_job",
+            "1m:11:0-31",
             "1m:10:*",
+            "sync_month_bars",
+            "sync_week_bars",
             "1m:13-14:*",
-            "sync_high_low_limit",
-            "sync_day_bars",
+            "sync_trade_price_limits",
+            "daily_calibration_sync",
+            "1m:9:31-59",
         }
         print(set([job.name for job in scheduler.get_jobs()]))
         self.assertSetEqual(base, set([job.name for job in scheduler.get_jobs()]))
 
-    @mock.patch("omega.master.jobs.get_timeout", return_value=10)
     @mock.patch(
-        "omega.master.jobs.Task.get_quota",
+        "omega.master.jobs.BarsSyncTask.get_quota",
         return_value=1000000,
     )
     @mock.patch("omega.master.jobs.mail_notify")
-    @mock.patch("omicron.models.stock.Stock.choose", return_value=[])
-    async def test_task(self, *args):
-        queue_name = "test"
-        state = f"{constants.TASK_PREFIX}.{queue_name}.state"
+    async def test_after_hour_sync_job(self, mail_notify, *args):
+        email_content = ""
 
-        async def tasks():
-            return []
+        async def mail_notify_mock(subject, body, **kwargs):
+            nonlocal email_content
+            email_content = body
+            print(body)
 
-        await cache.sys.delete(state)
-        params = {}
-        task = syncjobs.Task(
-            Events.OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK, queue_name, params, 10
+        mail_notify.side_effect = mail_notify_mock
+        emit.register(Events.OMEGA_DO_SYNC_DAY, workjobs.after_hour_sync)
+        end = arrow.get("2022-02-23 15:05:00")
+        task = syncjobs.BarsSyncTask(
+            event=Events.OMEGA_DO_SYNC_DAY,
+            name="test",
+            frame_type=[FrameType.MIN1, FrameType.DAY],
+            end=end.naive,
+            timeout=30,
+            recs_per_sec=240 * 2 + 4,
         )
-        task.tasks = tasks
-        ret = await task.run()
-        self.assertFalse(ret)
-        # 测试获取当前时间
+        await task.cleanup(success=True)
+        await Stock.reset_cache()
+        with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
+            with mock.patch("arrow.now", return_value=end):
+                await syncjobs.after_hour_sync_job()
+                self.assertTrue(task.status)
+                # 将redis数据读出来，并序列化之后和准备的文件做对比
+                influx_bars = await Stock.batch_get_bars(
+                    codes=["000001.XSHE", "300001.XSHE", "000001.XSHG"],
+                    n=240,
+                    frame_type=FrameType.MIN1,
+                    end=end.naive.replace(minute=0),
+                )
+                bars1 = pickle.dumps(
+                    influx_bars,
+                    protocol=cfg.pickle.ver,
+                )
+                with open(
+                    f"{test_dir()}/data/test_after_hour_sync_job/after_hour_sync_job.pik",
+                    "rb",
+                ) as f:
+                    bars2 = f.read()
+                self.assertEqual(bars1, bars2)
 
-        self.assertIsInstance(syncjobs.get_now(), datetime.datetime)
-        self.assertIsInstance(syncjobs.get_first_day_frame(), np.int64)
+        # 测试数据为None 时邮件是否正常
 
-        # 测试超时时发送邮件
-        await task.send_email()
+        with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
+            with mock.patch(
+                "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher.get_bars_batch",
+                return_value=None,
+            ):
+                with mock.patch("arrow.now", return_value=end):
+                    await syncjobs.after_hour_sync_job()
+                    self.assertFalse(task.status)
+                    self.assertIn("Got None Data", email_content)
+
+        # 测试quota不够
+        email_content = ""
+        with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
+            with mock.patch("arrow.now", return_value=end):
+                task.timeout = 5.1
+                await syncjobs.after_hour_sync_job()
+                print(email_content)
+                self.assertFalse(task.status)
+                self.assertIn("超时", email_content)
+
+        # 测试quota不够
+        email_content = ""
+        task.recs_per_sec = 1e9
+        with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
+            with mock.patch("arrow.now", return_value=end):
+                await syncjobs.after_hour_sync_job()
+                self.assertFalse(task.status)
+                self.assertIn("quota不足", email_content)
+
+        # 测试重复运行
+        await task.update_state(is_running=1, worker_count=0)
+        task.status = None
+        with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
+            with mock.patch("arrow.now", return_value=end):
+                await syncjobs.after_hour_sync_job()
+                self.assertFalse(task.status)
+
+    async def test_get_sync_date(self):
+        await cache.sys.delete(constants.BAR_SYNC_ARCHIVE_HEAD)
+        await cache.sys.delete(constants.BAR_SYNC_ARCHIVE_TAIL)
+        with mock.patch("arrow.now", return_value=arrow.get("2022-02-18 15:05:00")):
+            generator = syncjobs.get_sync_date()
+            sync_dt, head, tail = await generator.__anext__()
+            print(sync_dt, head, tail)
+            await cache.sys.set(
+                constants.BAR_SYNC_ARCHIVE_HEAD, head.strftime("%Y-%m-%d")
+            )
+            await cache.sys.set(
+                constants.BAR_SYNC_ARCHIVE_TAIL, tail.strftime("%Y-%m-%d")
+            )
+
+        with mock.patch("arrow.now", return_value=arrow.get("2022-02-22 02:05:00")):
+            generator = syncjobs.get_sync_date()
+            sync_dt, head, tail = await generator.__anext__()
+            print(sync_dt, head, tail)
+            self.assertIsNone(head)
+            self.assertEqual(tail.strftime("%Y-%m-%d"), "2022-02-18")
+
+            await cache.sys.set(
+                constants.BAR_SYNC_ARCHIVE_TAIL, tail.strftime("%Y-%m-%d")
+            )
+            sync_dt, head, tail = await generator.__anext__()
+            self.assertEqual(tail.strftime("%Y-%m-%d"), "2022-02-21")
+            await cache.sys.set(
+                constants.BAR_SYNC_ARCHIVE_TAIL, tail.strftime("%Y-%m-%d")
+            )
+
+            sync_dt, head, tail = await generator.__anext__()
+            self.assertEqual(head.strftime("%Y-%m-%d"), "2022-02-16")
+
+        await cache.sys.delete(constants.BAR_SYNC_ARCHIVE_HEAD)
+        await cache.sys.delete(constants.BAR_SYNC_ARCHIVE_TAIL)
+        with mock.patch("arrow.now", return_value=arrow.get("2005-01-05 02:05:00")):
+            generator = syncjobs.get_sync_date()
+            try:
+                await generator.__anext__()
+            except Exception as e:
+                self.assertIsInstance(e, StopAsyncIteration)
+            else:
+                self.assertEqual(1, 0)
+
+    async def test_get_month_week_day_sync_date(self):
+        tail_key = "test_sync_tail"
+        await cache.sys.delete(tail_key)
+        with mock.patch("arrow.now", return_value=arrow.get("2005-01-05 02:05:00")):
+            generator = syncjobs.get_month_week_day_sync_date(tail_key, FrameType.DAY)
+            tail = await generator.__anext__()
+            await cache.sys.set(tail_key, tail.strftime("%Y-%m-%d"))
+            tail = await generator.__anext__()
+            await cache.sys.set(tail_key, tail.strftime("%Y-%m-%d"))
+            self.assertEqual(tail.strftime("%Y-%m-%d"), "2005-01-05")
+
+        with mock.patch("arrow.now", return_value=arrow.get("2005-01-05 02:05:00")):
+            generator = syncjobs.get_month_week_day_sync_date(tail_key, FrameType.DAY)
+            try:
+                await generator.__anext__()
+            except Exception as e:
+                self.assertIsInstance(e, StopAsyncIteration)
+            else:
+                self.assertEqual(1, 0)

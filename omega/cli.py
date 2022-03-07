@@ -674,7 +674,7 @@ async def _stop_fetcher_processes():
 
 
 async def _show_get_quota():
-    spare = await AbstractQuotesFetcher.get_quota()
+    spare = await AbstractQuotesFetcher.get_quota_spare()
     print(f"fetcher当日剩余可调用条数: {spare}")
 
 

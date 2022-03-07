@@ -15,7 +15,7 @@ class Events:
     OMEGA_DO_SYNC_MIN = "omega/sync_min"
     OMEGA_DO_SYNC_DAY = "omega/sync_day"
     OMEGA_DO_SYNC_DAILY_CALIBRATION = "omega/daily_calibration"
-    OMEGA_DO_SYNC_HIGH_LOW_LIMIT = "omega/high_low_limit"
+    OMEGA_DO_SYNC_TRADE_PRICE_LIMITS = "omega/trade_price_limits"
     # year_quarter_month_week
     OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK = "omega/year_quarter_month_week"
 

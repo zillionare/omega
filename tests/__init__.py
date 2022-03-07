@@ -30,13 +30,8 @@ async def set_security_data(redis):
     # set example securities
     stocks = [
         ("000001.XSHE", "平安银行", "PAYH", "1991-04-03", "2200-01-01", "stock"),
-        # ("000001.XSHG", "上证指数", "SZZS", "1991-07-15", "2200-01-01", "index"),
-        ("000406.XSHE", "石油大明", "SYDM", "1996-06-28", "2006-04-20", "stock"),
-        ("000005.XSHE", "ST星源", "STXY", "1990-12-10", "2200-01-01", "stock"),
+        ("000001.XSHG", "上证指数", "SZZS", "1991-07-15", "2200-01-01", "index"),
         ("300001.XSHE", "特锐德", "TRD", "2009-10-30", "2200-01-01", "stock"),
-        ("600000.XSHG", "浦发银行", "PFYH", "1999-11-10", "2200-01-01", "stock"),
-        ("688001.XSHG", "华兴源创", "HXYC", "2019-07-22", "2200-01-01", "stock"),
-        ("000007.XSHE", "*ST全新", "*STQX", "1992-04-13", "2200-01-01", "stock"),
     ]
 
     pl = redis.pipeline()
@@ -5704,15 +5699,11 @@ async def init_test_env():
     # enable postgres for unittest
     cfg.postgres.enabled = True
 
-    os.environ[cfg4py.envar] = "DEV"
-
     handler = logging.StreamHandler()
     fmt = "%(asctime)s %(levelname)-1.1s %(name)s:%(funcName)s:%(lineno)s | %(message)s"
     formatter = logging.Formatter(fmt=fmt)
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-    cfg.omega.sync.bars.exclude = "000002.XSHE"
-    # cfg.omega.sync.bars.include = "000001.XSHE"
     redis = await aioredis.create_redis(cfg.redis.dsn, db=1)
 
     try:
@@ -5828,23 +5819,6 @@ async def is_local_archive_server_alive(port):
         pass
 
     return False
-
-
-async def start_archive_server(timeout=30):
-    port = find_free_port()
-    cfg.omega.urls.archive = f"http://localhost:{port}"
-    _dir = os.path.join(os.path.dirname(__file__), "data")
-
-    process = subprocess.Popen(
-        [sys.executable, "-m", "http.server", "-d", _dir, str(port)]
-    )
-
-    for i in range(timeout, 0, -1):
-        await asyncio.sleep(1)
-        if await is_local_archive_server_alive(port):
-            return process
-
-    raise TimeoutError("Archieved Bars server not started")
 
 
 def find_free_port():

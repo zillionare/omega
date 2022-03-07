@@ -76,7 +76,7 @@ dfs:
     bucket: zillionare
 
 influxdb:
-  url: http://${INFLUXDB_HOST}:${INFLUXDB_PORT}
+  url: ${INFLUXDB_URL}
   token: ${INFLUXDB_TOKEN}
   org: ${INFLUXDB_ORG}
   bucket_name: ${INFLUXDB_BUCKET}

@@ -6,7 +6,7 @@ import datetime
 import importlib
 import logging
 import random
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import arrow
 import cfg4py
@@ -77,10 +77,20 @@ class AbstractQuotesFetcher(QuotesFetcher):
         n_bars: int,
         frame_type: FrameType,
         include_unclosed=True,
-    ) -> np.ndarray:
+    ) -> Dict[str, np.ndarray]:
         return await cls.get_instance().get_bars_batch(
             secs, end, n_bars, frame_type.value, include_unclosed
         )
+
+    @classmethod
+    async def get_price(
+        cls,
+        secs: List[str],
+        end: Frame,
+        n_bars: int,
+        frame_type: FrameType,
+    ) -> Dict[str, np.recarray]:
+        return await cls.get_instance().get_price(secs, end, n_bars, frame_type.value)
 
     @classmethod
     async def get_all_trade_days(cls):
@@ -89,23 +99,23 @@ class AbstractQuotesFetcher(QuotesFetcher):
         return days
 
     @classmethod
-    async def get_high_limit_price(
-        cls, sec: Union[List, str], dt: Union[str, datetime.datetime, datetime.date]
+    async def get_trade_price_limits(
+        cls, sec: Union[List, str], dt: Union[str, Frame]
     ) -> np.ndarray:
         params = {
             "sec": sec,
             "dt": dt,
         }
-        bars = await cls.get_instance().get_high_limit_price(**params)
+        return await cls.get_instance().get_trade_price_limits(**params)
 
-        if len(bars) == 0:
-            return None
-        return bars
+    @classmethod
+    async def get_quota_spare(cls):
+        quota = await cls.get_instance().get_quota()
+        return quota.get("spare")
 
     @classmethod
     async def get_quota(cls):
-        quota = await cls.get_instance().get_quota()
-        return quota.get("spare")
+        return cls.get_instance().get_quota()
 
     @classmethod
     async def get_fund_list(
@@ -193,3 +203,7 @@ class AbstractQuotesFetcher(QuotesFetcher):
         mapping = dict(fund_net_values.dtype.descr)
         fields = [(name, mapping[name]) for name in fields]
         return rfn.require_fields(fund_net_values, fields)
+
+    @classmethod
+    async def result_size_limit(cls, op: str) -> int:
+        return cls.get_instance().result_size_limit(op)
