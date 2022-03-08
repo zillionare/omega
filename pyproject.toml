@@ -35,7 +35,7 @@ include = [
     "tests/*"
 ]
 
-version = "1.1.0.1"
+version = "2.0"
 
 [tool.poetry.dependencies]
 python=">=3.8,<3.9"
@@ -81,6 +81,8 @@ zillionare-core-types = "^0.4.1"
 msgpack = {version = "^1.0.3", optional = true}
 zillionare-omega-adaptors-jq = "^1.0.14"
 APScheduler = "^3.8.1"
+Cython = "^0.29.28"
+numpy = "^1.22"
 [tool.poetry.extras]
 test = [
     "pytest",

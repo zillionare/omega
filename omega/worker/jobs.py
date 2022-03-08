@@ -17,6 +17,7 @@ import numpy as np
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from coretypes import FrameType, SecurityType
 from omicron import cache
+from omicron.extensions.decimals import math_round
 from omicron.models.stock import Stock
 from omicron.models.timeframe import TimeFrame
 from omicron.notify.mail import mail_notify
@@ -371,9 +372,14 @@ def checksum(bars1, bars2) -> bool:
                     ):
                         logger.error(f"不相等 item1:{item1}, item2:{item2}, field:{field}")
                         return False
-                elif item1[field] != item2[field]:
-                    logger.error(f"不相等 item1:{item1}, item2:{item2}, field:{field}")
-                    return False
+                else:
+                    i1 = math_round(item1[field], 2)
+                    i2 = math_round(item2[field], 2)
+                    if i1 != i2:
+                        logger.error(
+                            f"不相等 item1:{item1}, {i1}, item2:{item2}, {i2}, field:{field}, code:{code}"
+                        )
+                        return False
 
     return True
 
