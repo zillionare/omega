@@ -292,7 +292,6 @@ async def sync_trade_price_limits(params: Dict):
             if bars is None:
                 raise exception.GotNoneData()
             await _cache_bars_for_aggregation(name, typ, FrameType.DAY, bars)
-            await Stock.save_trade_price_limits(bars, to_cache=False)
             await cache.sys.lpush(done_queue, *secs)
             # 取到到晚上12点还有多少秒
 

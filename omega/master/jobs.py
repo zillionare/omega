@@ -780,6 +780,7 @@ async def write_trade_price_limits_to_dfs(name: str, dt: datetime.datetime):
     dfs = Storage()
     if dfs is None:  # pragma: no cover
         return
+    today = datetime.datetime.now().date()
 
     for typ, ft in itertools.product(
         [SecurityType.STOCK, SecurityType.INDEX], [FrameType.DAY]
@@ -795,6 +796,11 @@ async def write_trade_price_limits_to_dfs(name: str, dt: datetime.datetime):
             assert isinstance(bars, np.ndarray)
             all_bars.append(bars)
         bars = np.concatenate(all_bars)
+        # 涨跌停写入inflaxdb 和 cache
+        await Stock.save_trade_price_limits(bars, to_cache=False)
+        if dt == today:
+            logger.info("说明同步的是今天的涨跌停，写入cache")
+            await Stock.save_trade_price_limits(bars, to_cache=True)
         binary = pickle.dumps(bars, protocol=cfg.pickle.ver)
         await dfs.write(get_trade_limit_filename(typ, dt), binary)
         await cache.temp.delete(queue_name)
