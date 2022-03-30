@@ -631,14 +631,15 @@ async def daily_calibration_job():
     now = arrow.now().date()
     async for sync_dt, head, tail in get_sync_date():
         # 创建task
+        # 当天的校准启动前，先清除缓存。
+        if sync_dt.date() == TimeFrame.day_shift(now, 0):
+            await Stock.reset_cache()
+
         task = await get_daily_calibration_job_task(sync_dt)
         success = await run_daily_calibration_sync_task(task)
         if not success:  # pragma: no cover
             break
         else:
-            # 当天的校准同步已经完成，清除缓存。
-            if sync_dt.date() == TimeFrame.day_shift(now, 0):
-                await Stock.reset_cache()
             # 成功同步了`sync_dt`这一天的数据，更新 head 和 tail
             if head is not None:
                 await cache.sys.set(
