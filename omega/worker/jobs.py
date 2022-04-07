@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 async def worker_exit(state, scope, error=None):
     if error is None:  # pragma: no cover
         error = traceback.format_exc()
-        print(error)
+        logger.warning("worker exited with error:%s", error)
     # 删除is_running 并写上错误堆栈信息
     former_error = await cache.sys.hget(state, "error")
     p = cache.sys.pipeline()
@@ -66,7 +66,7 @@ def abnormal_work_report():
             )
             # if isinstance(timeout, int):
             timeout -= 5  # 提前5秒退出
-            print("timeout", timeout)
+            logger.debug("timeout", timeout)
             try:
                 async with async_timeout.timeout(timeout):
                     # 执行之前，将状态中的worker_count + 1，以确保生产者能知道有多少个worker收到了消息
@@ -210,9 +210,9 @@ async def _sync_to_cache(typ: SecurityType, ft: FrameType, params: Dict):
     Returns:
 
     """
-    print("_sync_to_cache 被调用", ft)
+    logger.debug("_sync_to_cache(%s) 被调用", ft)
     name, n, queue, done_queue, limit = await _sync_params_analysis(typ, ft, params)
-    print(done_queue)
+    logger.info("%s", done_queue)
     async for secs in get_secs_for_sync(limit, n, queue):
         # todo 如果是日线，需要调用获取日线的方法，其他的不用变
         bars = await fetch_bars(secs, params.get("end"), n, ft)
@@ -235,7 +235,7 @@ async def _sync_for_persist(typ: SecurityType, ft: FrameType, params: Dict):
 
     """
     name, n, queue, done_queue, limit = await _sync_params_analysis(typ, ft, params)
-    print(await _sync_params_analysis(typ, ft, params))
+    logger.info("params: %s, %d, %s, %s, %d", name, n, queue, done_queue, limit)
     async for secs in get_secs_for_sync(limit, n, queue):
         # todo: is there better way to do the check? 校验和数据类型问题
         bars1 = await fetch_bars(secs, params.get("end"), n, ft)  # get_bars
@@ -248,7 +248,7 @@ async def _sync_for_persist(typ: SecurityType, ft: FrameType, params: Dict):
         #     print(e)
         await _cache_bars_for_aggregation(name, typ, ft, bars1)
         # 记录已完成的证券
-        print(secs, ft)
+        logger.info("done sync: %s, %s", ft, secs)
         await cache.sys.lpush(done_queue, *secs)
 
 

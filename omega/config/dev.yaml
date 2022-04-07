@@ -12,8 +12,8 @@ logging:
     redis:
       class: rlog.RedisHandler
       formatter: default
-      host: ${REDIS_HOST}
-      port: ${REDIS_PORT}
+      host: localhost
+      port: 6379
       channel: omega.log
   loggers:
     apscheduler:
@@ -27,16 +27,16 @@ logging:
 tz: Asia/Shanghai
 logreceiver:
   klass: omega.logging.receiver.redis.RedisLogReceiver
-  dsn: redis://${REDIS_HOST}:${REDIS_PORT}
+  dsn: redis://localhost:6379
   channel: omega.log
   filename: /tmp/log/zillionare/omega.log
   backup_count: 7
   max_bytes: 10M
 redis:
-  dsn: redis://${REDIS_HOST}:${REDIS_PORT}
+  dsn: redis://localhost:6379
 postgres:
-  dsn: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
-  enabled: ${POSTGRES_ENABLED}
+  dsn: postgres://zillionare:123456@localhost:5432/zillionare
+  enabled: true
 pickle:
   ver: 4
 omega:
@@ -68,21 +68,22 @@ quotes_fetchers:
 dfs:
   engine: minio
   minio:
-    host: ${MINIO_HOST}
-    port: ${MINIO_PORT}
-    access: ${MINIO_ACCESS}
-    secret: ${MINIO_SECRET}
+    host: localhost
+    port: 9000
+    access: minioadmin
+    secret: minioadmin
     secure: false
     bucket: zillionare
 
 influxdb:
-  url: ${INFLUXDB_URL}
-  token: ${INFLUXDB_TOKEN}
-  org: ${INFLUXDB_ORG}
-  bucket_name: ${INFLUXDB_BUCKET}
+  url: http://localhost:8086
+  token: my-token
+  org: my-org
+  bucket_name: my-bucket
+  enable_compress: true
 
 notify:
     mail_from: ${MAIL_FROM}
     mail_to:
-        - shaohu.chen@qq.com
+        - ${MAIL_TO}
     mail_server: ${MAIL_SERVER}

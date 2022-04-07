@@ -19,7 +19,7 @@ from omega.core.events import Events
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omega.worker import jobs as workjobs
 from omega.worker.dfs import Storage
-from tests import init_test_env
+from tests import assert_bars_equal, init_test_env
 from coretypes import FrameType, SecurityType
 from omicron.models.stock import Stock
 from tests import test_dir
@@ -257,10 +257,10 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             Events.OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK,
             workjobs.sync_year_quarter_month_week,
         )
-        end = arrow.get("2022-02-18")
+        end = arrow.get("2022-02-18").date()
 
         async def get_week_sync_date_mock(*args, **kwargs):
-            for sync_date in [end.naive]:
+            for sync_date in [end]:
                 yield sync_date
 
         get_week_sync_date.side_effect = get_week_sync_date_mock
@@ -270,17 +270,17 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             event=Events.OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK,
             name="week_test",
             frame_type=[FrameType.WEEK],
-            end=end.naive,
+            end=end,
             timeout=30,
             recs_per_sec=2,
         )
         await task.cleanup(success=True)
         dfs = Storage()
         await dfs.delete(
-            syncjobs.get_bars_filename(SecurityType.INDEX, end.naive, FrameType.WEEK)
+            syncjobs.get_bars_filename(SecurityType.INDEX, end, FrameType.WEEK)
         )
         await dfs.delete(
-            syncjobs.get_bars_filename(SecurityType.STOCK, end.naive, FrameType.WEEK)
+            syncjobs.get_bars_filename(SecurityType.STOCK, end, FrameType.WEEK)
         )
         with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
             with mock.patch("arrow.now", return_value=end):
@@ -292,27 +292,37 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                 base_dir = os.path.join(test_dir(), "data", "test_sync_week_bars")
 
                 # 从dfs查询 并对比
-                influx_bars = pickle.dumps(
-                    await Stock.batch_get_bars(
-                        codes=["000001.XSHE", "300001.XSHE", "000001.XSHG"],
-                        n=1,
-                        frame_type=FrameType.WEEK,
-                        end=end.naive,
-                    ),
-                    protocol=cfg.pickle.ver,
+                actual = await Stock.batch_get_bars(
+                    codes=["000001.XSHE", "300001.XSHE", "000001.XSHG"],
+                    n=1,
+                    frame_type=FrameType.WEEK,
+                    end=end,
                 )
+                expected = {}
                 with open(os.path.join(base_dir, "influx_1w.pik"), "rb") as f:
-                    self.assertEqual(influx_bars, f.read())
-                for typ, ft in itertools.product(
-                    [SecurityType.STOCK, SecurityType.INDEX], [FrameType.WEEK]
+                    expected = pickle.load(f)
+
+                self.assertSetEqual(set(actual.keys()), set(expected.keys()))
+                for code in actual.keys():
+                    assert_bars_equal(actual[code], expected[code])
+
+                expected_keys = [
+                    set(["000001.XSHE", "300001.XSHE"]),
+                    set(["000001.XSHG"]),
+                ]
+
+                for i, (typ, ft) in enumerate(
+                    itertools.product(
+                        [SecurityType.STOCK, SecurityType.INDEX], [FrameType.WEEK]
+                    )
                 ):
-                    filename = syncjobs.get_bars_filename(typ, end.naive, ft)
+                    filename = syncjobs.get_bars_filename(typ, end, ft)
                     data = await dfs.read(filename)
-                    with open(
-                        os.path.join(base_dir, f"dfs_{typ.value}.pik"), "rb"
-                    ) as f:
-                        local_data = f.read()
-                    self.assertEqual(data, local_data)
+                    actual = pickle.loads(data)
+
+                    self.assertSetEqual(set(actual.keys()), expected_keys[i])
+                    for code in expected_keys[i]:
+                        assert_bars_equal(actual[code], expected[code])
 
     @mock.patch(
         "omega.master.jobs.BarsSyncTask.get_quota",
@@ -327,10 +337,10 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         )
 
         # todo 测试同步月线 周线 写，minio inflaxdb 并读出来对比数据是否正确
-        end = arrow.get("2022-01-28")
+        end = arrow.get("2022-01-28").date()
 
         async def get_week_sync_date_mock(*args, **kwargs):
-            for sync_date in [end.naive]:
+            for sync_date in [end]:
                 yield sync_date
 
         get_week_sync_date.side_effect = get_week_sync_date_mock
@@ -340,17 +350,17 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             event=Events.OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK,
             name="month_test",
             frame_type=[frame_type],
-            end=end.naive,
+            end=end,
             timeout=30,
             recs_per_sec=2,
         )
         await task.cleanup(success=True)
         dfs = Storage()
         await dfs.delete(
-            syncjobs.get_bars_filename(SecurityType.INDEX, end.naive, FrameType.MONTH)
+            syncjobs.get_bars_filename(SecurityType.INDEX, end, FrameType.MONTH)
         )
         await dfs.delete(
-            syncjobs.get_bars_filename(SecurityType.STOCK, end.naive, FrameType.MONTH)
+            syncjobs.get_bars_filename(SecurityType.STOCK, end, FrameType.MONTH)
         )
         with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
             with mock.patch("arrow.now", return_value=end):
@@ -361,30 +371,36 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                 )
                 base_dir = os.path.join(test_dir(), "data", "test_sync_month_bars")
                 # 从dfs查询 并对比
-                influx_bars = pickle.dumps(
-                    await Stock.batch_get_bars(
-                        codes=["000001.XSHE", "300001.XSHE", "000001.XSHG"],
-                        n=1,
-                        frame_type=FrameType.MONTH,
-                        end=end.naive,
-                    ),
-                    protocol=cfg.pickle.ver,
+                actual = await Stock.batch_get_bars(
+                    codes=["000001.XSHE", "300001.XSHE", "000001.XSHG"],
+                    n=1,
+                    frame_type=FrameType.MONTH,
+                    end=end,
                 )
+                expected = {}
                 with open(os.path.join(base_dir, "influx_1M.pik"), "rb") as f:
-                    self.assertEqual(influx_bars, f.read())
+                    expected = pickle.load(f)
 
-                # with open(os.path.join(base_dir, "influx_1M.pik"), "rb") as f:
-                #     f.write(pickle.dumps(influx_bars, protocol=4))
-                for typ, ft in itertools.product(
-                    [SecurityType.STOCK, SecurityType.INDEX], [FrameType.MONTH]
+                self.assertSetEqual(set(expected.keys()), set(actual.keys()))
+                for code in expected.keys():
+                    assert_bars_equal(expected[code], actual[code])
+
+                expected_keys = [
+                    set(["000001.XSHE", "300001.XSHE"]),
+                    set(["000001.XSHG"]),
+                ]
+                for i, (typ, ft) in enumerate(
+                    itertools.product(
+                        [SecurityType.STOCK, SecurityType.INDEX], [FrameType.MONTH]
+                    )
                 ):
-                    filename = syncjobs.get_bars_filename(typ, end.naive, ft)
+                    filename = syncjobs.get_bars_filename(typ, end, ft)
                     data = await dfs.read(filename)
-                    with open(
-                        os.path.join(base_dir, f"dfs_{typ.value}.pik"), "rb"
-                    ) as f:
-                        local_data = f.read()
-                    self.assertEqual(data, local_data)
+                    actual = pickle.loads(data)
+
+                    self.assertSetEqual(set(actual.keys()), expected_keys[i])
+                    for code in expected_keys[i]:
+                        assert_bars_equal(expected[code], actual[code])
 
     async def test_load_cron_task(self):
         scheduler = AsyncIOScheduler(timezone=cfg.tz)
@@ -545,7 +561,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             await cache.sys.set(tail_key, tail.strftime("%Y-%m-%d"))
             tail = await generator.__anext__()
             await cache.sys.set(tail_key, tail.strftime("%Y-%m-%d"))
-            self.assertEqual(tail.strftime("%Y-%m-%d"), "2005-01-05")
+            self.assertEqual(tail, datetime.date(2005, 1, 5))
 
         with mock.patch("arrow.now", return_value=arrow.get("2005-01-05 02:05:00")):
             generator = syncjobs.get_month_week_day_sync_date(tail_key, FrameType.DAY)

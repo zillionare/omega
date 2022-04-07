@@ -102,7 +102,7 @@ def start(impl: str, cfg: dict = None, **fetcher_params):
     omega = Omega(impl, cfg, **fetcher_params)
     loop = asyncio.get_event_loop()
     loop.run_until_complete(omega.init())
-    print("omega worker 启动")
+    logger.info("omega worker 启动")
     loop.run_forever()
 
 

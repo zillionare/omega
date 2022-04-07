@@ -56,7 +56,7 @@ async def handle_work_heart_beat(params: dict):
 
     account = params.get("account")
     work_state[account] = params
-    print(work_state)
+    logger.info("worker state: %s", work_state)
 
 
 async def init():  # noqa
@@ -87,7 +87,7 @@ def start():  # pragma: no cover
     logger.info("starting omega master ...")
     loop = asyncio.get_event_loop()
     loop.run_until_complete(init())
-    print("omega 启动")
+    logger.info("omega 启动")
     loop.run_forever()
     logger.info("omega master exited.")
 

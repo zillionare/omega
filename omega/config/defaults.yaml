@@ -80,6 +80,7 @@ influxdb:
   token: ${INFLUXDB_TOKEN}
   org: ${INFLUXDB_ORG}
   bucket_name: ${INFLUXDB_BUCKET}
+  enable_compress: true
 
 notify:
     mail_from: ${MAIL_FROM}

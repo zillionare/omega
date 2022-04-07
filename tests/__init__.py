@@ -1,4 +1,3 @@
-import aioredis
 import asyncio
 import json
 import logging
@@ -8,11 +7,14 @@ import socket
 import subprocess
 import sys
 from contextlib import closing
-from coretypes import FrameType
 
 import aiohttp
+import aioredis
 import arrow
 import cfg4py
+from coretypes import FrameType, bars_dtype
+from numpy.testing import assert_array_almost_equal, assert_array_equal
+
 from omega.config import get_config_dir
 
 cfg = cfg4py.get_instance()
@@ -5703,7 +5705,11 @@ async def init_test_env():
     fmt = "%(asctime)s %(levelname)-1.1s %(name)s:%(funcName)s:%(lineno)s | %(message)s"
     formatter = logging.Formatter(fmt=fmt)
     handler.setFormatter(formatter)
-    logger.addHandler(handler)
+
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    root.addHandler(handler)
+
     redis = await aioredis.create_redis(cfg.redis.dsn, db=1)
 
     try:
@@ -5731,102 +5737,17 @@ async def is_local_omega_alive():
     return True
 
 
-async def start_omega(timeout=60):
-    port = find_free_port()
+def assert_bars_equal(exp, actual):
+    assert_array_equal(exp["frame"], actual["frame"])
 
-    cfg.omega.urls.quotes_server = f"http://localhost:{port}"
-    account = os.environ["JQ_ACCOUNT"]
-    password = os.environ["JQ_PASSWORD"]
+    for field, _ in bars_dtype:
+        if field == "frame":
+            continue
 
-    # hack: by default postgres is disabled, but we need it enabled for ut
-    cfg_ = json.dumps({"postgres": {"dsn": cfg.postgres.dsn, "enabled": "true"}})
-
-    process = subprocess.Popen(
-        [
-            sys.executable,
-            "-m",
-            "omega.worker",
-            "start",
-            "--impl=jqadaptor",
-            f"-cfg={cfg_}",
-            f"--account={account}",
-            f"--password={password}",
-            f"--port={port}",
-        ],
-        env=os.environ,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    for i in range(timeout, 0, -1):
-        await asyncio.sleep(1)
-        if process.poll() is not None:
-            # already exit, due to finish or fail
-            out, err = process.communicate()
-            logger.warning(
-                "subprocess exited, %s: %s", process.pid, out.decode("utf-8")
-            )
-            raise subprocess.SubprocessError(err.decode("utf-8"))
-
-        if await is_local_omega_alive():
-            # return the process id, the caller should shutdown it later
-            logger.info(
-                "omega server(%s) is listen on %s",
-                process.pid,
-                cfg.omega.urls.quotes_server,
-            )
-
-            return process
-
-    os.kill(process.pid, signal.SIGINT)
-    raise TimeoutError("Omega server is not started.")
-
-
-async def is_local_job_server_alive(port):
-    try:
-        url = f"http://localhost:{port}/jobs/status"
-        async with aiohttp.ClientSession() as client:
-            async with client.get(url) as resp:
-                if resp.status == 200:
-                    return True
-    except Exception:
-        pass
-
-    return False
-
-
-async def start_job_server(port, timeout=30):
-    process = subprocess.Popen(
-        [sys.executable, "-m", "omega.jobs", "start", f"--port={port}"],
-        env=os.environ,
-    )
-
-    for i in range(timeout, 0, -1):
-        await asyncio.sleep(1)
-        if await is_local_job_server_alive(port):
-            return process
-
-    raise TimeoutError("jobs server not started")
-
-
-async def is_local_archive_server_alive(port):
-    try:
-        url = f"http://localhost:{port}/index.yml"
-        async with aiohttp.ClientSession() as client:
-            async with client.get(url) as resp:
-                if resp.status == 200:
-                    return True
-    except Exception:
-        pass
-
-    return False
-
-
-def find_free_port():
-    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-        s.bind(("localhost", 0))
-        # s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        port = s.getsockname()[1]
-        return port
+        if field in ["volume", "amount"]:
+            assert_array_almost_equal(exp[field], actual[field], decimal=-1)
+        else:
+            assert_array_almost_equal(exp[field], actual[field], 2)
 
 
 def test_dir():

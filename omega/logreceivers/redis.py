@@ -67,7 +67,7 @@ class RedisLogReceiver:
             files.sort()
             for file in files[::-1]:
                 old_file = os.path.join(self._dir, file)
-                matched = re.match(fr"{self._filename}\.(\d+)", file)
+                matched = re.match(rf"{self._filename}\.(\d+)", file)
                 if matched:
                     seq = int(matched.group(1))
                     if seq + 1 > self._backup_count:

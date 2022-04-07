@@ -363,7 +363,6 @@ class BarsSyncTask:
                     else:
                         # 说明执行完了
                         logger.info(f"params:{self.params},耗时：{time.time() - t0}")
-                        print(f"params:{self.params},耗时：{time.time() - t0}")
                         ret = True
                         break
         except asyncio.exceptions.TimeoutError:  # pragma: no cover
@@ -658,7 +657,7 @@ async def get_after_hour_sync_job_task() -> Optional[BarsSyncTask]:
     """获取盘后同步的task实例"""
     now = arrow.now().naive
     if not TimeFrame.is_trade_day(now):  # pragma: no cover
-        print("非交易日，不同步")
+        logger.info("非交易日，不同步")
         return
     end = TimeFrame.last_min_frame(now, FrameType.MIN1)
     if now < end:  # pragma: no cover
@@ -698,10 +697,10 @@ async def get_sync_minute_date():
     first = end.replace(hour=9, minute=30, second=0, microsecond=0)
     # 检查当前时间是否在交易时间内
     if not TimeFrame.is_trade_day(end):  # pragma: no cover
-        print("非交易日，不同步")
+        logger.info("非交易日，不同步")
         return False
     if end < first:  # pragma: no cover
-        print("时间过早，不能拿到k线数据")
+        logger.info("时间过早，不能拿到k线数据")
         return False
 
     end = TimeFrame.floor(end, FrameType.MIN1)
@@ -875,7 +874,7 @@ async def get_month_week_day_sync_date(tail_key: str, frame_type: FrameType):
     """获取周月的同步日期，通常情况下，周月数据相对较少，一天的quota足够同步完所有的数据，所以直接从2005年开始同步至今
     做成生成器方式，不停的获取时间
     """
-    year_quarter_month_week_calendar = {
+    epoch_start = {
         FrameType.DAY: TimeFrame.int2date(TimeFrame.day_frames[0]),
         FrameType.WEEK: TimeFrame.int2date(TimeFrame.week_frames[0]),
         FrameType.MONTH: TimeFrame.int2date(TimeFrame.month_frames[0]),
@@ -884,7 +883,7 @@ async def get_month_week_day_sync_date(tail_key: str, frame_type: FrameType):
         tail = await cache.sys.get(tail_key)
         now = arrow.now().naive
         if not tail:
-            tail = year_quarter_month_week_calendar.get(frame_type)
+            tail = epoch_start.get(frame_type)
         else:
             tail = datetime.datetime.strptime(tail, "%Y-%m-%d")
             tail = TimeFrame.shift(tail, 1, frame_type)

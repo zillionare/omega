@@ -11,7 +11,7 @@ from omega import cli
 from omega.config import get_config_dir
 from pyemit import emit
 from ruamel.yaml import YAML
-from tests import init_test_env, start_omega
+from tests import init_test_env
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 
 
@@ -45,17 +45,6 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
 
     async def asyncTearDown(self) -> None:
         await emit.stop()
-
-    async def _start_servers(self):
-        # 将server启动独立出来，加快单元测试速度
-        self.omega = await start_omega()
-
-    async def _stop_servers(self):
-        try:
-            if self.omega:
-                self.omega.kill()
-        except AttributeError:
-            pass
 
     def yaml_dumps(self, settings):
         stream = io.StringIO()
@@ -270,12 +259,8 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
                 ],
             ):
                 try:
-                    self.omega = await start_omega()
                     await cli.setup(force=True)
                 finally:
-
-                    if self.omega:
-                        self.omega.kill()
                     os.remove(origin)
                     os.rename(bak, origin)
 
