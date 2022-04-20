@@ -631,7 +631,7 @@ async def daily_calibration_job():
     async for sync_dt, head, tail in get_sync_date():
         # 创建task
         # 当天的校准启动前，先清除缓存。
-        if sync_dt.date() == TimeFrame.day_shift(now, 0):
+        if sync_dt.date() == TimeFrame.day_shift(now, -1):
             await Stock.reset_cache()
 
         task = await get_daily_calibration_job_task(sync_dt)
