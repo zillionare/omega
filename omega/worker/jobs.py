@@ -189,10 +189,19 @@ async def _sync_params_analysis(
     name = params.get("name")
     n = params.get("n_bars")
     if not n:
-        if ft != FrameType.MIN1:
-            n = 1
-        else:
+        if ft == FrameType.MIN1:
             n = 240
+        elif ft == FrameType.MIN5:
+            n = 240 // 5
+        elif ft == FrameType.MIN15:
+            n = 240 // 15
+        elif ft == FrameType.MIN30:
+            n = 240 // 30
+        elif ft == FrameType.MIN60:
+            n = 240 // 60
+        elif ft == FrameType.DAY:
+            n = 1
+
     queue = f"{TASK_PREFIX}.{name}.scope.{typ.value}.{ft.value}"
     done_queue = f"{TASK_PREFIX}.{name}.scope.{typ.value}.{ft.value}.done"
     limit = await fetcher.result_size_limit("bars")

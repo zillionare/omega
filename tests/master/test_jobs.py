@@ -134,7 +134,14 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
 
         get_sync_date.side_effect = get_sync_date_mock
         name = "calibration_sync"
-        frame_type = [FrameType.MIN1, FrameType.DAY]
+        frame_type = [
+            FrameType.MIN1,
+            FrameType.MIN5,
+            FrameType.MIN15,
+            FrameType.MIN30,
+            FrameType.MIN60,
+            FrameType.DAY,
+        ]
         task = syncjobs.BarsSyncTask(
             event=Events.OMEGA_DO_SYNC_DAILY_CALIBRATION,
             name=name,
@@ -147,7 +154,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         # 清楚dfs数据
         dfs = Storage()
         for typ, ft in itertools.product(
-            [SecurityType.STOCK, SecurityType.INDEX], [FrameType.DAY, FrameType.MIN1]
+            [SecurityType.STOCK, SecurityType.INDEX], frame_type
         ):
             await dfs.delete(syncjobs.get_bars_filename(typ, end.naive, ft))
 
@@ -159,7 +166,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                 )
                 for typ, ft in itertools.product(
                     [SecurityType.STOCK, SecurityType.INDEX],
-                    [FrameType.MIN1, FrameType.DAY],
+                    frame_type,
                 ):
                     # dfs读出来
                     filename = syncjobs.get_bars_filename(typ, end.naive, ft)
@@ -170,8 +177,9 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                     ) as f:
                         local_data = f.read()
                     self.assertEqual(data, local_data)
-                # todo 从inflaxdb读取分钟线做校验
-                for ft, n_bars in zip((FrameType.MIN1, FrameType.DAY), (240, 1)):
+                for ft, n_bars in zip(
+                    frame_type, (240, 240 // 5, 240 // 15, 240 // 30, 240 // 60, 1)
+                ):
                     # 从dfs查询 并对比
                     influx_bars = await Stock.batch_get_bars(
                         codes=["000001.XSHE", "300001.XSHE", "000001.XSHG"],
