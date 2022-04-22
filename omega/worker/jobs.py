@@ -248,10 +248,10 @@ async def _sync_for_persist(typ: SecurityType, ft: FrameType, params: Dict):
     async for secs in get_secs_for_sync(limit, n, queue):
         # todo: is there better way to do the check? 校验和数据类型问题
         bars1 = await fetch_bars(secs, params.get("end"), n, ft)  # get_bars
-        if ft in (FrameType.MIN1, FrameType.DAY):
-            bars2 = await fetch_price(secs, params.get("end"), n, ft)  # get_price
-            if not checksum(bars1, bars2):
-                raise exception.ChecksumFail()
+        # if ft in (FrameType.MIN1, FrameType.DAY):
+        #     bars2 = await fetch_price(secs, params.get("end"), n, ft)  # get_price
+        #     if not checksum(bars1, bars2):
+        #         raise exception.ChecksumFail()
         await Stock.persist_bars(ft, bars1)
         # except Exception as e:
         #     print(e)
@@ -360,6 +360,12 @@ async def sync_daily_calibration(params: dict):
 
 @abnormal_work_report()
 async def sync_year_quarter_month_week(params):
+    """同步周月线"""
+    await _daily_sync_impl(_sync_for_persist, params)
+
+
+@abnormal_work_report()
+async def sync_min_5_15_30_60(params):
     """同步周月线"""
     await _daily_sync_impl(_sync_for_persist, params)
 

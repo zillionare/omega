@@ -99,6 +99,10 @@ def start(impl: str, cfg: dict = None, **fetcher_params):
     emit.register(
         Events.OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK, jobs.sync_year_quarter_month_week
     )
+    emit.register(
+        Events.OMEGA_DO_SYNC_OTHER_MIN,
+        jobs.sync_min_5_15_30_60,
+    )
     omega = Omega(impl, cfg, **fetcher_params)
     loop = asyncio.get_event_loop()
     loop.run_until_complete(omega.init())

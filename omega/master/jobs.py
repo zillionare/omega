@@ -925,6 +925,34 @@ async def get_month_week_sync_task(
 
 
 @abnormal_master_report()
+async def sync_min_5_15_30_60():
+    """同步 5 15 30 60 分钟线"""
+    # 检查周线 tail
+    frame_type = [
+        FrameType.MIN5,
+        FrameType.MIN15,
+        FrameType.MIN30,
+        FrameType.MIN60,
+    ]
+    async for sync_date in get_month_week_day_sync_date(
+        constants.BAR_SYNC_OTHER_MIN_TAIL, FrameType.DAY  # 传日线进去就行，因为这个是按照天同步的
+    ):
+        # 初始化task
+        task = BarsSyncTask(
+            event=Events.OMEGA_DO_SYNC_OTHER_MIN,
+            name="min_5_15_30_60",
+            frame_type=frame_type,
+            end=sync_date,
+            timeout=60 * 10,
+        )
+        task.recs_per_sec = 48 + 16 + 8 + 4
+
+        await run_month_week_sync_task(constants.BAR_SYNC_OTHER_MIN_TAIL, task)
+        if not task.status:
+            break
+
+
+@abnormal_master_report()
 async def sync_week_bars():
     """同步周线"""
     # 检查周线 tail
@@ -1010,6 +1038,13 @@ async def load_cron_task(scheduler):
         hour=2,
         minute=5,
         name="sync_week_bars",
+    )
+    scheduler.add_job(
+        sync_min_5_15_30_60,
+        "cron",
+        hour=2,
+        minute=30,
+        name="sync_min_5_15_30_60",
     )
     scheduler.add_job(
         sync_month_bars,

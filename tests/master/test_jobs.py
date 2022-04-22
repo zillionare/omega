@@ -136,10 +136,10 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         name = "calibration_sync"
         frame_type = [
             FrameType.MIN1,
-            FrameType.MIN5,
-            FrameType.MIN15,
-            FrameType.MIN30,
-            FrameType.MIN60,
+            # FrameType.MIN5,
+            # FrameType.MIN15,
+            # FrameType.MIN30,
+            # FrameType.MIN60,
             FrameType.DAY,
         ]
         task = syncjobs.BarsSyncTask(
@@ -193,7 +193,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                         os.path.join(base_dir, f"influx_{ft.value}.pik"), "rb"
                     ) as f:
                         local_influx_bars = f.read()
-                self.assertEqual(influx_bars, local_influx_bars)
+                    self.assertEqual(influx_bars, local_influx_bars)
 
     @mock.patch(
         "omega.master.jobs.BarsSyncTask.get_quota",
@@ -415,16 +415,17 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
 
         await syncjobs.load_cron_task(scheduler)
         base = {
-            "1m:15:00",
-            "after_hour_sync_job",
-            "1m:11:0-31",
+            "daily_calibration_sync",
             "1m:10:*",
-            "sync_month_bars",
-            "sync_week_bars",
+            "1m:11:0-31",
             "1m:13-14:*",
             "sync_trade_price_limits",
-            "daily_calibration_sync",
+            "1m:15:00",
+            "after_hour_sync_job",
             "1m:9:31-59",
+            "sync_month_bars",
+            "sync_week_bars",
+            "sync_min_5_15_30_60",
         }
         print(set([job.name for job in scheduler.get_jobs()]))
         self.assertSetEqual(base, set([job.name for job in scheduler.get_jobs()]))
@@ -579,3 +580,82 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                 self.assertIsInstance(e, StopAsyncIteration)
             else:
                 self.assertEqual(1, 0)
+
+    @mock.patch(
+        "omega.master.jobs.BarsSyncTask.get_quota",
+        return_value=1000000,
+    )
+    @mock.patch("omega.master.jobs.get_month_week_day_sync_date")
+    @mock.patch("omega.master.jobs.mail_notify")
+    async def test_sync_min_5_15_30_60(self, mail_notify, get_week_sync_date, *args):
+        emit.register(
+            Events.OMEGA_DO_SYNC_OTHER_MIN,
+            workjobs.sync_min_5_15_30_60,
+        )
+        end = arrow.get("2022-02-18 15:00:00")
+
+        async def get_week_sync_date_mock(*args, **kwargs):
+            for sync_date in [end]:
+                yield sync_date
+
+        get_week_sync_date.side_effect = get_week_sync_date_mock
+        frame_type = [
+            FrameType.MIN5,
+            FrameType.MIN15,
+            FrameType.MIN30,
+            FrameType.MIN60,
+        ]
+        task = syncjobs.BarsSyncTask(
+            event=Events.OMEGA_DO_SYNC_OTHER_MIN,
+            name="min_5_15_30_60",
+            frame_type=frame_type,
+            end=end.naive,
+            timeout=30,
+            recs_per_sec=48 + 16 + 8 + 4,
+        )
+
+        dfs = Storage()
+
+        for typ, ft in itertools.product(
+            [SecurityType.STOCK, SecurityType.INDEX], frame_type
+        ):
+            await dfs.delete(syncjobs.get_bars_filename(typ, end.naive, ft))
+
+        await task.cleanup(success=True)
+        with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
+            with mock.patch("arrow.now", return_value=end):
+                await syncjobs.sync_min_5_15_30_60()
+                self.assertTrue(task.status)
+                base_dir = os.path.join(
+                    test_dir(), "data", "test_daily_calibration_sync"
+                )
+                for typ, ft in itertools.product(
+                    [SecurityType.STOCK, SecurityType.INDEX],
+                    frame_type,
+                ):
+                    # dfs读出来
+                    filename = syncjobs.get_bars_filename(typ, end.naive, ft)
+                    data = await dfs.read(filename)
+
+                    with open(
+                        os.path.join(base_dir, f"dfs_{typ.value}_{ft.value}.pik"), "rb"
+                    ) as f:
+                        local_data = f.read()
+                    self.assertEqual(data, local_data)
+                for ft, n_bars in zip(
+                    frame_type, (240, 240 // 5, 240 // 15, 240 // 30, 240 // 60, 1)
+                ):
+                    # 从dfs查询 并对比
+                    influx_bars = await Stock.batch_get_bars(
+                        codes=["000001.XSHE", "300001.XSHE", "000001.XSHG"],
+                        n=n_bars,
+                        frame_type=ft,
+                        end=end.naive,
+                    )
+
+                    influx_bars = pickle.dumps(influx_bars, protocol=cfg.pickle.ver)
+                    with open(
+                        os.path.join(base_dir, f"influx_{ft.value}.pik"), "rb"
+                    ) as f:
+                        local_influx_bars = f.read()
+                    self.assertEqual(influx_bars, local_influx_bars)
