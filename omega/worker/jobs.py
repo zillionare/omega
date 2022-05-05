@@ -199,7 +199,7 @@ async def _sync_params_analysis(
             n = 240 // 30
         elif ft == FrameType.MIN60:
             n = 240 // 60
-        elif ft == FrameType.DAY:
+        else:
             n = 1
 
     queue = f"{TASK_PREFIX}.{name}.scope.{typ.value}.{ft.value}"
@@ -244,7 +244,7 @@ async def _sync_for_persist(typ: SecurityType, ft: FrameType, params: Dict):
 
     """
     name, n, queue, done_queue, limit = await _sync_params_analysis(typ, ft, params)
-    logger.info("params: %s, %d, %s, %s, %d", name, n, queue, done_queue, limit)
+    logger.info("params: %s, %s, %s, %s, %s", name, n, queue, done_queue, limit)
     async for secs in get_secs_for_sync(limit, n, queue):
         # todo: is there better way to do the check? 校验和数据类型问题
         bars1 = await fetch_bars(secs, params.get("end"), n, ft)  # get_bars
