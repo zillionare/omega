@@ -158,6 +158,16 @@ async def fetch_bars(
     for k in list(bars.keys()):
         if not len(bars[k]):
             del bars[k]
+        if np.any(np.isnan(bars[k]["amount"])) or np.any(np.isnan(bars[k]["volume"])):
+            del bars[k]
+        # 判断日期是否是end
+        frame = bars[k]["frame"][0]
+        if hasattr(frame, "date"):
+            frame = frame.date()
+        if hasattr(end, "date"):
+            end = end.date()
+        if frame != end:
+            del bars[k]
     return bars
 
 

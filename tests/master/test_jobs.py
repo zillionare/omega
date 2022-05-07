@@ -193,8 +193,8 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                         os.path.join(base_dir, f"influx_{ft.value}.pik"), "rb"
                     ) as f:
                         local_influx_bars = f.read()
+                    print(f"influx_{ft.value}.pik")
                     self.assertEqual(influx_bars, local_influx_bars)
-
     @mock.patch(
         "omega.master.jobs.BarsSyncTask.get_quota",
         return_value=1000000,

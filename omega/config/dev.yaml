@@ -81,7 +81,6 @@ influxdb:
   org: my-org
   bucket_name: my-bucket
   enable_compress: true
-
 notify:
     mail_from: ${MAIL_FROM}
     mail_to:
