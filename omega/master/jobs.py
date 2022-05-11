@@ -945,7 +945,7 @@ async def sync_min_5_15_30_60():
             end=sync_date,
             timeout=60 * 10,
         )
-        task.recs_per_sec = (48 + 16 + 8 + 4) * 7
+        task.recs_per_sec = (48 + 16 + 8 + 4) * 9
 
         await run_month_week_sync_task(constants.BAR_SYNC_OTHER_MIN_TAIL, task)
         if not task.status:
