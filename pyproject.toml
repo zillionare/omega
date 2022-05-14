@@ -48,7 +48,6 @@ gino = "1.0.1"
 sh = "1.14.1"
 aiocache = "0.11.1"
 xxhash = "2.0.0"
-sanic = "20.12.2"
 cfg4py = "^0.9.0"
 psutil  = "5.8.0"
 fire = "0.4.0"
@@ -83,6 +82,7 @@ zillionare-omega-adaptors-jq = "^1.0.14"
 APScheduler = "^3.8.1"
 Cython = "^0.29.28"
 numpy = "^1.22"
+multidict = "^6.0.2"
 [tool.poetry.extras]
 test = [
     "pytest",
