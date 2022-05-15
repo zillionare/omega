@@ -13,7 +13,7 @@ from coretypes import Frame, FrameType
 
 
 class QuotesFetcher(ABC):
-    async def get_security_list(self) -> numpy.ndarray:
+    async def get_security_list(self, date: datetime.date) -> numpy.ndarray:
         """
         fetch security list from server. The returned list is a numpy.ndarray,
         which each elements

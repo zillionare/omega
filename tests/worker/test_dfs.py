@@ -1,16 +1,17 @@
 # -*- coding: utf-8 -*-
 # @Author   : xiaohuzi
 # @Time     : 2022-01-06 15:52
+import asyncio
 import datetime
 import logging
 import unittest
-import asyncio
+
 import cfg4py
 from coretypes import FrameType, SecurityType
 
-from omega.worker.dfs import Storage, MinioStorage
-from omega.master.jobs import get_bars_filename
 from omega.config.schema import Config
+from omega.master.dfs import MinioStorage, Storage
+from omega.master.jobs import get_bars_filename
 from tests import init_test_env
 
 logger = logging.getLogger(__name__)

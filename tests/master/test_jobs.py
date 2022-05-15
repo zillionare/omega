@@ -3,6 +3,7 @@ import datetime
 import itertools
 import logging
 import os
+import pickle
 import unittest
 from unittest import mock
 
@@ -10,21 +11,20 @@ import arrow
 import cfg4py
 import omicron
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from coretypes import FrameType, SecurityType
 from omicron.dal.cache import cache
+from omicron.dal.influx.influxclient import InfluxClient
+from omicron.models.stock import Stock
+from omicron.models.timeframe import TimeFrame as tf
 from pyemit import emit
-import pickle
+
 import omega.master.jobs as syncjobs
 from omega.core import constants
 from omega.core.events import Events
-from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
+from omega.master.dfs import Storage
 from omega.worker import jobs as workjobs
-from omega.worker.dfs import Storage
-from tests import assert_bars_equal, init_test_env
-from coretypes import FrameType, SecurityType
-from omicron.models.stock import Stock
-from tests import test_dir
-from omicron.dal.influx.influxclient import InfluxClient
-from omicron.models.timeframe import TimeFrame as tf
+from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
+from tests import assert_bars_equal, init_test_env, test_dir
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
@@ -195,6 +195,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                         local_influx_bars = f.read()
                     print(f"influx_{ft.value}.pik")
                     self.assertEqual(influx_bars, local_influx_bars)
+
     @mock.patch(
         "omega.master.jobs.BarsSyncTask.get_quota",
         return_value=1000000,

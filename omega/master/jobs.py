@@ -8,7 +8,6 @@ from typing import Optional
 import arrow
 import cfg4py
 from cfg4py.config import Config
-
 from coretypes import FrameType
 from omicron.dal import cache
 from omicron.models.timeframe import TimeFrame
@@ -16,11 +15,15 @@ from omicron.models.timeframe import TimeFrame
 from omega.core import constants
 from omega.core.events import Events
 from omega.master.tasks.calibration_task import daily_calibration_job
-from omega.master.tasks.sync_other_bars import sync_min_5_15_30_60, sync_month_bars, sync_week_bars
+from omega.master.tasks.sync_other_bars import (
+    sync_min_5_15_30_60,
+    sync_month_bars,
+    sync_week_bars,
+)
 from omega.master.tasks.sync_price_limit import sync_trade_price_limits
+from omega.master.tasks.sync_securities import sync_securities_job
 from omega.master.tasks.synctask import BarsSyncTask
 from omega.master.tasks.task_utils import abnormal_master_report
-
 
 logger = logging.getLogger(__name__)
 cfg: Config = cfg4py.get_instance()
@@ -139,8 +142,15 @@ async def sync_minute_bars():
     await run_sync_minute_bars_task(task)
 
 
-
 async def load_cron_task(scheduler):
+    scheduler.add_job(
+        sync_trade_price_limits,
+        "cron",
+        hour=9,
+        minute=31,
+        name="sync_trade_price_limits",
+    )
+
     scheduler.add_job(
         sync_minute_bars,
         "cron",
@@ -187,19 +197,20 @@ async def load_cron_task(scheduler):
         minute=5,
         name="after_hour_sync_job",
     )
+
+    scheduler.add_job(
+        sync_securities_job,  # 更新完交易时间之后，更新证券列表
+        "cron",
+        hour=1,
+        minute=30,
+        name="sync_securities",
+    )
     scheduler.add_job(
         sync_week_bars,
         "cron",
         hour=2,
         minute=5,
         name="sync_week_bars",
-    )
-    scheduler.add_job(
-        sync_min_5_15_30_60,
-        "cron",
-        hour=2,
-        minute=30,
-        name="sync_min_5_15_30_60",
     )
     scheduler.add_job(
         sync_month_bars,
@@ -215,11 +226,10 @@ async def load_cron_task(scheduler):
         minute=5,
         name="daily_calibration_sync",
     )
-
     scheduler.add_job(
-        sync_trade_price_limits,
+        sync_min_5_15_30_60,
         "cron",
-        hour=9,
-        minute=31,
-        name="sync_trade_price_limits",
+        hour=2,
+        minute=30,
+        name="sync_min_5_15_30_60",
     )

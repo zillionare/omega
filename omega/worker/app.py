@@ -20,8 +20,10 @@ from pyemit import emit
 
 from omega.config import get_config_dir
 from omega.core.events import Events
-from omega.worker import jobs
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher
+from omega.worker.jobs import load_cron_task
+from omega.worker.tasks import synctask
+from omega.worker.tasks.task_utils import cache_init
 
 cfg = cfg4py.get_instance()
 
@@ -46,10 +48,10 @@ class Omega(object):
         await AbstractQuotesFetcher.create_instance(self.fetcher_impl, **self.params)
         # listen on omega events
         await omicron.cache.init()
-        await jobs.cache_init()
+        await cache_init()
         await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
         self.scheduler.add_job(self.heart_beat, trigger="interval", seconds=5)
-        await jobs.load_cron_task(self.scheduler)
+        await load_cron_task(self.scheduler)
         self.scheduler.start()
         await omicron.init()
         logger.info("<<< init %s process done", self.__class__.__name__)
@@ -92,16 +94,21 @@ def start(impl: str, cfg: dict = None, **fetcher_params):
         cfg: the cfg in json string
         fetcher_params: contains info required by creating quotes worker
     """
-    emit.register(Events.OMEGA_DO_SYNC_TRADE_PRICE_LIMITS, jobs.sync_trade_price_limits)
-    emit.register(Events.OMEGA_DO_SYNC_DAILY_CALIBRATION, jobs.sync_daily_calibration)
-    emit.register(Events.OMEGA_DO_SYNC_DAY, jobs.after_hour_sync)
-    emit.register(Events.OMEGA_DO_SYNC_MIN, jobs.sync_minute_bars)
     emit.register(
-        Events.OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK, jobs.sync_year_quarter_month_week
+        Events.OMEGA_DO_SYNC_TRADE_PRICE_LIMITS, synctask.sync_trade_price_limits
+    )
+    emit.register(
+        Events.OMEGA_DO_SYNC_DAILY_CALIBRATION, synctask.sync_daily_calibration
+    )
+    emit.register(Events.OMEGA_DO_SYNC_DAY, synctask.after_hour_sync)
+    emit.register(Events.OMEGA_DO_SYNC_MIN, synctask.sync_minute_bars)
+    emit.register(
+        Events.OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK,
+        synctask.sync_year_quarter_month_week,
     )
     emit.register(
         Events.OMEGA_DO_SYNC_OTHER_MIN,
-        jobs.sync_min_5_15_30_60,
+        synctask.sync_min_5_15_30_60,
     )
     omega = Omega(impl, cfg, **fetcher_params)
     loop = asyncio.get_event_loop()

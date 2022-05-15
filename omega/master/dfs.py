@@ -4,14 +4,11 @@
 import io
 import logging
 from abc import ABC
-from datetime import date, datetime
-from typing import AnyStr, Dict, Union
+from typing import Union
 
 import cfg4py
 import numpy as np
-from coretypes import FrameType, SecurityType
-from minio import Minio, error
-from omicron.models.timeframe import TimeFrame
+from minio import Minio
 from retrying import retry
 
 from omega.config.schema import Config

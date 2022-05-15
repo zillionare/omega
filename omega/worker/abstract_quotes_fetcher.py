@@ -1,14 +1,10 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""This is a awesome
-        python script!"""
 import datetime
 import importlib
 import logging
 import random
 from typing import Dict, List, Optional, Union
 
-import arrow
 import cfg4py
 import numpy as np
 from coretypes import Frame, FrameType
@@ -16,7 +12,6 @@ from numpy.lib import recfunctions as rfn
 from omicron.models.funds import FundNetValue, FundPortfolioStock, Funds, FundShareDaily
 from omicron.models.stock import Stock
 from omicron.models.timeframe import TimeFrame
-from scipy import rand
 
 from omega.worker.quotes_fetcher import QuotesFetcher
 
@@ -52,7 +47,7 @@ class AbstractQuotesFetcher(QuotesFetcher):
         return cls._instances[i]
 
     @classmethod
-    async def get_security_list(cls) -> Union[None, np.ndarray]:
+    async def get_security_list(cls, date: datetime.date) -> Union[None, np.ndarray]:
         """按如下格式返回证券列表。
 
         code         display_name   name   start_date   end_date   type
@@ -61,12 +56,11 @@ class AbstractQuotesFetcher(QuotesFetcher):
         Returns:
             Union[None, np.ndarray]: [description]
         """
-        securities = await cls.get_instance().get_security_list()
+        securities = await cls.get_instance().get_security_list(date)
         if securities is None or len(securities) == 0:
             logger.warning("failed to update securities. %s is returned.", securities)
-            return securities
+            return None
 
-        await Stock.save_securities(securities)
         return securities
 
     @classmethod

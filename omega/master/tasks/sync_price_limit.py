@@ -2,35 +2,47 @@ import datetime
 import itertools
 import logging
 import pickle
+from typing import AnyStr, Union
 
 import cfg4py
+import numpy as np
 from cfg4py.config import Config
 from coretypes import FrameType, SecurityType
 from omicron.dal import cache
 from omicron.models.stock import Stock
+from omicron.models.timeframe import TimeFrame
 
 from omega.core import constants
-from omega.core.events import Events
-from omega.master.tasks.sync_other_bars import get_month_week_day_sync_date, get_month_week_sync_task
-from omega.master.tasks.task_utils import abnormal_master_report, delete_temporal_bars, get_trade_limit_filename
-from omega.worker.dfs import Storage
 from omega.core.constants import MINIO_TEMPORAL
-
+from omega.core.events import Events
+from omega.master.dfs import Storage
+from omega.master.tasks.sync_other_bars import (
+    get_month_week_day_sync_date,
+    get_month_week_sync_task,
+)
+from omega.master.tasks.synctask import BarsSyncTask
+from omega.master.tasks.task_utils import abnormal_master_report, delete_temporal_bars
 
 logger = logging.getLogger(__name__)
 cfg: Config = cfg4py.get_instance()
 
 
+def get_trade_limit_filename(
+    prefix: SecurityType, dt: Union[datetime.datetime, datetime.date, AnyStr]
+):
+    assert isinstance(prefix, SecurityType)
+    assert isinstance(dt, (datetime.datetime, datetime.date, str))
+    filename = [prefix.value, "trade_limit", str(TimeFrame.date2int(dt))]
+    return "/".join(filename)
+
+
 async def write_trade_price_limits_to_dfs(name: str, dt: datetime.datetime):
     """
     将涨跌停写入dfs
-
     Args:
         name: task的名字
         dt: 写入dfs的日期，用来作为文件名
-
     Returns:
-
     """
     dfs = Storage()
     if dfs is None:  # pragma: no cover

@@ -10,16 +10,25 @@ import cfg4py
 from cfg4py.config import Config
 from coretypes import FrameType, SecurityType
 from omicron.dal import cache
-from omicron.notify.mail import mail_notify
 from omicron.models.timeframe import TimeFrame
+from omicron.notify.mail import mail_notify
 
 from omega.core import constants
-from omega.worker.dfs import Storage
 from omega.core.constants import MINIO_TEMPORAL
-
+from omega.master.dfs import Storage
 
 logger = logging.getLogger(__name__)
 cfg: Config = cfg4py.get_instance()
+
+
+def get_yesterday_or_pre_trade_day(now):
+    """获取昨天或者上一个交易日"""
+    # todo: could be replaced by TimeFrame.day_shift(now, 0)?
+    if TimeFrame.date2int(now) in TimeFrame.day_frames:
+        pre_trade_day = TimeFrame.day_shift(now, -1)
+    else:
+        pre_trade_day = TimeFrame.day_shift(now, 0)
+    return pre_trade_day
 
 
 def abnormal_master_report():
@@ -76,15 +85,6 @@ def get_bars_filename(
     else:
         raise TypeError("dt must be type datetime, date, str, got type:%s" % type(dt))
 
-    return "/".join(filename)
-
-
-def get_trade_limit_filename(
-    prefix: SecurityType, dt: Union[datetime.datetime, datetime.date, AnyStr]
-):
-    assert isinstance(prefix, SecurityType)
-    assert isinstance(dt, (datetime.datetime, datetime.date, str))
-    filename = [prefix.value, "trade_limit", str(TimeFrame.date2int(dt))]
     return "/".join(filename)
 
 

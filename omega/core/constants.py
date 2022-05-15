@@ -24,3 +24,7 @@ BAR_SYNC_TRADE_PRICE_TAIL = "jobs.bars_sync.trade_price.tail"
 BAR_SYNC_OTHER_MIN_TAIL = "jobs.bars_sync.min_5_15_30_60.tail"
 
 TRADE_PRICE_LIMITS = "trade_price_limits"
+
+# securities sync
+SECS_SYNC_ARCHIVE_HEAD = "jobs.secs_sync.archive.head"
+SECS_SYNC_ARCHIVE_TAIL = "jobs.secs_sync.archive.tail"
