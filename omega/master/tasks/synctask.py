@@ -18,7 +18,6 @@ from pyemit import emit
 from omega.core import constants
 from omega.master.tasks.task_utils import delete_temporal_bars
 
-
 logger = logging.getLogger(__name__)
 cfg: Config = cfg4py.get_instance()
 
@@ -367,4 +366,3 @@ class BarsSyncTask:
             )
 
         return list(set(failed))
-

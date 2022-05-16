@@ -7,6 +7,7 @@ from unittest import mock
 import aioredis
 import arrow
 import cfg4py
+import omicron
 from omega import cli
 from omega.config import get_config_dir
 from pyemit import emit
@@ -20,6 +21,7 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
         self.cfg = await init_test_env()
 
         # setup need these info
+        os.environ["__cfg4py_server_role__"] = "DEV"
         os.environ["TZ"] = "Asia/Shanghai"
         os.environ["REDIS_HOST"] = "127.0.0.1"
         os.environ["REDIS_PORT"] = "6379"
@@ -44,6 +46,7 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
         await aq.create_instance(impl, **params)
 
     async def asyncTearDown(self) -> None:
+        await omicron.close()
         await emit.stop()
 
     def yaml_dumps(self, settings):

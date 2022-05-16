@@ -1,5 +1,6 @@
 import datetime
 import logging
+from typing import List
 
 import arrow
 from coretypes import FrameType
@@ -10,7 +11,6 @@ from omega.core import constants
 from omega.core.events import Events
 from omega.master.tasks.synctask import BarsSyncTask
 from omega.master.tasks.task_utils import abnormal_master_report, write_dfs
-
 
 logger = logging.getLogger(__name__)
 
@@ -64,14 +64,11 @@ async def get_month_week_sync_task(
     event: str, sync_date: datetime.datetime, frame_type: FrameType
 ) -> BarsSyncTask:
     """
-
     Args:
         event: 事件名称，emit通过这个key发布消息到worker
         sync_date: 同步的时间
         frame_type: 同步的K线类型
-
     Returns:
-
     """
     name = frame_type.value
 
@@ -83,6 +80,21 @@ async def get_month_week_sync_task(
         timeout=60 * 10,
     )
     task.recs_per_sec = 2
+    return task
+
+
+async def get_min_5_15_30_60_sync_task(
+    event: str, sync_date: datetime.datetime, frame_type: List[FrameType]
+) -> BarsSyncTask:
+    task = BarsSyncTask(
+        event=event,
+        name="min_5_15_30_60",
+        frame_type=frame_type,
+        end=sync_date,
+        timeout=60 * 10,
+    )
+    task.recs_per_sec = (48 + 16 + 8 + 4) * 9
+
     return task
 
 
@@ -100,15 +112,9 @@ async def sync_min_5_15_30_60():
         constants.BAR_SYNC_OTHER_MIN_TAIL, FrameType.DAY  # 传日线进去就行，因为这个是按照天同步的
     ):
         # 初始化task
-        task = BarsSyncTask(
-            event=Events.OMEGA_DO_SYNC_OTHER_MIN,
-            name="min_5_15_30_60",
-            frame_type=frame_type,
-            end=sync_date,
-            timeout=60 * 10,
+        task = await get_min_5_15_30_60_sync_task(
+            Events.OMEGA_DO_SYNC_OTHER_MIN, sync_date, frame_type
         )
-        task.recs_per_sec = (48 + 16 + 8 + 4) * 9
-
         await run_month_week_sync_task(constants.BAR_SYNC_OTHER_MIN_TAIL, task)
         if not task.status:
             break

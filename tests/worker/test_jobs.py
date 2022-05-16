@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import unittest
 from unittest import mock
@@ -11,9 +10,7 @@ from omicron.models.stock import Stock
 
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omega.worker import jobs as worker_job
-from omega.master import jobs as master_job
 from tests import init_test_env, test_dir
-from apscheduler.job import Job
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
@@ -44,14 +41,13 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         base = {
             "sync_fund_net_value",
             "sync_calendar",
-            "sync_security_list",
             "sync_funds",
             "sync_fund_share_daily",
             "sync_fund_portfolio_stock",
         }
         self.assertSetEqual(base, set([job.name for job in scheduler.get_jobs()]))
 
-    @mock.patch("omega.master.jobs.mail_notify")
+    @mock.patch("omega.master.tasks.synctask.mail_notify")
     @mock.patch("omega.master.jobs.TimeFrame.save_calendar")
     @mock.patch("jqadaptor.fetcher.Fetcher.get_all_trade_days")
     async def test_sync_calendar(self, get_all_trade_days, *args):
@@ -61,10 +57,3 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
 
         get_all_trade_days.side_effect = get_all_trade_days_mock
         await worker_job.sync_calendar()
-
-    @mock.patch("omega.master.jobs.mail_notify")
-    async def test_sync_security_list(self, *args):
-        await cache.security.delete("securities")
-        await worker_job.sync_security_list()
-        secs = Stock.choose(["stock"])
-        self.assertTrue(len(secs) > 0)

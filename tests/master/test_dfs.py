@@ -11,7 +11,7 @@ from coretypes import FrameType, SecurityType
 
 from omega.config.schema import Config
 from omega.master.dfs import MinioStorage, Storage
-from omega.master.jobs import get_bars_filename
+from omega.master.tasks.task_utils import get_bars_filename
 from tests import init_test_env
 
 logger = logging.getLogger(__name__)

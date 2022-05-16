@@ -37,7 +37,7 @@ async def set_security_data(redis):
     ]
 
     pl = redis.pipeline()
-    key = "security:stock"
+    key = "security:all"
     await redis.delete(key)
     for s in stocks:
         pl.rpush(key, ",".join(s))

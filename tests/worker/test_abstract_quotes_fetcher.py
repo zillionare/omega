@@ -44,7 +44,8 @@ class TestAbstractQuotesFetcher(unittest.IsolatedAsyncioTestCase):
         await cache.security.delete(f"{sec}:{frame_type.value}")
 
     async def test_get_security_list(self):
-        secs = await aq.get_security_list()
+        end_dt = arrow.get("2020-11-01").date()
+        secs = await aq.get_security_list(end_dt)
         self.assertEqual("000001.XSHE", secs[0][0])
 
     async def test_get_bars_batch(self):

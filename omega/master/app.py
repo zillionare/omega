@@ -19,7 +19,8 @@ from pyemit import emit
 from omega.config import get_config_dir
 from omega.core.events import Events
 from omega.logreceivers.redis import RedisLogReceiver
-from omega.master.jobs import load_cron_task, work_state
+from omega.master.jobs import load_cron_task
+from omega.master.tasks.synctask import work_state
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
@@ -53,7 +54,7 @@ async def heartbeat():
 
 
 async def handle_work_heart_beat(params: dict):
-
+    global work_state
     account = params.get("account")
     work_state[account] = params
     logger.info("worker state: %s", work_state)

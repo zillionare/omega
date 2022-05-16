@@ -1,3 +1,4 @@
+import datetime
 import logging
 import pickle
 from typing import Dict, Tuple, Union
@@ -7,7 +8,9 @@ import numpy as np
 from coretypes import FrameType, SecurityType
 from omicron import cache
 from omicron.extensions.decimals import math_round
+from omicron.models.security import Security
 from omicron.models.stock import Stock
+from omicron.models.timeframe import TimeFrame
 
 from omega.core.constants import MINIO_TEMPORAL, TASK_PREFIX
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as fetcher
@@ -25,8 +28,11 @@ async def cache_init():
     """
     if not await cache.security.exists(f"calendar:{FrameType.DAY.value}"):
         await fetcher.get_all_trade_days()
-    if not await cache.security.exists("security:stock"):
-        await fetcher.get_security_list()
+    if not await cache.security.exists("security:all"):
+        now = datetime.date.today()
+        last_trade_date = TimeFrame.day_shift(now, 0)
+        securities = await fetcher.get_security_list(last_trade_date)
+        Security.save_securities(securities, last_trade_date, False)
 
 
 async def sync_params_analysis(typ: SecurityType, ft: FrameType, params: Dict) -> Tuple:
