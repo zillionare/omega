@@ -17,6 +17,7 @@ from omicron.models.stock import Stock
 from omicron.models.timeframe import TimeFrame as tf
 from pyemit import emit
 
+import omega.worker.tasks.synctask as workjobs
 from omega.core import constants
 from omega.core.events import Events
 from omega.master.dfs import Storage
@@ -28,7 +29,6 @@ from omega.master.tasks.sync_other_bars import (
 )
 from omega.master.tasks.synctask import BarsSyncTask
 from omega.master.tasks.task_utils import get_bars_filename
-import omega.worker.tasks.synctask as workjobs
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omega.worker.tasks.task_utils import cache_init
 from tests import assert_bars_equal, init_test_env, test_dir
@@ -126,7 +126,7 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
         await dfs.delete(get_bars_filename(SecurityType.INDEX, end, FrameType.WEEK))
         await dfs.delete(get_bars_filename(SecurityType.STOCK, end, FrameType.WEEK))
         with mock.patch(
-            "omega.master.tasks.sync_other_bars.get_month_week_sync_task",
+            "omega.master.tasks.sync_other_bars.BarsSyncTask",
             side_effect=[task],
         ):
             with mock.patch("arrow.now", return_value=end):
@@ -205,7 +205,7 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
         await dfs.delete(get_bars_filename(SecurityType.INDEX, end, FrameType.MONTH))
         await dfs.delete(get_bars_filename(SecurityType.STOCK, end, FrameType.MONTH))
         with mock.patch(
-            "omega.master.tasks.sync_other_bars.get_month_week_sync_task",
+            "omega.master.tasks.sync_other_bars.BarsSyncTask",
             side_effect=[task],
         ):
             with mock.patch("arrow.now", return_value=end):
@@ -246,26 +246,6 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
                     self.assertSetEqual(set(actual.keys()), expected_keys[i])
                     for code in expected_keys[i]:
                         assert_bars_equal(expected[code], actual[code])
-
-    async def test_get_month_week_day_sync_date(self):
-        tail_key = "test_sync_tail"
-        await cache.sys.delete(tail_key)
-        with mock.patch("arrow.now", return_value=arrow.get("2005-01-05 02:05:00")):
-            generator = get_month_week_day_sync_date(tail_key, FrameType.DAY)
-            tail = await generator.__anext__()
-            await cache.sys.set(tail_key, tail.strftime("%Y-%m-%d"))
-            tail = await generator.__anext__()
-            await cache.sys.set(tail_key, tail.strftime("%Y-%m-%d"))
-            self.assertEqual(tail, datetime.date(2005, 1, 5))
-
-        with mock.patch("arrow.now", return_value=arrow.get("2005-01-05 02:05:00")):
-            generator = get_month_week_day_sync_date(tail_key, FrameType.DAY)
-            try:
-                await generator.__anext__()
-            except Exception as e:
-                self.assertIsInstance(e, StopAsyncIteration)
-            else:
-                self.assertEqual(1, 0)
 
     @mock.patch(
         "omega.master.tasks.synctask.BarsSyncTask.get_quota",
@@ -309,7 +289,7 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
 
         await task.cleanup(success=True)
         with mock.patch(
-            "omega.master.tasks.sync_other_bars.get_min_5_15_30_60_sync_task",
+            "omega.master.tasks.sync_other_bars.BarsSyncTask",
             side_effect=[task],
         ):
             with mock.patch("arrow.now", return_value=end):

@@ -15,6 +15,7 @@ from omicron.models.stock import Stock
 from omicron.models.timeframe import TimeFrame as tf
 from pyemit import emit
 
+import omega.worker.tasks.synctask as workjobs
 from omega.core import constants
 from omega.core.events import Events
 from omega.master.dfs import Storage
@@ -22,9 +23,7 @@ from omega.master.tasks.sync_price_limit import (
     get_trade_limit_filename,
     sync_trade_price_limits,
 )
-
 from omega.master.tasks.synctask import BarsSyncTask
-import omega.worker.tasks.synctask as workjobs
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omega.worker.tasks.task_utils import cache_init
 from tests import init_test_env, test_dir
@@ -97,11 +96,11 @@ class TestSyncJobs_PriceLimit(unittest.IsolatedAsyncioTestCase):
         await dfs.delete(get_trade_limit_filename(SecurityType.INDEX, end.naive))
         await dfs.delete(get_trade_limit_filename(SecurityType.STOCK, end.naive))
         with mock.patch(
-            "omega.master.tasks.sync_other_bars.get_month_week_sync_task",
+            "omega.master.tasks.sync_other_bars.BarsSyncTask",
             side_effect=[task],
         ):
             with mock.patch(
-                "omega.master.tasks.sync_other_bars.get_month_week_day_sync_date",
+                "omega.master.tasks.sync_price_limit.get_month_week_day_sync_date",
                 side_effect=get_week_sync_date_mock,
             ):
                 await sync_trade_price_limits()

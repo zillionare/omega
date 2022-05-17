@@ -78,23 +78,8 @@ async def get_month_week_sync_task(
         frame_type=[frame_type],
         end=sync_date,
         timeout=60 * 10,
+        recs_per_sec=2,
     )
-    task.recs_per_sec = 2
-    return task
-
-
-async def get_min_5_15_30_60_sync_task(
-    event: str, sync_date: datetime.datetime, frame_type: List[FrameType]
-) -> BarsSyncTask:
-    task = BarsSyncTask(
-        event=event,
-        name="min_5_15_30_60",
-        frame_type=frame_type,
-        end=sync_date,
-        timeout=60 * 10,
-    )
-    task.recs_per_sec = (48 + 16 + 8 + 4) * 9
-
     return task
 
 
@@ -112,9 +97,15 @@ async def sync_min_5_15_30_60():
         constants.BAR_SYNC_OTHER_MIN_TAIL, FrameType.DAY  # 传日线进去就行，因为这个是按照天同步的
     ):
         # 初始化task
-        task = await get_min_5_15_30_60_sync_task(
-            Events.OMEGA_DO_SYNC_OTHER_MIN, sync_date, frame_type
+        task = BarsSyncTask(
+            event=Events.OMEGA_DO_SYNC_OTHER_MIN,
+            name="min_5_15_30_60",
+            frame_type=frame_type,
+            end=sync_date,
+            timeout=60 * 10,
+            recs_per_sec=(48 + 16 + 8 + 4) * 9,
         )
+
         await run_month_week_sync_task(constants.BAR_SYNC_OTHER_MIN_TAIL, task)
         if not task.status:
             break

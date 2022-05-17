@@ -19,14 +19,13 @@ from omicron.models.timeframe import TimeFrame as tf
 from pyemit import emit
 
 import omega.master.jobs as syncjobs
+import omega.worker.tasks.synctask as workjobs
 from omega.core import constants
 from omega.core.events import Events
 from omega.master.tasks.synctask import BarsSyncTask
-import omega.worker.tasks.synctask as workjobs
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omega.worker.tasks.task_utils import cache_init
 from tests import init_test_env, test_dir
-
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
@@ -89,9 +88,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         )
         await task.cleanup(success=True)
         await cache.sys.delete(constants.BAR_SYNC_MINUTE_TAIL)
-        with mock.patch(
-            "omega.master.jobs.get_sync_minute_bars_task", side_effect=[task, task]
-        ):
+        with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task, task]):
             with mock.patch("arrow.now", return_value=end):
                 await syncjobs.sync_minute_bars()
                 self.assertTrue(task.status)
@@ -170,9 +167,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         )
         await task.cleanup(success=True)
         await Stock.reset_cache()
-        with mock.patch(
-            "omega.master.jobs.get_after_hour_sync_job_task", side_effect=[task]
-        ):
+        with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
             with mock.patch("arrow.now", return_value=end):
                 await syncjobs.after_hour_sync_job()
                 self.assertTrue(task.status)
@@ -196,9 +191,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
 
         # 测试数据为None 时邮件是否正常
 
-        with mock.patch(
-            "omega.master.jobs.get_after_hour_sync_job_task", side_effect=[task]
-        ):
+        with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
             with mock.patch(
                 "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher.get_bars_batch",
                 return_value=None,
@@ -210,9 +203,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
 
         # 测试quota不够
         email_content = ""
-        with mock.patch(
-            "omega.master.jobs.get_after_hour_sync_job_task", side_effect=[task]
-        ):
+        with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
             with mock.patch("arrow.now", return_value=end):
                 task.timeout = 5.1
                 await syncjobs.after_hour_sync_job()
@@ -223,9 +214,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         # 测试quota不够
         email_content = ""
         task.recs_per_sec = 1e9
-        with mock.patch(
-            "omega.master.jobs.get_after_hour_sync_job_task", side_effect=[task]
-        ):
+        with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
             with mock.patch("arrow.now", return_value=end):
                 await syncjobs.after_hour_sync_job()
                 self.assertFalse(task.status)
@@ -234,9 +223,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         # 测试重复运行
         await task.update_state(is_running=1, worker_count=0)
         task.status = None
-        with mock.patch(
-            "omega.master.jobs.get_after_hour_sync_job_task", side_effect=[task]
-        ):
+        with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
             with mock.patch("arrow.now", return_value=end):
                 await syncjobs.after_hour_sync_job()
                 self.assertFalse(task.status)

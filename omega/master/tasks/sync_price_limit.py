@@ -13,11 +13,14 @@ from omicron.dal import cache
 from omicron.models.stock import Stock
 from omicron.models.timeframe import TimeFrame
 
-import omega.master.tasks.sync_other_bars as sync_other_bars
 from omega.core import constants
 from omega.core.constants import MINIO_TEMPORAL
 from omega.core.events import Events
 from omega.master.dfs import Storage
+from omega.master.tasks.sync_other_bars import (
+    get_month_week_day_sync_date,
+    get_month_week_sync_task,
+)
 from omega.master.tasks.synctask import BarsSyncTask
 from omega.master.tasks.task_utils import abnormal_master_report, delete_temporal_bars
 
@@ -88,11 +91,11 @@ async def run_sync_trade_price_limits_task(task: BarsSyncTask):
 async def sync_trade_price_limits():
     """每天9点半之后同步一次今日涨跌停并写入redis"""
     frame_type = FrameType.DAY
-    async for sync_date in sync_other_bars.get_month_week_day_sync_date(
+    async for sync_date in get_month_week_day_sync_date(
         constants.BAR_SYNC_TRADE_PRICE_TAIL, frame_type
     ):
         # 初始化task
-        task = await sync_other_bars.get_month_week_sync_task(
+        task = await get_month_week_sync_task(
             Events.OMEGA_DO_SYNC_TRADE_PRICE_LIMITS, sync_date, frame_type
         )
         # 持久化涨跌停到dfs

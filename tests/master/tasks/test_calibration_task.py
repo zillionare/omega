@@ -15,13 +15,13 @@ from omicron.models.stock import Stock
 from omicron.models.timeframe import TimeFrame as tf
 from pyemit import emit
 
+import omega.worker.tasks.synctask as workjobs
 from omega.core import constants
 from omega.core.events import Events
 from omega.master.dfs import Storage
 from omega.master.tasks.calibration_task import daily_calibration_job, get_sync_date
 from omega.master.tasks.synctask import BarsSyncTask
 from omega.master.tasks.task_utils import get_bars_filename
-import omega.worker.tasks.synctask as workjobs
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omega.worker.tasks.task_utils import cache_init
 from tests import init_test_env, test_dir
@@ -151,7 +151,9 @@ class TestSyncJobs_Calibration(unittest.IsolatedAsyncioTestCase):
         ):
             await dfs.delete(get_bars_filename(typ, end.naive, ft))
 
-        with mock.patch("omega.master.tasks.synctask.BarsSyncTask", side_effect=[task]):
+        with mock.patch(
+            "omega.master.tasks.calibration_task.BarsSyncTask", side_effect=[task]
+        ):
             with mock.patch("arrow.now", return_value=end.naive):
                 await daily_calibration_job()
                 base_dir = os.path.join(
