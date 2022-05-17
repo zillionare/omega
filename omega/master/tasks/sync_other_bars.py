@@ -9,8 +9,8 @@ from omicron.models.timeframe import TimeFrame
 
 from omega.core import constants
 from omega.core.events import Events
-from omega.master.tasks.synctask import BarsSyncTask
-from omega.master.tasks.task_utils import abnormal_master_report, write_dfs
+from omega.master.tasks.synctask import BarsSyncTask, abnormal_master_report
+from omega.master.tasks.task_utils import write_dfs
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +103,7 @@ async def sync_min_5_15_30_60():
             frame_type=frame_type,
             end=sync_date,
             timeout=60 * 10,
-            recs_per_sec=(48 + 16 + 8 + 4) * 9,
+            recs_per_sec=48 + 16 + 8 + 4,
         )
 
         await run_month_week_sync_task(constants.BAR_SYNC_OTHER_MIN_TAIL, task)

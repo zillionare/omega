@@ -527,14 +527,14 @@ async def _start_fetcher_processes():
 
         ports = [3181 + i for i in range(len(workers))]
         for group in workers:
-            sessions = group.get("sessions", 1)
+            sessions = 1  # group.get("sessions", 1)
             port = group.get("port") or ports.pop()
             account = group.get("account")
             password = group.get("password")
             started_sessions = procs.get(f"{impl}:{port}", [])
+            # 目前只能支持一个impl一个实例（worker），如果有多个，quota计算会出错
             if sessions - len(started_sessions) > 0:
                 print(f"启动的{impl}实例少于配置要求（或尚未启动），正在启动中。。。")
-                # sanic manages sessions, so we have to restart it as a whole
                 for pid in started_sessions:
                     try:
                         os.kill(pid, signal.SIGTERM)

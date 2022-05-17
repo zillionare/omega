@@ -16,8 +16,7 @@ from omega.core import constants
 from omega.core.constants import MINIO_TEMPORAL
 from omega.core.events import Events
 from omega.master.dfs import Storage
-from omega.master.tasks.synctask import BarsSyncTask
-from omega.master.tasks.task_utils import abnormal_master_report, delete_temporal_bars
+from omega.master.tasks.synctask import BarsSyncTask, abnormal_master_report
 
 logger = logging.getLogger(__name__)
 
@@ -127,10 +126,44 @@ async def get_security_sync_task(sync_dt: datetime.datetime):
         name=name,
         end=sync_dt,
         frame_type=frame_type,  # 需要同步的类型
-        timeout=60,
+        timeout=60 * 5,
         recs_per_sec=7500,  # 目前只有7111条记录
     )
+    if sync_dt.year < 2010:
+        task.recs_per_sec = 2000
+    elif sync_dt.year < 2014:
+        task.recs_per_sec = 3500
+    elif sync_dt.year < 2017:
+        task.recs_per_sec = 4500
+    elif sync_dt.year < 2020:
+        task.recs_per_sec = 5500
+    elif sync_dt.year < 2022:
+        task.recs_per_sec = 6500
+    else:
+        task.recs_per_sec = 7500
+
     return task
+
+
+"""
+2005-12-31 1410
+2006-12-31 1488
+2007-12-31 1647
+2008-12-31 1744
+2009-12-31 1945
+2010-12-31 2408
+2011-12-31 2871
+2012-12-31 3208
+2013-12-31 3346
+2014-12-31 3601
+2015-12-31 4118
+2016-12-31 4426
+2017-12-31 4938
+2018-12-31 5042
+2019-12-31 5331
+2020-12-31 5603
+2021-12-31 6262
+"""
 
 
 @abnormal_master_report()

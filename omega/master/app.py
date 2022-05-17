@@ -20,7 +20,7 @@ from omega.config import get_config_dir
 from omega.core.events import Events
 from omega.logreceivers.redis import RedisLogReceiver
 from omega.master.jobs import load_cron_task
-from omega.master.tasks.synctask import work_state
+from omega.master.tasks.quota_utils import work_state
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()

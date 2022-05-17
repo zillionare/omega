@@ -57,11 +57,14 @@ class Omega(object):
         logger.info("<<< init %s process done", self.__class__.__name__)
 
     async def heart_beat(self):
+        quota = await AbstractQuotesFetcher.get_quota_spare()
+
         await emit.emit(
             Events.OMEGA_HEART_BEAT,
             {
                 "account": self.gid,
-                "quota": await AbstractQuotesFetcher.get_quota_spare(),
+                "quota": quota.get("spare"),  # 剩余额度
+                "total": quota.get("total"),  # 总额度
                 "impl": self.fetcher_impl,
                 "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             },

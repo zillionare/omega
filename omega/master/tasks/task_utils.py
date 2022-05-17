@@ -2,8 +2,6 @@ import datetime
 import itertools
 import logging
 import pickle
-import traceback
-from functools import wraps
 from typing import AnyStr, List, Union
 
 import cfg4py
@@ -11,7 +9,6 @@ from cfg4py.config import Config
 from coretypes import FrameType, SecurityType
 from omicron.dal import cache
 from omicron.models.timeframe import TimeFrame
-from omicron.notify.mail import mail_notify
 
 from omega.core import constants
 from omega.core.constants import MINIO_TEMPORAL
@@ -29,27 +26,6 @@ def get_yesterday_or_pre_trade_day(now):
     else:
         pre_trade_day = TimeFrame.day_shift(now, 0)
     return pre_trade_day
-
-
-def abnormal_master_report():
-    def inner(f):
-        @wraps(f)
-        async def decorated_function():
-            """装饰所有生产者"""
-            try:
-                ret = await f()
-                return ret
-            except Exception as e:  # pragma: no cover
-                logger.exception(e)
-                # 发送邮件报告错误
-                subject = f"执行生产者{f.__name__}时发生异常"
-                body = f"详细信息：\n{traceback.format_exc()}"
-                traceback.print_exc()
-                await mail_notify(subject, body, html=True)
-
-        return decorated_function
-
-    return inner
 
 
 def get_bars_filename(

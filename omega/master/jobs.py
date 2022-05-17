@@ -22,8 +22,7 @@ from omega.master.tasks.sync_other_bars import (
 )
 from omega.master.tasks.sync_price_limit import sync_trade_price_limits
 from omega.master.tasks.sync_securities import sync_securities_job
-from omega.master.tasks.synctask import BarsSyncTask
-from omega.master.tasks.task_utils import abnormal_master_report
+from omega.master.tasks.synctask import BarsSyncTask, abnormal_master_report
 
 logger = logging.getLogger(__name__)
 cfg: Config = cfg4py.get_instance()
@@ -47,7 +46,8 @@ async def get_after_hour_sync_job_task() -> Optional[BarsSyncTask]:
         frame_type=[FrameType.MIN1, FrameType.DAY],
         end=end,
         timeout=60 * 60 * 2,
-        recs_per_sec=240 * 2 + 4,
+        recs_per_sec=240 + 4,
+        quota_type=2,  # 白天的同步任务
     )
     return task
 
@@ -66,9 +66,7 @@ async def after_hour_sync_job():
 
 
 async def get_sync_minute_date():
-    """获取这次同步分钟线的时间和n_bars
-    如果redis记录的是11：30
-    """
+    """获取这次同步分钟线的时间和n_bars"""
     end = arrow.now().naive.replace(second=0, microsecond=0)
     first = end.replace(hour=9, minute=30, second=0, microsecond=0)
     # 检查当前时间是否在交易时间内
@@ -113,6 +111,7 @@ async def get_sync_minute_bars_task() -> Optional[BarsSyncTask]:
         timeout=timeout * n_bars,
         n_bars=n_bars,
         recs_per_sec=n_bars,
+        quota_type=2,  # 白天的同步任务
     )
     return task
 

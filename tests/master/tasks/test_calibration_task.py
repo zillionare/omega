@@ -141,7 +141,7 @@ class TestSyncJobs_Calibration(unittest.IsolatedAsyncioTestCase):
             end=end.naive,
             frame_type=frame_type,  # 需要同步的类型
             timeout=60,
-            recs_per_sec=int((240 * 2 + 4) // 0.75),
+            recs_per_sec=240 + 4,
         )
         await task.cleanup(success=True)
         # 清楚dfs数据

@@ -9,8 +9,8 @@ import arrow
 import cfg4py
 import numpy as np
 import omicron
-from omicron import cache
 from coretypes import FrameType
+from omicron import cache
 
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from tests import init_test_env
@@ -44,7 +44,8 @@ class TestAbstractQuotesFetcher(unittest.IsolatedAsyncioTestCase):
         await cache.security.delete(f"{sec}:{frame_type.value}")
 
     async def test_get_security_list(self):
-        end_dt = arrow.get("2020-11-01").date()
+        # 2020-11-01
+        end_dt = arrow.get("2020-12-31").date()
         secs = await aq.get_security_list(end_dt)
         self.assertEqual("000001.XSHE", secs[0][0])
 

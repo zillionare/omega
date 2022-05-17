@@ -163,7 +163,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             frame_type=[FrameType.MIN1, FrameType.DAY],
             end=end.naive,
             timeout=30,
-            recs_per_sec=240 * 2 + 4,
+            recs_per_sec=240 + 4,
         )
         await task.cleanup(success=True)
         await Stock.reset_cache()
@@ -190,7 +190,6 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(bars1, bars2)
 
         # 测试数据为None 时邮件是否正常
-
         with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
             with mock.patch(
                 "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher.get_bars_batch",
@@ -201,7 +200,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                     self.assertFalse(task.status)
                     self.assertIn("Got None Data", email_content)
 
-        # 测试quota不够
+        # 测试超时
         email_content = ""
         with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
             with mock.patch("arrow.now", return_value=end):
@@ -210,6 +209,39 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                 print(email_content)
                 self.assertFalse(task.status)
                 self.assertIn("超时", email_content)
+
+        # 测试重复运行
+        await task.update_state(is_running=1, worker_count=0)
+        task.status = None
+        with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
+            with mock.patch("arrow.now", return_value=end):
+                await syncjobs.after_hour_sync_job()
+                self.assertFalse(task.status)
+
+    @mock.patch(
+        "omega.master.tasks.synctask.BarsSyncTask.get_quota",
+        return_value=((1000000, 1000000)),
+    )
+    @mock.patch("omega.master.tasks.synctask.mail_notify")
+    async def test_quota_case1(self, mail_notify, *args):
+        email_content = ""
+
+        async def mail_notify_mock(subject, body, **kwargs):
+            nonlocal email_content
+            email_content = body
+            print(body)
+
+        mail_notify.side_effect = mail_notify_mock
+        emit.register(Events.OMEGA_DO_SYNC_DAY, workjobs.after_hour_sync)
+        end = arrow.get("2022-02-23 15:05:00")
+        task = BarsSyncTask(
+            event=Events.OMEGA_DO_SYNC_DAY,
+            name="test_quota",
+            frame_type=[FrameType.MIN1, FrameType.DAY],
+            end=end.naive,
+            timeout=30,
+            recs_per_sec=240 + 4,
+        )
 
         # 测试quota不够
         email_content = ""
@@ -220,10 +252,97 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                 self.assertFalse(task.status)
                 self.assertIn("quota不足", email_content)
 
-        # 测试重复运行
-        await task.update_state(is_running=1, worker_count=0)
-        task.status = None
+    @mock.patch(
+        "omega.master.tasks.synctask.BarsSyncTask.get_quota",
+        side_effect=[(1000000, 1000000), (400000, 1000000), (400000, 1000000)],
+    )
+    @mock.patch("omega.master.tasks.synctask.mail_notify")
+    async def test_quota_case2(self, mail_notify, *args):
+        email_content = ""
+
+        async def mail_notify_mock(subject, body, **kwargs):
+            nonlocal email_content
+            email_content = body
+            print(body)
+
+        mail_notify.side_effect = mail_notify_mock
+        emit.register(Events.OMEGA_DO_SYNC_DAY, workjobs.after_hour_sync)
+        end = arrow.get("2022-02-23 15:05:00")
+        task = BarsSyncTask(
+            event=Events.OMEGA_DO_SYNC_DAY,
+            name="test_quota",
+            frame_type=[FrameType.MIN1, FrameType.DAY],
+            end=end.naive,
+            timeout=30,
+            recs_per_sec=240 + 4,
+        )
+
+        # 测试quota不够
+        email_content = ""
+        task.recs_per_sec = 600000 / 3
         with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
             with mock.patch("arrow.now", return_value=end):
                 await syncjobs.after_hour_sync_job()
+                self.assertTrue(task.status)
+
+        task.recs_per_sec = 600000 / 3
+        with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
+            with mock.patch("arrow.now", return_value=end):
+                task.timeout = 5.1
+                await syncjobs.after_hour_sync_job()
+                print(email_content)
                 self.assertFalse(task.status)
+                self.assertIn("quota不足", email_content)
+
+    @mock.patch(
+        "omega.master.tasks.synctask.BarsSyncTask.get_quota",
+        side_effect=[
+            (1000000, 1000000),
+            (300000, 1000000),
+            (200000, 1000000),
+            (200000, 1000000),
+        ],
+    )
+    @mock.patch("omega.master.tasks.synctask.mail_notify")
+    async def test_quota_case3(self, mail_notify, *args):
+        email_content = ""
+
+        async def mail_notify_mock(subject, body, **kwargs):
+            nonlocal email_content
+            email_content = body
+            print(body)
+
+        mail_notify.side_effect = mail_notify_mock
+        emit.register(Events.OMEGA_DO_SYNC_DAY, workjobs.after_hour_sync)
+        end = arrow.get("2022-02-23 15:05:00")
+        task = BarsSyncTask(
+            event=Events.OMEGA_DO_SYNC_DAY,
+            name="test_quota",
+            frame_type=[FrameType.MIN1, FrameType.DAY],
+            end=end.naive,
+            timeout=30,
+            recs_per_sec=240 + 4,
+        )
+
+        # 测试quota不够
+        email_content = ""
+        task.recs_per_sec = 600000 / 3
+        with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
+            with mock.patch("arrow.now", return_value=end):
+                await syncjobs.after_hour_sync_job()
+                self.assertTrue(task.status)
+
+        task.recs_per_sec = 30000 / 3
+        with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
+            with mock.patch("arrow.now", return_value=end):
+                await syncjobs.after_hour_sync_job()
+                self.assertTrue(task.status)
+
+        task.recs_per_sec = 30000 / 3
+        with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
+            with mock.patch("arrow.now", return_value=end):
+                task.timeout = 5.1
+                await syncjobs.after_hour_sync_job()  # mail_notify会用掉一次get_quota
+                print(email_content)
+                self.assertFalse(task.status)
+                self.assertIn("quota不足", email_content)

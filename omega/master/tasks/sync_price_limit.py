@@ -21,8 +21,8 @@ from omega.master.tasks.sync_other_bars import (
     get_month_week_day_sync_date,
     get_month_week_sync_task,
 )
-from omega.master.tasks.synctask import BarsSyncTask
-from omega.master.tasks.task_utils import abnormal_master_report, delete_temporal_bars
+from omega.master.tasks.synctask import BarsSyncTask, abnormal_master_report
+from omega.master.tasks.task_utils import delete_temporal_bars
 
 logger = logging.getLogger(__name__)
 cfg: Config = cfg4py.get_instance()
@@ -98,5 +98,7 @@ async def sync_trade_price_limits():
         task = await get_month_week_sync_task(
             Events.OMEGA_DO_SYNC_TRADE_PRICE_LIMITS, sync_date, frame_type
         )
+        task._quota_type = 2  # 白天的同步任务
+
         # 持久化涨跌停到dfs
         await run_sync_trade_price_limits_task(task)

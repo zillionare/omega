@@ -9,12 +9,8 @@ from omicron.models.timeframe import TimeFrame
 
 from omega.core import constants
 from omega.core.events import Events
-from omega.master.tasks.synctask import BarsSyncTask
-from omega.master.tasks.task_utils import (
-    abnormal_master_report,
-    get_yesterday_or_pre_trade_day,
-    write_dfs,
-)
+from omega.master.tasks.synctask import BarsSyncTask, abnormal_master_report
+from omega.master.tasks.task_utils import get_yesterday_or_pre_trade_day, write_dfs
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +77,6 @@ async def get_sync_date():
 
 async def run_daily_calibration_sync_task(task: BarsSyncTask):
     """
-
     Args:
         task: 需要运行的task实例
     """
@@ -99,9 +94,7 @@ async def run_daily_calibration_sync_task(task: BarsSyncTask):
     return True
 
 
-async def get_daily_calibration_job_task(
-    sync_dt: datetime.datetime,
-):
+async def get_daily_calibration_job_task(sync_dt: datetime.datetime):
     """
     获取凌晨校准同步的task实例
     Args:
@@ -111,7 +104,6 @@ async def get_daily_calibration_job_task(
 
     """
     end = sync_dt.replace(hour=15, minute=0, microsecond=0, second=0)
-    # 检查 end 是否在交易日
 
     name = "calibration_sync"
     frame_type = [FrameType.MIN1, FrameType.DAY]
@@ -121,7 +113,7 @@ async def get_daily_calibration_job_task(
         end=end,
         frame_type=frame_type,  # 需要同步的类型
         timeout=60 * 60 * 6,
-        recs_per_sec=int((240 * 2 + 4) // 0.75),
+        recs_per_sec=240 + 4,
     )
     return task
 
