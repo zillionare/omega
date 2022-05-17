@@ -9,7 +9,7 @@ from omicron.models.timeframe import TimeFrame
 
 from omega.core import constants
 from omega.core.events import Events
-from omega.master.tasks.synctask import BarsSyncTask, abnormal_master_report
+from omega.master.tasks.synctask import BarsSyncTask, master_syncbars_task
 from omega.master.tasks.task_utils import write_dfs
 
 logger = logging.getLogger(__name__)
@@ -83,7 +83,7 @@ async def get_month_week_sync_task(
     return task
 
 
-@abnormal_master_report()
+@master_syncbars_task()
 async def sync_min_5_15_30_60():
     """同步 5 15 30 60 分钟线"""
     # 检查周线 tail
@@ -111,7 +111,7 @@ async def sync_min_5_15_30_60():
             break
 
 
-@abnormal_master_report()
+@master_syncbars_task()
 async def sync_week_bars():
     """同步周线"""
     # 检查周线 tail
@@ -128,7 +128,7 @@ async def sync_week_bars():
             break
 
 
-@abnormal_master_report()
+@master_syncbars_task()
 async def sync_month_bars():
     """同步月线"""
     frame_type = FrameType.MONTH

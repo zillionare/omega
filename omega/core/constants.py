@@ -6,6 +6,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 TASK_PREFIX = "master.task"
+TASK_SECS_PREFIX = "master.task.secs"
 
 # jobs.bars_sync.archive.head
 BAR_SYNC_ARCHIVE_HEAD = "jobs.bars_sync.archive.head"

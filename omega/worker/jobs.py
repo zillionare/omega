@@ -29,7 +29,6 @@ def cron_work_report():
                 await cache.sys.setex(key, 3600 * 2, 1)
                 try:
                     ret = await f()
-                    await cache.sys.delete(key)
                     return ret
                 except Exception as e:  # pragma: no cover
                     # 说明消费者消费时错误了
@@ -37,6 +36,8 @@ def cron_work_report():
                     subject = f"执行定时任务{f.__name__}时发生异常"
                     body = f"详细信息：\n{traceback.format_exc()}"
                     await mail_notify(subject, body, html=True)
+                finally:
+                    await cache.sys.delete(key)
 
         return decorated_function
 

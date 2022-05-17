@@ -22,7 +22,7 @@ from omega.master.tasks.sync_other_bars import (
 )
 from omega.master.tasks.sync_price_limit import sync_trade_price_limits
 from omega.master.tasks.sync_securities import sync_securities_job
-from omega.master.tasks.synctask import BarsSyncTask, abnormal_master_report
+from omega.master.tasks.synctask import BarsSyncTask, master_syncbars_task
 
 logger = logging.getLogger(__name__)
 cfg: Config = cfg4py.get_instance()
@@ -52,7 +52,7 @@ async def get_after_hour_sync_job_task() -> Optional[BarsSyncTask]:
     return task
 
 
-@abnormal_master_report()
+@master_syncbars_task()
 async def after_hour_sync_job():
     """交易日盘后同步任务入口
 
@@ -129,7 +129,7 @@ async def run_sync_minute_bars_task(task: BarsSyncTask):
     return task
 
 
-@abnormal_master_report()
+@master_syncbars_task()
 async def sync_minute_bars():
     """盘中同步每分钟的数据
     1. 从redis拿到上一次同步的分钟数据

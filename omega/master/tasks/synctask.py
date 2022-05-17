@@ -19,7 +19,7 @@ from pyemit import emit
 
 from omega.core import constants
 from omega.core.events import Events
-from omega.master.tasks.quota_utils import quota_lock, today_quota_stat, work_state
+from omega.master.tasks.quota_utils import QuotaMgmt
 from omega.master.tasks.task_utils import delete_temporal_bars
 
 logger = logging.getLogger(__name__)
@@ -180,7 +180,7 @@ class BarsSyncTask:
         body += "\n\n================================================\n\n"
         body += "消费者得到的参数是：" + str(self.params)
         body += "\n\n================================================\n\n"
-        quota, total = self.get_quota()
+        quota, total = QuotaMgmt.get_quota()
         body += f"剩余可用quota：{quota}/{total}"
 
         # review: 因为报告机制特别重要，所以不能因为读redis失败而导致发送失败。
@@ -207,82 +207,6 @@ class BarsSyncTask:
         pl.expire(key, self.timeout * 2)  # 自动设置超时时间
         await pl.execute()
         self.params.update({"state": key})
-
-    @classmethod
-    def get_quota(cls):
-        """获取quota的数量，需要根据worker对应的impl里面的账号计算，目前暂时支持单个impl进程"""
-        global work_state
-
-        quota = 0
-        total = 0
-        for worker in work_state.values():
-            quota = worker.get("quota", 0)
-            total = worker.get("total", 0)
-            break  # 当前只会有一个worker
-
-        return (quota, total)
-
-    def update_quota(self, quota: int, total: int):
-        today = arrow.now().naive.date()
-
-        # 获取最新的quota信息
-        quota, total = self.get_quota()
-        if today_quota_stat["date"] is None or today_quota_stat["date"] != today:
-            today_quota_stat["date"] = today  # 初始化当天的配额
-            reserved = int(total * 0.25)  # 保留25%给白天同步使用
-            if reserved > quota:
-                today_quota_stat["quota1"] = 0
-                today_quota_stat["quota2"] = quota
-            else:
-                today_quota_stat["quota1"] = quota - reserved
-                today_quota_stat["quota2"] = reserved
-        else:
-            q1 = today_quota_stat["quota1"]
-            q2 = today_quota_stat["quota2"]
-            if quota < q1 + q2:  # 有其他任务占用了quota，需要重新计算
-                delta = (q1 + q2) - quota
-                q1 -= delta  # 扣除到晚上的配额上
-                if q1 < 0:  # 不够扣除，则扣除到白天的配额上
-                    q2 = quota  # 配额全部给白天的任务
-                    q1 = 0
-                today_quota_stat["quota1"] = q1
-                today_quota_stat["quota2"] = q2
-
-    def check_quota(self) -> Tuple:
-        """检查quota是否足够完成本次同步
-        Returns:
-            返回Tuple(isok, spare quota, required quota)
-        """
-        # 证券同步的数目是固定的，如果增加期货，需要手动修改Task初始化时的recs_per_sec参数
-        if self.event == Events.OMEGA_DO_SYNC_SECURITIES:
-            count = 1
-        else:
-            # 只相加len的值应该快一点
-            count = len(self._index_scope) + len(self._stock_scope)
-        assert count > 0
-        need = count * self._recs_per_sec
-
-        # 检查quota，通过证券数据 * 每支证券待同步的条数
-        global today_quota_stat, quota_lock
-        try:
-            quota_lock.acquire()
-            self.update_quota()
-            q1 = today_quota_stat["quota1"]
-            q2 = today_quota_stat["quota2"]
-            if self._quota_type == 1:  # calibration tasks
-                if q1 > need:
-                    today_quota_stat["quota1"] = q1 - need
-                    return True, q1 - need, need
-                else:
-                    return False, q1, need
-            else:
-                if q2 > need:
-                    today_quota_stat["quota2"] = q2 - need
-                    return True, q2 - need, need
-                else:
-                    return False, q2, need
-        finally:
-            quota_lock.release()
 
     async def update_sync_scope(self):
         """将待同步的证券代码列表写入redis队列，以便worker获取"""
@@ -337,7 +261,10 @@ class BarsSyncTask:
             self.status = False
             return self.status
 
-        ok, spare, required = self.check_quota()
+        # 检查quota，通过证券数据 * 每支证券待同步的条数，只相加len的值应该快一点
+        sum1 = len(self._index_scope) + len(self._stock_scope)
+        count = sum1 * self._recs_per_sec
+        ok, spare, required = QuotaMgmt.check_quota(self._quota_type, count)
         if not ok:
             msg = f"quota不足，剩余quota：{spare}, 需要quota：{required}"
             await self.send_email(msg)
@@ -425,7 +352,7 @@ class BarsSyncTask:
         return list(set(failed))
 
 
-def abnormal_master_report():
+def master_syncbars_task():
     def inner(f):
         @wraps(f)
         async def decorated_function():

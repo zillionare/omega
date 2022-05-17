@@ -45,7 +45,7 @@ class TestAbstractQuotesFetcher(unittest.IsolatedAsyncioTestCase):
 
     async def test_get_security_list(self):
         # 2020-11-01
-        end_dt = arrow.get("2020-12-31").date()
+        end_dt = arrow.get("2005-12-31").date()
         secs = await aq.get_security_list(end_dt)
         self.assertEqual("000001.XSHE", secs[0][0])
 

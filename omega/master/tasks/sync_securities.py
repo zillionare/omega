@@ -1,13 +1,11 @@
 import datetime
-import itertools
 import logging
 import pickle
-from typing import AnyStr, List, Union
 
 import arrow
 import cfg4py
 import numpy as np
-from coretypes import FrameType, SecurityType
+from coretypes import FrameType
 from omicron.dal import cache
 from omicron.models.stock import Stock
 from omicron.models.timeframe import TimeFrame
@@ -16,7 +14,7 @@ from omega.core import constants
 from omega.core.constants import MINIO_TEMPORAL
 from omega.core.events import Events
 from omega.master.dfs import Storage
-from omega.master.tasks.synctask import BarsSyncTask, abnormal_master_report
+from omega.master.tasks.sec_synctask import SecuritySyncTask, master_secs_task
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +106,7 @@ async def delete_temporal_data(name: str):
     await p.execute()
 
 
-async def run_security_sync_task(task: BarsSyncTask):
+async def run_security_sync_task(task: SecuritySyncTask):
     ret = await task.run()
     if not ret:
         # 执行失败需要删除数据队列
@@ -120,27 +118,25 @@ async def run_security_sync_task(task: BarsSyncTask):
 
 async def get_security_sync_task(sync_dt: datetime.datetime):
     name = "securities_sync"
-    frame_type = [FrameType.DAY]
-    task = BarsSyncTask(
+    task = SecuritySyncTask(
         event=Events.OMEGA_DO_SYNC_SECURITIES,
         name=name,
         end=sync_dt,
-        frame_type=frame_type,  # 需要同步的类型
         timeout=60 * 5,
-        recs_per_sec=7500,  # 目前只有7111条记录
+        recs_per_task=7500,  # 目前只有7111条记录
     )
     if sync_dt.year < 2010:
-        task.recs_per_sec = 2000
+        task.recs_per_task = 2000
     elif sync_dt.year < 2014:
-        task.recs_per_sec = 3500
+        task.recs_per_task = 3500
     elif sync_dt.year < 2017:
-        task.recs_per_sec = 4500
+        task.recs_per_task = 4500
     elif sync_dt.year < 2020:
-        task.recs_per_sec = 5500
+        task.recs_per_task = 5500
     elif sync_dt.year < 2022:
-        task.recs_per_sec = 6500
+        task.recs_per_task = 6500
     else:
-        task.recs_per_sec = 7500
+        task.recs_per_task = 7500
 
     return task
 
@@ -166,7 +162,7 @@ async def get_security_sync_task(sync_dt: datetime.datetime):
 """
 
 
-@abnormal_master_report()
+@master_secs_task()
 async def sync_securities_job():
     """同步证券列表，每天凌晨执行一次，利用多余的quota每天追赶一部分数据"""
 

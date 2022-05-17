@@ -9,7 +9,7 @@ from omicron.models.timeframe import TimeFrame
 
 from omega.core import constants
 from omega.core.events import Events
-from omega.master.tasks.synctask import BarsSyncTask, abnormal_master_report
+from omega.master.tasks.synctask import BarsSyncTask, master_syncbars_task
 from omega.master.tasks.task_utils import get_yesterday_or_pre_trade_day, write_dfs
 
 logger = logging.getLogger(__name__)
@@ -118,7 +118,7 @@ async def get_daily_calibration_job_task(sync_dt: datetime.datetime):
     return task
 
 
-@abnormal_master_report()
+@master_syncbars_task()
 async def daily_calibration_job():
     """scheduled task entry
 

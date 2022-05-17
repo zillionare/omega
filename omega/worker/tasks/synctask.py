@@ -13,7 +13,6 @@ from omicron import cache
 from omicron.models.security import Security
 
 from omega.worker import exception
-from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as fetcher
 from omega.worker.tasks.fetchers import get_trade_price_limits
 from omega.worker.tasks.task_utils import (
     cache_bars_for_aggregation,
@@ -44,7 +43,7 @@ async def worker_exit(state, scope, error=None):
     await p.execute()
 
 
-def abnormal_work_report():
+def worker_syncbars_task():
     """装饰所有worker的装饰器，主要功能有
     1.处理worker的异常，并写入错误信息到redis，由master统一发送邮件上报
     2.统计worker的执行时间，总是比master给的超时时间少5秒，以便于确保worker比master提前退出
@@ -105,7 +104,7 @@ async def _daily_sync_impl(impl: Callable, params: Dict):
     await asyncio.gather(*tasks)
 
 
-@abnormal_work_report()
+@worker_syncbars_task()
 async def sync_minute_bars(params):
     """盘中同步分钟
     Args:
@@ -115,13 +114,13 @@ async def sync_minute_bars(params):
     await _daily_sync_impl(sync_to_cache, params)
 
 
-@abnormal_work_report()
+@worker_syncbars_task()
 async def after_hour_sync(params):
     """这是下午三点收盘后的同步，仅写cache，同步分钟线和日线"""
     await _daily_sync_impl(sync_to_cache, params)
 
 
-@abnormal_work_report()
+@worker_syncbars_task()
 async def sync_daily_calibration(params: dict):
     """校准同步。在数据经上游服务器核对，本地两次同步比较后，分别存入时序数据库和minio中。
     Args:
@@ -131,19 +130,19 @@ async def sync_daily_calibration(params: dict):
     await _daily_sync_impl(sync_for_persist, params)
 
 
-@abnormal_work_report()
+@worker_syncbars_task()
 async def sync_year_quarter_month_week(params):
     """同步周月线"""
     await _daily_sync_impl(sync_for_persist, params)
 
 
-@abnormal_work_report()
+@worker_syncbars_task()
 async def sync_min_5_15_30_60(params):
     """同步周月线"""
     await _daily_sync_impl(sync_for_persist, params)
 
 
-@abnormal_work_report()
+@worker_syncbars_task()
 async def sync_trade_price_limits(params: Dict):
     """同步涨跌停worker
     分别遍历股票和指数，获取涨跌停之后，缓存至temp库中，写入influxdb
@@ -161,19 +160,3 @@ async def sync_trade_price_limits(params: Dict):
             await cache_bars_for_aggregation(name, typ, FrameType.DAY, bars)
             await cache.sys.lpush(done_queue, *secs)
             # 取到到晚上12点还有多少秒
-
-
-@abnormal_work_report()
-async def sync_security_list(params: Dict):
-    """更新证券列表"""
-    target_date = params.get("end")
-    securities = await fetcher.get_security_list(target_date)
-    if securities is None or len(securities) < 100:
-        logger.error(
-            "failed to get security list(%s)", target_date.strftime("%Y-%m-%d")
-        )
-        return False
-
-    Security.save_securities(securities, target_date, True)
-
-    logger.info("secs are fetched and saved.")

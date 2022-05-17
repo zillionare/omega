@@ -21,7 +21,7 @@ from omega.master.tasks.sync_other_bars import (
     get_month_week_day_sync_date,
     get_month_week_sync_task,
 )
-from omega.master.tasks.synctask import BarsSyncTask, abnormal_master_report
+from omega.master.tasks.synctask import BarsSyncTask, master_syncbars_task
 from omega.master.tasks.task_utils import delete_temporal_bars
 
 logger = logging.getLogger(__name__)
@@ -87,7 +87,7 @@ async def run_sync_trade_price_limits_task(task: BarsSyncTask):
     )
 
 
-@abnormal_master_report()
+@master_syncbars_task()
 async def sync_trade_price_limits():
     """每天9点半之后同步一次今日涨跌停并写入redis"""
     frame_type = FrameType.DAY
