@@ -8,14 +8,18 @@ import aioredis
 import arrow
 import cfg4py
 import omicron
-from omega import cli
-from omega.config import get_config_dir
+import pytest
+from omicron import tf
 from pyemit import emit
 from ruamel.yaml import YAML
-from tests import init_test_env
+
+from omega import cli
+from omega.config import get_config_dir
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
+from tests import init_test_env
 
 
+@pytest.mark.skip
 class TestCLI(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         self.cfg = await init_test_env()
@@ -34,9 +38,15 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
 
         # disable catch up sync, since test_cli, jobs will be launched many times and cache might by empty
         redis = await aioredis.create_redis(self.cfg.redis.dsn)
+
         last_sync = arrow.now(self.cfg.tz).format("YYYY-MM-DD HH:mm:SS")
         await redis.set("jobs.bars_sync.stop", last_sync)
+
+        redis.close()
+        await redis.wait_closed()
+
         await self.create_quotes_fetcher()
+        # await tf.service_degrade()
 
     async def create_quotes_fetcher(self):
         cfg = cfg4py.get_instance()
@@ -46,7 +56,6 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
         await aq.create_instance(impl, **params)
 
     async def asyncTearDown(self) -> None:
-        await omicron.close()
         await emit.stop()
 
     def yaml_dumps(self, settings):
@@ -222,9 +231,11 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
         # 2. exception case
         settings = {}
         with mock.patch("builtins.input", side_effect=["localserver", "3180", "", "C"]):
-            await cli.config_redis(settings)
-            self.assertDictEqual({}, settings)
+            with mock.patch("omega.cli.logger.exception"):
+                await cli.config_redis(settings)
+                self.assertDictEqual({}, settings)
 
+    @pytest.mark.skip()
     async def test_setup(self):
         # clear cache to simulate first setup
         redis = await aioredis.create_redis("redis://localhost:6379")

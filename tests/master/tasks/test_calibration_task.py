@@ -51,6 +51,7 @@ class TestSyncJobs_Calibration(unittest.IsolatedAsyncioTestCase):
         )
         self.client = InfluxClient(url, token, bucket, org)
 
+        await Stock.reset_cache()
         for ft in itertools.chain(tf.day_level_frames, tf.minute_level_frames):
             name = f"stock_bars_{ft.value}"
             await self.client.drop_measurement(name)
@@ -112,7 +113,8 @@ class TestSyncJobs_Calibration(unittest.IsolatedAsyncioTestCase):
 
     @mock.patch("omega.master.tasks.synctask.mail_notify")
     @mock.patch(
-        "omega.master.tasks.synctask.BarsSyncTask.get_quota", return_value=1000000
+        "omega.master.tasks.synctask.QuotaMgmt.check_quota",
+        return_value=((True, 500000, 1000000)),
     )
     @mock.patch("omega.master.tasks.calibration_task.get_sync_date")
     async def test_daily_calibration_sync(self, get_sync_date, *args):
@@ -144,7 +146,7 @@ class TestSyncJobs_Calibration(unittest.IsolatedAsyncioTestCase):
             recs_per_sec=240 + 4,
         )
         await task.cleanup(success=True)
-        # 清楚dfs数据
+        # 清除dfs数据
         dfs = Storage()
         for typ, ft in itertools.product(
             [SecurityType.STOCK, SecurityType.INDEX], frame_type
@@ -189,4 +191,12 @@ class TestSyncJobs_Calibration(unittest.IsolatedAsyncioTestCase):
                     ) as f:
                         local_influx_bars = f.read()
                     print(f"influx_{ft.value}.pik")
+
                     self.assertEqual(influx_bars, local_influx_bars)
+
+                    # influx_bars_ = pickle.loads(influx_bars)
+                    # local_influx_bars_ = pickle.loads(local_influx_bars)
+                    # for code, bars in influx_bars_.items():
+                    #     bars_ = local_influx_bars_.get(code)
+                    #     assert_bars_equal(bars, bars_)
+                    # self.assertSetEqual(set(influx_bars_.keys()), set(local_influx_bars_.keys()))

@@ -4,6 +4,7 @@ import traceback
 from functools import wraps
 from typing import Callable, Dict, List, Tuple, Union
 
+import arrow
 import async_timeout
 import cfg4py
 from omicron import cache
@@ -54,7 +55,7 @@ def worker_secs_task():
                         logger.exception(e)
                         await secs_task_exit(state)
             except asyncio.exceptions.TimeoutError:  # pragma: no cover
-                await secs_task_exit(state, error="消费者超时")
+                await secs_task_exit(state, error="worker task timeout")
                 return False
 
         return decorated_function
@@ -62,9 +63,9 @@ def worker_secs_task():
     return inner
 
 
-async def mark_task_done(state):
+async def mark_task_done(state, count=1):
     p = cache.sys.pipeline()
-    p.hmset(state, "done_count", 1)
+    p.hmset(state, "done_count", count)
     await p.execute()
 
 
@@ -80,7 +81,10 @@ async def sync_security_list(params: Dict):
         await secs_task_exit(state, msg)
         return False
 
-    Security.save_securities(securities, target_date, True)
-    await mark_task_done(state)
+    if arrow.now().date() == target_date:  # 更新今天的缓存数据
+        await Security.update_secs_cache(securities)
+
+    await Security.save_securities(securities, target_date)
+    await mark_task_done(state, len(securities))
 
     logger.info("secs are fetched and saved.")

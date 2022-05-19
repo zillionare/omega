@@ -3,7 +3,6 @@ import logging
 import os
 import unittest
 from unittest import mock
-from unittest.mock import AsyncMock, MagicMock
 
 import arrow
 import cfg4py

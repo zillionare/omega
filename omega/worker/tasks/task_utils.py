@@ -32,7 +32,9 @@ async def cache_init():
         now = datetime.date.today()
         last_trade_date = TimeFrame.day_shift(now, 0)
         securities = await fetcher.get_security_list(last_trade_date)
-        Security.save_securities(securities, last_trade_date, False)
+        if securities is None:
+            raise Exception("获取证券列表失败")
+        Security.update_secs_cache(securities)
 
 
 async def sync_params_analysis(typ: SecurityType, ft: FrameType, params: Dict) -> Tuple:

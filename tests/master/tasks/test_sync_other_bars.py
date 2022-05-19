@@ -94,8 +94,8 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(1, 0)
 
     @mock.patch(
-        "omega.master.jobs.BarsSyncTask.get_quota",
-        return_value=1000000,
+        "omega.master.tasks.synctask.QuotaMgmt.check_quota",
+        return_value=((True, 500000, 1000000)),
     )
     @mock.patch("omega.master.tasks.sync_other_bars.get_month_week_day_sync_date")
     @mock.patch("omega.master.tasks.synctask.mail_notify")
@@ -171,8 +171,8 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
                         assert_bars_equal(actual[code], expected[code])
 
     @mock.patch(
-        "omega.master.tasks.synctask.BarsSyncTask.get_quota",
-        return_value=1000000,
+        "omega.master.tasks.synctask.QuotaMgmt.check_quota",
+        return_value=((True, 500000, 1000000)),
     )
     @mock.patch("omega.master.tasks.sync_other_bars.get_month_week_day_sync_date")
     @mock.patch("omega.master.tasks.synctask.mail_notify")
@@ -248,8 +248,8 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
                         assert_bars_equal(expected[code], actual[code])
 
     @mock.patch(
-        "omega.master.tasks.synctask.BarsSyncTask.get_quota",
-        return_value=1000000,
+        "omega.master.tasks.synctask.QuotaMgmt.check_quota",
+        return_value=((True, 500000, 1000000)),
     )
     @mock.patch("omega.master.tasks.sync_other_bars.get_month_week_day_sync_date")
     @mock.patch("omega.master.tasks.synctask.mail_notify")

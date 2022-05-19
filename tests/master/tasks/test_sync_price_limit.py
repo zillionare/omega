@@ -69,8 +69,8 @@ class TestSyncJobs_PriceLimit(unittest.IsolatedAsyncioTestCase):
         await aq.create_instance(impl, **params)
 
     @mock.patch(
-        "omega.master.jobs.BarsSyncTask.get_quota",
-        return_value=1000000,
+        "omega.master.tasks.synctask.QuotaMgmt.check_quota",
+        return_value=((True, 500000, 1000000)),
     )
     async def test_sync_trade_price_limits(self, *args):
         emit.register(

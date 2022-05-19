@@ -20,7 +20,7 @@ from omega.config import get_config_dir
 from omega.core.events import Events
 from omega.logreceivers.redis import RedisLogReceiver
 from omega.master.jobs import load_cron_task
-from omega.master.tasks.quota_utils import work_state
+from omega.master.tasks.quota_utils import QuotaMgmt
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
@@ -54,10 +54,9 @@ async def heartbeat():
 
 
 async def handle_work_heart_beat(params: dict):
-    global work_state
+    QuotaMgmt.update_quota(params)
     account = params.get("account")
-    work_state[account] = params
-    logger.info("worker state: %s", work_state)
+    logger.info("update worker state: %s -> %s", account, params)
 
 
 async def init():  # noqa
@@ -74,7 +73,8 @@ async def init():  # noqa
     except Exception:
         pass
 
-    await omicron.init()
+    # await omicron.init()
+
     scheduler = AsyncIOScheduler(timezone=cfg.tz)
     await heartbeat()
     scheduler.add_job(heartbeat, "interval", seconds=5)

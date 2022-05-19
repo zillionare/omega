@@ -76,7 +76,7 @@ def worker_syncbars_task():
                         logger.exception(e)
                         await worker_exit(state, scope)
             except asyncio.exceptions.TimeoutError:  # pragma: no cover
-                await worker_exit(state, scope, error="消费者超时")
+                await worker_exit(state, scope, error="worker task timeout")
                 return False
 
         return decorated_function

@@ -1,15 +1,14 @@
 import logging
 import unittest
 from unittest import mock
-import numpy as np
+
 import cfg4py
+import numpy as np
 import omicron
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from omicron import cache
-from omicron.models.stock import Stock
 
-from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omega.worker import jobs as worker_job
+from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from tests import init_test_env, test_dir
 
 logger = logging.getLogger(__name__)

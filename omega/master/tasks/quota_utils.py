@@ -1,9 +1,10 @@
+import logging
 from threading import Lock
 from typing import Tuple
 
 import arrow
 
-from omega.core.events import Events
+logger = logging.getLogger(__name__)
 
 
 class QuotaMgmt:
@@ -13,6 +14,12 @@ class QuotaMgmt:
     quota_stat_q2 = 0  # 当日剩余配额，夜间任务
     quota_date = None
     quota_lock = Lock()  # 读写上面的quota_stat时，需要加锁
+
+    @classmethod
+    def update_state(cls, params: dict):
+        account = params.get("account")
+        cls.work_state[account] = params
+        logger.info("worker state: %s", cls.work_state)
 
     @classmethod
     def get_quota(cls):

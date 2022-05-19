@@ -5,7 +5,7 @@ import logging
 import time
 import traceback
 from functools import wraps
-from typing import Any, AnyStr, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Union
 
 import arrow
 import async_timeout
@@ -172,24 +172,22 @@ class BarsSyncTask:
         return list(set(codes))
 
     async def send_email(self, error=None):
-        subject = f"执行{self.name}时异常！"
+        subject = f"execution exception for master task {self.name}"
         if error:
             body = error
         else:  # pragma: no cover
-            body = f"超时时间是：{self.timeout}"
+            body = f"timeout parameter: {self.timeout}"
         body += "\n\n================================================\n\n"
-        body += "消费者得到的参数是：" + str(self.params)
+        body += "all params in master task: " + str(self.params)
         body += "\n\n================================================\n\n"
-        quota, total = QuotaMgmt.get_quota()
-        body += f"剩余可用quota：{quota}/{total}"
 
         # review: 因为报告机制特别重要，所以不能因为读redis失败而导致发送失败。
         try:
             body += f"{await self.get_sync_failed_secs()}"
         except Exception as e:  # noqa   # pragma: no cover
-            body += "获取失败的证券列表时发生异常：" + traceback.format_exc()
+            body += "failed to get unfinished security list: " + traceback.format_exc()
 
-        logger.info(f"发送邮件subject:{subject}, body: {body}")
+        logger.info(f"send mail, subject: {subject}, body: {body}")
         await mail_notify(subject, body, html=True)
 
     async def update_state(self, **kwargs):
@@ -266,7 +264,7 @@ class BarsSyncTask:
         count = sum1 * self._recs_per_sec
         ok, spare, required = QuotaMgmt.check_quota(self._quota_type, count)
         if not ok:
-            msg = f"quota不足，剩余quota：{spare}, 需要quota：{required}"
+            msg = f"quota insufficient, remaining: {spare}, quota required: {required}"
             await self.send_email(msg)
             self.status = False
             return self.status
@@ -363,8 +361,8 @@ def master_syncbars_task():
             except Exception as e:  # pragma: no cover
                 logger.exception(e)
                 # 发送邮件报告错误
-                subject = f"执行生产者{f.__name__}时发生异常"
-                body = f"详细信息：\n{traceback.format_exc()}"
+                subject = f"exception for master task {f.__name__}"
+                body = f"detailed information: \n{traceback.format_exc()}"
                 traceback.print_exc()
                 await mail_notify(subject, body, html=True)
 

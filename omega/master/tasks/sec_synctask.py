@@ -121,7 +121,7 @@ class SecuritySyncTask:
 
         ok, spare, required = QuotaMgmt.check_quota(self.quota_type, self.recs_per_task)
         if not ok:
-            msg = f"quota不足，剩余quota：{spare}, 需要quota：{required}"
+            msg = f"quota insufficient, remaining: {spare}, quota required: {required}"
             await self.send_email(msg)
             self.status = False
             return self.status
@@ -159,19 +159,19 @@ class SecuritySyncTask:
 
         return ret
 
-    async def send_email(self, error=None):
-        subject = f"执行{self.name}时异常！"
+    async def send_email(self, error=None, additional_info=None):
+        subject = f"execution exception: {self.name}"
         if error:
             body = error
         else:  # pragma: no cover
-            body = f"超时时间是：{self.timeout}"
+            body = f"timeout parameter: {self.timeout}"
         body += "\n\n================================================\n\n"
-        body += "消费者得到的参数是：" + str(self.params)
+        body += "all parameters in worker task: " + str(self.params)
         body += "\n\n================================================\n\n"
-        quota, total = QuotaMgmt.get_quota()
-        body += f"剩余可用quota：{quota}/{total}"
+        if additional_info:
+            body += additional_info
 
-        logger.info(f"发送邮件subject:{subject}, body: {body}")
+        logger.info(f"send mail: subject: {subject}, body: {body}")
         await mail_notify(subject, body, html=True)
 
 
@@ -184,8 +184,8 @@ def master_secs_task():
                 return ret
             except Exception as e:  # pragma: no cover
                 logger.exception(e)
-                subject = f"执行生产者{f.__name__}时发生异常"
-                body = f"详细信息：\n{traceback.format_exc()}"
+                subject = f"exception when execute master task: {f.__name__}"
+                body = f"detailed information: \n{traceback.format_exc()}"
                 traceback.print_exc()
                 await mail_notify(subject, body, html=True)
 

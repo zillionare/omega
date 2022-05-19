@@ -21,7 +21,7 @@ from omega.master.tasks.sync_other_bars import (
     sync_week_bars,
 )
 from omega.master.tasks.sync_price_limit import sync_trade_price_limits
-from omega.master.tasks.sync_securities import sync_securities_job
+from omega.master.tasks.sync_securities import sync_securities_list
 from omega.master.tasks.synctask import BarsSyncTask, master_syncbars_task
 
 logger = logging.getLogger(__name__)
@@ -198,12 +198,20 @@ async def load_cron_task(scheduler):
     )
 
     scheduler.add_job(
-        sync_securities_job,  # 更新完交易时间之后，更新证券列表
+        sync_securities_list,  # 更新完交易时间之后，更新证券列表
         "cron",
-        hour=1,
-        minute=30,
+        hour="1-8",
+        minute="*/5",  # 每5分钟执行一次
         name="sync_securities",
     )
+    scheduler.add_job(
+        sync_securities_list,  # 更新完交易时间之后，更新证券列表
+        "cron",
+        hour="16-23",
+        minute="*/5",  # 每5分钟执行一次
+        name="sync_securities",
+    )
+
     scheduler.add_job(
         sync_week_bars,
         "cron",
