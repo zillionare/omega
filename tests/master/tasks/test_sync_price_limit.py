@@ -1,12 +1,13 @@
+import datetime
 import itertools
 import logging
 import os
-import pickle
 import unittest
 from unittest import mock
 
 import arrow
 import cfg4py
+import numpy as np
 import omicron
 from coretypes import FrameType, SecurityType
 from omicron.dal.cache import cache
@@ -26,7 +27,7 @@ from omega.master.tasks.sync_price_limit import (
 from omega.master.tasks.synctask import BarsSyncTask
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omega.worker.tasks.task_utils import cache_init
-from tests import init_test_env, test_dir
+from tests import assert_bars_equal, init_test_env, test_dir
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
@@ -56,6 +57,10 @@ class TestSyncJobs_PriceLimit(unittest.IsolatedAsyncioTestCase):
         for ft in itertools.chain(tf.day_level_frames, tf.minute_level_frames):
             name = f"stock_bars_{ft.value}"
             await self.client.drop_measurement(name)
+
+        await Stock.reset_cache()
+        await self.client.delete_bucket()
+        await self.client.create_bucket()
 
     async def asyncTearDown(self) -> None:
         await omicron.close()
@@ -114,12 +119,21 @@ class TestSyncJobs_PriceLimit(unittest.IsolatedAsyncioTestCase):
                     test_dir(), "data", "test_sync_trade_price_limits"
                 )
                 # 从dfs查询 并对比
-                bars = await Stock.get_trade_price_limits(
+                actual = await Stock.get_trade_price_limits(
                     code="000001.XSHE", begin=end.naive.date(), end=end.naive.date()
                 )
-                influx_bars = pickle.dumps(bars, protocol=cfg.pickle.ver)
-                with open(os.path.join(base_dir, "influx.pik"), "rb") as f:
-                    self.assertEqual(influx_bars, f.read())
+
+                exp = np.array(
+                    [(datetime.date(2022, 2, 18), 18.06, 14.78)],
+                    dtype=[("frame", "O"), ("high_limit", "<f4"), ("low_limit", "<f4")],
+                )
+                np.testing.assert_array_equal(actual["frame"], exp["frame"])
+                np.testing.assert_array_almost_equal(
+                    actual["high_limit"], exp["high_limit"], decimal=2
+                )
+                np.testing.assert_array_almost_equal(
+                    actual["low_limit"], exp["low_limit"], decimal=2
+                )
 
                 # dfs读出来
                 for typ in [SecurityType.STOCK, SecurityType.INDEX]:
