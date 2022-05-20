@@ -1,19 +1,16 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
 import asyncio
-import functools
-import itertools
 import logging
 import os
 import time
 from typing import Optional
 
-import arrow
 import cfg4py
 import fire
 import omicron
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from omicron.core.errors import DataNotReadyError
 from pyemit import emit
 
 from omega.config import get_config_dir
@@ -54,7 +51,7 @@ async def heartbeat():
 
 
 async def handle_work_heart_beat(params: dict):
-    QuotaMgmt.update_quota(params)
+    QuotaMgmt.update_state(params)
     account = params.get("account")
     logger.info("update worker state: %s -> %s", account, params)
 
@@ -70,10 +67,12 @@ async def init():  # noqa
     logger.info("init omega-master process with config at %s", config_dir)
     try:
         await omicron.init()
-    except Exception:
-        pass
-
-    # await omicron.init()
+    except Exception as e:
+        print(
+            'No calendar and securities in cache, make sure you have called "omega init" first:\n',
+            e,
+        )
+        os._exit(1)
 
     scheduler = AsyncIOScheduler(timezone=cfg.tz)
     await heartbeat()

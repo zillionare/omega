@@ -22,7 +22,7 @@ from omega.config import get_config_dir
 from omega.core.events import Events
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher
 from omega.worker.jobs import load_cron_task
-from omega.worker.tasks import synctask
+from omega.worker.tasks import sec_synctask, synctask
 from omega.worker.tasks.task_utils import cache_init
 
 cfg = cfg4py.get_instance()
@@ -39,6 +39,17 @@ class Omega(object):
         self.inherit_cfg = cfg or {}
         self.scheduler = AsyncIOScheduler(timezone="Asia/Shanghai")
 
+    async def first_load_data(self, *args):  # 从零开始初始化数据
+        logger.info("first_load_data %s", self.__class__.__name__)
+
+        cfg4py.init(get_config_dir(), False)
+        cfg4py.update_config(self.inherit_cfg)
+
+        await AbstractQuotesFetcher.create_instance(self.fetcher_impl, **self.params)
+        await omicron.cache.init()
+        await cache_init()
+        logger.info("<<< init %s process done", self.__class__.__name__)
+
     async def init(self, *args):
         logger.info("init %s", self.__class__.__name__)
 
@@ -48,16 +59,28 @@ class Omega(object):
         await AbstractQuotesFetcher.create_instance(self.fetcher_impl, **self.params)
         # listen on omega events
         await omicron.cache.init()
-        await cache_init()
+        try:
+            await omicron.init()
+        except Exception as e:
+            print(
+                'No calendar and securities in cache, make sure you have called "omega init" first:\n',
+                e,
+            )
+            logger.error(
+                'No calendar and securities in cache, make sure you have called "omega init" first:\n'
+            )
+            time.sleep(5)
+            os._exit(1)
+
         await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
         self.scheduler.add_job(self.heart_beat, trigger="interval", seconds=5)
         await load_cron_task(self.scheduler)
         self.scheduler.start()
-        await omicron.init()
+
         logger.info("<<< init %s process done", self.__class__.__name__)
 
     async def heart_beat(self):
-        quota = await AbstractQuotesFetcher.get_quota_spare()
+        quota = await AbstractQuotesFetcher.get_quota()
 
         await emit.emit(
             Events.OMEGA_HEART_BEAT,
@@ -97,6 +120,7 @@ def start(impl: str, cfg: dict = None, **fetcher_params):
         cfg: the cfg in json string
         fetcher_params: contains info required by creating quotes worker
     """
+    emit.register(Events.OMEGA_DO_SYNC_SECURITIES, sec_synctask.sync_security_list)
     emit.register(
         Events.OMEGA_DO_SYNC_TRADE_PRICE_LIMITS, synctask.sync_trade_price_limits
     )
@@ -118,6 +142,11 @@ def start(impl: str, cfg: dict = None, **fetcher_params):
     loop.run_until_complete(omega.init())
     logger.info("omega worker 启动")
     loop.run_forever()
+
+
+async def init_data(impl: str, cfg: dict = None, **fetcher_params):
+    omega = Omega(impl, cfg, **fetcher_params)
+    await omega.first_load_data()
 
 
 if __name__ == "__main__":

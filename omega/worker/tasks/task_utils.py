@@ -27,14 +27,20 @@ async def cache_init():
     当系统第一次启动（cold boot)时，cache中并不存在证券列表和日历。而在`omicron.init`时，又依赖这些信息。因此，我们需要在Omega中加入冷启动处理的逻辑如下。
     """
     if not await cache.security.exists(f"calendar:{FrameType.DAY.value}"):
-        await fetcher.get_all_trade_days()
+        days = await fetcher.get_all_trade_days()
+        if days is None or len(days) < 100:
+            raise Exception("获取交易日历失败")
+
+    # 强制加载交易日历，随后的操作需要使用
+    await TimeFrame.init()
+
     if not await cache.security.exists("security:all"):
         now = datetime.date.today()
         last_trade_date = TimeFrame.day_shift(now, 0)
         securities = await fetcher.get_security_list(last_trade_date)
-        if securities is None:
+        if securities is None or len(securities) < 100:
             raise Exception("获取证券列表失败")
-        Security.update_secs_cache(securities)
+        await Security.update_secs_cache(last_trade_date, securities)
 
 
 async def sync_params_analysis(typ: SecurityType, ft: FrameType, params: Dict) -> Tuple:

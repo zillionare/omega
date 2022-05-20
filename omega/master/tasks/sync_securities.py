@@ -37,11 +37,11 @@ async def get_security_sync_date():
         if not head or not tail:
             # try to get date scope from db
             head, tail = await Security.get_datescope_from_db()
-            if not head and not tail:
+            if head is None or tail is None:
+                head = tail = None
+            else:
                 head = head.strftime("%Y-%m-%d")
                 tail = tail.strftime("%Y-%m-%d")
-            else:
-                head = tail = None
 
         if not head or not tail:
             logger.info("首次同步，查找最新的交易日, %s", pre_trade_day.strftime("%Y-%m-%d"))
@@ -104,12 +104,13 @@ async def run_security_sync_task(task: SecuritySyncTask):
 
 
 async def get_security_sync_task(sync_dt: datetime.datetime):
+    # 1:30左右开始，最长到8:30，下午16:00开始，到24:00结束
     name = "securities_sync"
     task = SecuritySyncTask(
         event=Events.OMEGA_DO_SYNC_SECURITIES,
         name=name,
         end=sync_dt,
-        timeout=3600,  # 1:30左右开始，最长到8:30，下午16:00开始，到24:00结束
+        timeout=1200,  # 单次任务最长20分钟超时
         recs_per_task=7500,  # 目前只有7111条记录
     )
     if sync_dt.year < 2010:

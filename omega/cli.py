@@ -516,6 +516,26 @@ async def start(service: str = ""):
         print("不支持的服务")
 
 
+async def first_init(service: str = ""):
+    print(f"正在初始化系统数据 {colored(service, 'green')}...")
+
+    config_dir = get_config_dir()
+    cfg4py.init(config_dir, False)
+
+    from omega.worker.app import init_data
+
+    for fetcher in cfg.quotes_fetchers:
+        impl = fetcher.get("impl")
+        workers = fetcher.get("workers")
+        for group in workers:
+            account = group.get("account")
+            password = group.get("password")
+            await init_data(impl, account=account, password=password)
+            break
+
+    print(f"系统数据初始化完毕 {colored(service, 'green')}...")
+
+
 async def _start_fetcher_processes():
     procs = find_fetcher_processes()
 
@@ -801,6 +821,7 @@ def main():
             "stop": run(stop),
             "status": run(status),
             "restart": run(restart),
+            "init": run(first_init),
         }
     )
 

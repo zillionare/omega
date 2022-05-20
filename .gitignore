@@ -109,3 +109,5 @@ omega/config/schema.py
 nohup.out
 .history/
 dev.env
+
+mydemo.py

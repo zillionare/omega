@@ -17,9 +17,13 @@ class QuotaMgmt:
 
     @classmethod
     def update_state(cls, params: dict):
+        # hearbeat定时更新quota数据
         account = params.get("account")
-        cls.work_state[account] = params
-        logger.info("worker state: %s", cls.work_state)
+        try:
+            cls.quota_lock.acquire()
+            cls.work_state[account] = params
+        finally:
+            cls.quota_lock.release()
 
     @classmethod
     def get_quota(cls):
@@ -34,7 +38,7 @@ class QuotaMgmt:
         return (quota, total)
 
     @classmethod
-    def update_quota(cls, quota: int, total: int):
+    def update_quota(cls):
         today = arrow.now().naive.date()
 
         # 获取最新的quota信息
@@ -68,7 +72,9 @@ class QuotaMgmt:
         """
         try:
             cls.quota_lock.acquire()
+
             cls.update_quota()
+
             q1 = cls.quota_stat_q1
             q2 = cls.quota_stat_q2
             if quota_type == 1:  # calibration tasks

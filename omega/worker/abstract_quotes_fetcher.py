@@ -109,7 +109,7 @@ class AbstractQuotesFetcher(QuotesFetcher):
 
     @classmethod
     async def get_quota(cls):
-        return cls.get_instance().get_quota()
+        return await cls.get_instance().get_quota()
 
     @classmethod
     async def get_fund_list(

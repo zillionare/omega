@@ -1,5 +1,4 @@
 import asyncio
-import datetime
 import itertools
 import logging
 import traceback
@@ -10,7 +9,6 @@ import async_timeout
 import cfg4py
 from coretypes import FrameType, SecurityType
 from omicron import cache
-from omicron.models.security import Security
 
 from omega.worker import exception
 from omega.worker.tasks.fetchers import get_trade_price_limits
