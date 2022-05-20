@@ -89,6 +89,9 @@ class AbstractQuotesFetcher(QuotesFetcher):
     @classmethod
     async def get_all_trade_days(cls):
         days = await cls.get_instance().get_all_trade_days()
+        if days is None or len(days) < 100:
+            return None
+
         await TimeFrame.save_calendar(days)
         return days
 
