@@ -45,7 +45,7 @@ async def get_after_hour_sync_job_task() -> Optional[BarsSyncTask]:
         name=name,
         frame_type=[FrameType.MIN1, FrameType.DAY],
         end=end,
-        timeout=3600 * 2,
+        timeout=3600 * 2,  # 实际观察大约350秒左右
         recs_per_sec=240 + 4,
         quota_type=2,  # 白天的同步任务
     )
@@ -107,7 +107,7 @@ async def get_sync_minute_bars_task() -> Optional[BarsSyncTask]:
         name=name,
         frame_type=[FrameType.MIN1],
         end=end,
-        timeout=60 * n_bars,
+        timeout=60 * n_bars,  # 实际观察大约130秒左右
         n_bars=n_bars,
         recs_per_sec=n_bars,
         quota_type=2,  # 白天的同步任务

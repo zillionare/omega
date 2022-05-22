@@ -267,12 +267,14 @@ class BarsSyncTask:
 
         # 同步检查任务是否结束
         try:
-            self.status = False
             # 增加5秒的超时等待，避免与worker的超时设定冲突
             async with async_timeout.timeout(self.timeout + 5):
                 self.status = await self.check_done()
         except asyncio.exceptions.TimeoutError:  # pragma: no cover
             logger.info("消费者超时退出")
+            self.status = False
+        except Exception as e:  # noqa   # pragma: no cover
+            logger.error(f"消费者异常退出: {traceback.format_exc()}")
             self.status = False
         finally:
             await self.cleanup(self.status)

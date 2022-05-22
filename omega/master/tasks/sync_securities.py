@@ -41,7 +41,9 @@ async def get_security_sync_date():
                 head = tail = None
             else:
                 head = head.strftime("%Y-%m-%d")
+                await cache.sys.set(constants.SECS_SYNC_ARCHIVE_HEAD, head)
                 tail = tail.strftime("%Y-%m-%d")
+                await cache.sys.set(constants.SECS_SYNC_ARCHIVE_TAIL, tail)
 
         if not head or not tail:
             logger.info("首次同步，查找最新的交易日, %s", pre_trade_day.strftime("%Y-%m-%d"))
@@ -109,7 +111,7 @@ async def get_security_sync_task(sync_dt: datetime.datetime):
         event=Events.OMEGA_DO_SYNC_SECURITIES,
         name=name,
         end=sync_dt,
-        timeout=60,  # 单次任务最长1分钟超时
+        timeout=3600 * 2,  # 从2005年到2022年，大约需要70分钟
         recs_per_task=7500,  # 目前只有7111条记录
     )
     if sync_dt.year < 2010:

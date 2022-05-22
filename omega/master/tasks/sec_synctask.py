@@ -153,16 +153,18 @@ class SecuritySyncTask:
                     state = await self._get_task_state()
                     task_status, error = state.get("status"), state.get("error")
                     if error is not None or task_status == -1:  # 异常退出
+                        logger.info("worker exit with error")
                         ret = False
                         break
-                    if state.get("done_count") > 0:  # 执行完毕
+                    if task_status == 1 or state.get("done_count") > 0:  # 执行完毕
                         ret = True
                         logger.info(f"params:{self.params},耗时：{time.time() - t0}")
                         break
-                    if task_status == 1:
-                        break
         except asyncio.exceptions.TimeoutError:  # pragma: no cover
             logger.info("消费者超时退出")
+            ret = False
+        except Exception:  # pragma: no cover
+            logger.error(f"消费者异常退出: {traceback.format_exc()}")
             ret = False
         finally:
             await self.cleanup(ret)

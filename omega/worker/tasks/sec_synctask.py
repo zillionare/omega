@@ -51,7 +51,7 @@ def worker_secs_task():
                     await cache.sys.hincrby(state, "worker_count")  # 标记worker执行次数
                     try:
                         ret = await f(params)
-                        cache.sys.hmset(state, "status", 1)  # 0运行，1成功，-1失败
+                        await cache.sys.hmset(state, "status", 1)  # 0运行，1成功，-1失败
                         return ret
                     except exception.WorkerException as e:
                         await secs_task_exit(state, e.msg)

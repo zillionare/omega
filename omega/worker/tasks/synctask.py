@@ -67,7 +67,7 @@ def worker_syncbars_task():
                     await cache.sys.hincrby(state, "worker_count")
                     try:
                         ret = await f(params)
-                        cache.sys.hmset(state, "status", 1)  # 0运行，1成功，-1失败
+                        await cache.sys.hmset(state, "status", 1)  # 0运行，1成功，-1失败
                         return ret
                     except exception.WorkerException as e:
                         await worker_exit(state, scope, e.msg)
