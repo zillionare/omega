@@ -10,9 +10,9 @@ import cfg4py
 import fire
 import omicron
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from omicron.core.errors import DataNotReadyError
 from pyemit import emit
 
+from omega.common.process_utils import find_jobs_process
 from omega.config import get_config_dir
 from omega.core.events import Events
 from omega.logreceivers.redis import RedisLogReceiver
@@ -60,11 +60,12 @@ async def init():  # noqa
     global scheduler
     config_dir = get_config_dir()
     cfg4py.init(get_config_dir(), False)
-    emit.register(Events.OMEGA_HEART_BEAT, handle_work_heart_beat)
-    await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
 
+    # logger receiver使用单独的redis配置项，可以先行启动
     await start_logging()
     logger.info("init omega-master process with config at %s", config_dir)
+
+    # try to load omicron and init redis connection pool
     try:
         await omicron.init()
     except Exception as e:
@@ -73,6 +74,9 @@ async def init():  # noqa
             e,
         )
         os._exit(1)
+
+    emit.register(Events.OMEGA_HEART_BEAT, handle_work_heart_beat)
+    await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
 
     scheduler = AsyncIOScheduler(timezone=cfg.tz)
     await heartbeat()
@@ -85,10 +89,18 @@ async def init():  # noqa
 
 def start():  # pragma: no cover
     logger.info("starting omega master ...")
+    mypid = os.getpid()
+    pid = find_jobs_process()
+    if pid != mypid:
+        print("find master process: %s" % pid)
+        print("only 1 master process can be running, exiting...")
+        os._exit(1)
+
     loop = asyncio.get_event_loop()
     loop.run_until_complete(init())
     logger.info("omega 启动")
     loop.run_forever()
+
     logger.info("omega master exited.")
 
 

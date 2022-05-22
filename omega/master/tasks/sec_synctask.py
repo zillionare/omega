@@ -52,23 +52,31 @@ class SecuritySyncTask:
     def _state_key_name(self):
         return f"{constants.TASK_SECS_PREFIX}.{self.name}.state"
 
+    def _task_key_name(self):
+        return f"{constants.TASK_SECS_PREFIX}.{self.name}.lock"
+
     async def delete_state(self):
         """将任务状态进行删除"""
         key = self._state_key_name()
         await cache.sys.delete(key)
 
+        key = self._task_key_name()
+        await cache.sys.delete(key)
+
     async def is_running(self) -> bool:
-        """检查同类任务是否有一个实例正在运行。
-        同一类任务（通过名字来区分）只能有一个实例运行。在redis中，每个同步任务都有一个状态，其key由任务名字惟一确定。通过检查这个状态就可以确定同类任务是否正在运行。
-        为避免任务出错时未清除状态，而导致后续任务都无法进行，该状态可以设置自动expire。
-        """
-        state = await self._get_task_state()
-        if state and state["is_running"] is not None:
+        key = self._task_key_name()
+        rc = await cache.sys.set(
+            key,
+            self.name,
+            expire=self.timeout + 45,  # 比state的超时时间多15秒
+            exist="SET_IF_NOT_EXIST",
+        )
+        if rc == 1:
+            return False
+        else:
             msg = f"检测到{self.name}下有正在运行的任务，本次任务不执行"
             logger.info(msg)
             return True
-
-        return False
 
     async def _get_task_state(self) -> Union[Dict, Any]:
         """从redis中获取任务状态"""
@@ -76,7 +84,7 @@ class SecuritySyncTask:
         state = await cache.sys.hgetall(key)
         if len(state) != 0:
             state = {
-                "is_running": state.get("is_running") is not None,
+                "status": int(state.get("status", 0)),
                 "done_count": int(state.get("done_count", 0)),
                 "error": state.get("error"),
                 "worker_count": int(state.get("worker_count", 0)),
@@ -84,7 +92,7 @@ class SecuritySyncTask:
 
         return state
 
-    async def update_state(self, **kwargs):
+    async def init_state(self, **kwargs):
         """更新任务状态"""
         key = self._state_key_name()
 
@@ -126,7 +134,7 @@ class SecuritySyncTask:
             self.status = False
             return self.status
 
-        await self.update_state(is_running=1, worker_count=0)
+        await self.init_state(status=0, worker_count=0)
 
         await emit.emit(self.event, self.get_params())
         self.status = await self.check_done()
@@ -143,13 +151,15 @@ class SecuritySyncTask:
             async with async_timeout.timeout(self.timeout):
                 while True:
                     state = await self._get_task_state()
-                    is_running, error = state.get("is_running"), state.get("error")
-                    if error is not None or not is_running:  # 异常退出
+                    task_status, error = state.get("status"), state.get("error")
+                    if error is not None or task_status == -1:  # 异常退出
                         ret = False
                         break
                     if state.get("done_count") > 0:  # 执行完毕
                         ret = True
                         logger.info(f"params:{self.params},耗时：{time.time() - t0}")
+                        break
+                    if task_status == 1:
                         break
         except asyncio.exceptions.TimeoutError:  # pragma: no cover
             logger.info("消费者超时退出")

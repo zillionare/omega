@@ -36,7 +36,9 @@ async def worker_exit(state, scope, error=None):
         p.hmset(state, "error", former_error + "\n" + error)
     else:
         p.hmset(state, "error", error)
-    p.hdel(state, "is_running")
+
+    p.hmset(state, "status", -1)  # 设置状态为失败
+
     p.delete(*scope)  # 删除任务队列，让其他没退出的消费者也退出，错误上报至master
     await p.execute()
 
@@ -52,20 +54,20 @@ def worker_syncbars_task():
         @wraps(f)
         async def decorated_function(params):
             """装饰所有worker，统一处理错误信息"""
-            scope, state, timeout = (
+            name, scope, state, timeout = (
+                params.get("name"),
                 params.get("scope"),
                 params.get("state"),
                 params.get("timeout"),
             )
-            # if isinstance(timeout, int):
-            timeout -= 5  # 提前5秒退出
-            logger.debug("timeout", timeout)
+            logger.debug("worker task: %s, timeout %d", name, timeout)
             try:
                 async with async_timeout.timeout(timeout):
                     # 执行之前，将状态中的worker_count + 1，以确保生产者能知道有多少个worker收到了消息
                     await cache.sys.hincrby(state, "worker_count")
                     try:
                         ret = await f(params)
+                        cache.sys.hmset(state, "status", 1)  # 0运行，1成功，-1失败
                         return ret
                     except exception.WorkerException as e:
                         await worker_exit(state, scope, e.msg)

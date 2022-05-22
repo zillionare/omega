@@ -26,6 +26,7 @@ from pyemit import emit
 from ruamel.yaml import YAML
 from termcolor import colored
 
+from omega.common.process_utils import find_jobs_process
 from omega.config import get_config_dir
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher
 
@@ -545,10 +546,9 @@ async def _start_fetcher_processes():
         impl = fetcher.get("impl")
         workers = fetcher.get("workers")
 
-        ports = [3181 + i for i in range(len(workers))]
         for group in workers:
             sessions = 1  # group.get("sessions", 1)
-            port = group.get("port") or ports.pop()
+            port = group.get("port", 1381)
             account = group.get("account")
             password = group.get("password")
             started_sessions = procs.get(f"{impl}:{port}", [])
@@ -613,7 +613,7 @@ async def _start_jobs():
     )
 
     retry = 0
-    while _find_jobs_process() is None and retry < 5:
+    while find_jobs_process() is None and retry < 5:
         print("等待omega.master启动中")
         retry += 1
         await asyncio.sleep(1)
@@ -627,7 +627,7 @@ async def _start_jobs():
 
 
 def _restart_jobs():
-    pid = _find_jobs_process()
+    pid = find_jobs_process()
     if pid is None:
         print("omega.master未运行。正在启动中...")
         _start_jobs()
@@ -638,7 +638,7 @@ def _restart_jobs():
 
 
 async def _stop_jobs():
-    pid = _find_jobs_process()
+    pid = find_jobs_process()
     retry = 0
     while pid is not None and retry < 5:
         retry += 1
@@ -647,7 +647,7 @@ async def _stop_jobs():
             await asyncio.sleep(0.5)
         except Exception:
             pass
-        pid = _find_jobs_process()
+        pid = find_jobs_process()
 
     if retry >= 5:
         print("未能停止omega.master")
@@ -655,22 +655,11 @@ async def _stop_jobs():
 
 def _show_jobs_process():
     print(f"正在运行中的master进程:\n{'=' * 40}")
-    pid = _find_jobs_process()
+    pid = find_jobs_process()
     if pid:
         print(pid)
     else:
         print("None")
-
-
-def _find_jobs_process():
-    for p in psutil.process_iter():
-        try:
-            cmd = " ".join(p.cmdline())
-            if cmd.find("omega.master") != -1:
-                return p.pid
-        except (PermissionError, ProcessLookupError):
-            pass
-    return None
 
 
 async def _stop_fetcher_processes():

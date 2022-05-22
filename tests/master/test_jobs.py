@@ -208,7 +208,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         email_content = ""
         with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
             with mock.patch("arrow.now", return_value=end):
-                task.timeout = 5.1
+                task.timeout = 0
                 await syncjobs.after_hour_sync_job()
                 print(email_content)
                 self.assertFalse(task.status)
@@ -216,7 +216,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
 
         # 测试重复运行
         print("测试重复运行")
-        await task.update_state(is_running=1, worker_count=0)
+        await task.init_state(status=0, worker_count=0)
         task.status = None
         with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
             with mock.patch("arrow.now", return_value=end):

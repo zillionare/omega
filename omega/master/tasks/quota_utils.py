@@ -19,6 +19,11 @@ class QuotaMgmt:
     def update_state(cls, params: dict):
         # hearbeat定时更新quota数据
         account = params.get("account")
+
+        # 当前无法事先分配worker，因此不支持多个数据服务商
+        # impl = params.get("impl")
+        # key = f"{impl}:{account}"
+
         try:
             cls.quota_lock.acquire()
             cls.work_state[account] = params

@@ -66,8 +66,10 @@ class BarsSyncTask:
         self.status = None
 
     def _state_key_name(self):
-        # review: 最初这些名字被保存为成员变量。成员变量一般用来记录对象的状态和属性。如果只是一些可以通过计算得出来的中间属性，可应该考虑使用函数计算的方式（如果没有性能问题）。
         return f"{constants.TASK_PREFIX}.{self.name}.state"
+
+    def _task_key_name(self):  # lock for task
+        return f"{constants.TASK_PREFIX}.{self.name}.lock"
 
     def _scope_key_name(self, typ: SecurityType, ft: FrameType, is_done: bool):
         if is_done:
@@ -80,6 +82,9 @@ class BarsSyncTask:
     async def delete_state(self):
         """将任务状态进行删除"""
         key = self._state_key_name()
+        await cache.sys.delete(key)
+
+        key = self._task_key_name()
         await cache.sys.delete(key)
 
     async def delete_done(self):
@@ -102,42 +107,32 @@ class BarsSyncTask:
         self._recs_per_sec = value
 
     async def is_running(self) -> bool:
-        """检查同类任务是否有一个实例正在运行。
-
-        同一类任务（通过名字来区分）只能有一个实例运行。在redis中，每个同步任务都有一个状态，其key由任务名字惟一确定。通过检查这个状态就可以确定同类任务是否正在运行。
-
-        为避免任务出错时未清除状态，而导致后续任务都无法进行，该状态可以设置自动expire。
-        """
-        state = await self._get_task_state()
-        if state and state["is_running"] is not None:
+        key = self._task_key_name()
+        rc = await cache.sys.set(
+            key,
+            self.name,
+            expire=self.timeout + 20,  # 比state的超时时间多10秒
+            exist="SET_IF_NOT_EXIST",
+        )
+        if rc == 1:
+            return False
+        else:
             msg = f"检测到{self.name}下有正在运行的任务，本次任务不执行"
             logger.info(msg)
             return True
 
-        return False
-
-    async def _get_task_state(self, field: str = None) -> Union[Dict, Any]:
-        """从redis中获取任务状态
-
-        如果指明了field,则返回某个具体的字段值，否则返回整个字典。
-        """
-        # review: 由于多处请求和修改state状态，因此集中管理更好。
+    async def _get_task_state(self) -> Union[Dict, Any]:
+        """从redis中获取任务状态"""
         key = self._state_key_name()
-        # always return a dict
-        state = await cache.sys.hgetall(key)
+        state = await cache.sys.hgetall(key)  # always return a dict
         if len(state) != 0:
             state = {
-                # 如果值存在，则表明已在运行，不关心具体取值
-                "is_running": state.get("is_running") is not None,
+                "status": int(state.get("status", 0)),
                 "done_count": int(state.get("done_count", 0)),
                 "error": state.get("error"),
                 "worker_count": int(state.get("worker_count", 0)),
             }
-
-        if field:  # pragma: no cover
-            return state.get(field)
-        else:
-            return state
+        return state
 
     def parse_bars_sync_scope(self, _type: SecurityType):
         """生成待同步行情数据的证券列表
@@ -190,25 +185,17 @@ class BarsSyncTask:
         logger.info(f"send mail, subject: {subject}, body: {body}")
         await mail_notify(subject, body, html=True)
 
-    async def update_state(self, **kwargs):
-        """更新任务状态"""
+    async def init_state(self, **kwargs):
+        """初始化任务状态"""
         key = self._state_key_name()
-
-        # aioredis cannot save bool directly
-        # if isinstance(kwargs.get("is_running"), bool):
-        #     kwargs["is_running"] = str(kwargs["is_running"])
-
         pl = cache.sys.pipeline()
         pl.hmset_dict(key, kwargs)
-        # todo: 是使用expire还是timeout?或者使用auto_expire?
-        # if self.expire_time is not None:
-        pl.expire(key, self.timeout * 2)  # 自动设置超时时间
+        pl.expire(key, self.timeout + 10)  # 增加10秒的超时，确保worker处理完毕
         await pl.execute()
         self.params.update({"state": key})
 
     async def update_sync_scope(self):
         """将待同步的证券代码列表写入redis队列，以便worker获取"""
-        # todo 不同的frame_type 和 SecurityType的队列不一样，但是只写了一个队列，这样worker同步第二个frame_type时 就获取不到数据了
         pl = cache.sys.pipeline()
         keys = []
         keys_done = []
@@ -233,7 +220,6 @@ class BarsSyncTask:
 
     async def cleanup(self, success: bool = True):
         """在任务结束时（成功或失败）的清理操作"""
-
         if not success:
             state = await self._get_task_state()
             await self.send_email(state.get("error"))
@@ -269,61 +255,60 @@ class BarsSyncTask:
             self.status = False
             return self.status
 
-        await self.update_state(is_running=1, worker_count=0)
+        await self.init_state(status=0, worker_count=0)
         await self.update_sync_scope()
 
-        # todo worker在同步中，会将bars追加到下面的队列中，因此在同步前需要清空队列，清空队列时仅清空本次需要用到的队列，根据frame_type和name
+        # worker在同步中，会将bars追加到下面的队列中，因此在同步前需要清空队列，
+        # 清空队列时仅清空本次需要用到的队列，根据frame_type和name
         await delete_temporal_bars(self.name, self.frame_type)
 
+        # 消息发给worker，启动任务
         await emit.emit(self.event, self.get_params())
-        self.status = await self.check_done()
+
+        # 同步检查任务是否结束
+        try:
+            self.status = False
+            # 增加5秒的超时等待，避免与worker的超时设定冲突
+            async with async_timeout.timeout(self.timeout + 5):
+                self.status = await self.check_done()
+        except asyncio.exceptions.TimeoutError:  # pragma: no cover
+            logger.info("消费者超时退出")
+            self.status = False
+        finally:
+            await self.cleanup(self.status)
+
         return self.status
 
     async def check_done(self) -> bool:
-        """等待worker完成任务
-
-        Returns:
-            任务是否完成
-        """
-        # review: 一般我们可以用t0来标识计时的起点
-        t0 = time.time()
+        """等待worker完成任务"""
         ret = False
-        try:
-            async with async_timeout.timeout(self.timeout):
-                while True:
-                    state = await self._get_task_state()
-                    is_running, error = state.get("is_running"), state.get("error")
-                    if error is not None or not is_running:
-                        # 异常退出
-                        ret = False
-                        break
-                    # 如果所有证券已完成同步，则退出
-                    for ft in self.frame_type:
-                        # 当for循环检查没有任何一次break时，则说明任务全部完成了。有任何一次
-                        await asyncio.sleep(0.5)
-                        done_index = await self.get_sync_done_secs(
-                            SecurityType.INDEX, ft
-                        )
-                        if set(done_index) != set(self._index_scope):
-                            break
-                        done_stock = await self.get_sync_done_secs(
-                            SecurityType.STOCK, ft
-                        )
-                        if set(done_stock) != set(
-                            self._stock_scope
-                        ):  # pragma: no cover
-                            break
-                    else:
-                        # 说明执行完了
-                        logger.info(f"params:{self.params},耗时：{time.time() - t0}")
-                        ret = True
-                        break
-        except asyncio.exceptions.TimeoutError:  # pragma: no cover
-            # review: 这里有一个pragma: nocover. 对异常分支不进行单元测试的问题是，万一这些异常真的出现，它们可能引起二次异常，从而最终导致程序崩溃 -- 这也许并不是我们想要的 -- 单元测试可以排除掉未处理的二次异常。
-            logger.info("消费者超时退出")
-            ret = False
-        finally:
-            await self.cleanup(ret)
+        t0 = time.time()
+
+        while True:
+            state = await self._get_task_state()
+            task_status, error = state.get("status"), state.get("error")
+            if error is not None or task_status == -1:
+                # 异常退出
+                ret = False
+                break
+
+            # 如果所有证券已完成同步，则退出
+            for ft in self.frame_type:
+                # 当for循环检查没有任何一次break时，则说明任务全部完成了。有任何一次
+                await asyncio.sleep(0.5)
+                done_index = await self.get_sync_done_secs(SecurityType.INDEX, ft)
+                if set(done_index) != set(self._index_scope):
+                    break
+                done_stock = await self.get_sync_done_secs(SecurityType.STOCK, ft)
+                if set(done_stock) != set(self._stock_scope):  # pragma: no cover
+                    break
+            else:  # for循环没有执行break，说明执行完了
+                logger.info(f"params:{self.params},耗时：{time.time() - t0}")
+                ret = True
+                break
+
+            if task_status == 1:  # 任务已结束
+                break
 
         return ret
 

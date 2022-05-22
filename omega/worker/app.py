@@ -137,6 +137,7 @@ def start(impl: str, cfg: dict = None, **fetcher_params):
         Events.OMEGA_DO_SYNC_OTHER_MIN,
         synctask.sync_min_5_15_30_60,
     )
+
     omega = Omega(impl, cfg, **fetcher_params)
     loop = asyncio.get_event_loop()
     loop.run_until_complete(omega.init())

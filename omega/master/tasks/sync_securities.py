@@ -104,13 +104,12 @@ async def run_security_sync_task(task: SecuritySyncTask):
 
 
 async def get_security_sync_task(sync_dt: datetime.datetime):
-    # 1:30左右开始，最长到8:30，下午16:00开始，到24:00结束
     name = "securities_sync"
     task = SecuritySyncTask(
         event=Events.OMEGA_DO_SYNC_SECURITIES,
         name=name,
         end=sync_dt,
-        timeout=1200,  # 单次任务最长20分钟超时
+        timeout=60,  # 单次任务最长1分钟超时
         recs_per_task=7500,  # 目前只有7111条记录
     )
     if sync_dt.year < 2010:
@@ -180,7 +179,7 @@ async def sync_securities_list():
             sync_days_count += 1
             logger.info(f"{task.name}({task.end})同步完成,参数为{task.params}")
 
-            if sync_days_count >= 300:  # 3 * 75s，大约4~5分钟
-                break
+            # if sync_days_count >= 300:  # 3 * 75s，大约4~5分钟
+            #    break
 
     logger.info("sync_securities_list ends")

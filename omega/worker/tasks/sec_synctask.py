@@ -32,7 +32,8 @@ async def secs_task_exit(state, error=None):
     else:
         p.hmset(state, "error", error)
 
-    p.hdel(state, "is_running")
+    p.hmset(state, "status", -1)  # 设置状态为失败
+
     await p.execute()
 
 
@@ -42,12 +43,15 @@ def worker_secs_task():
         async def decorated_function(params):
             state = params.get("state")
             timeout = params.get("timeout")
-            timeout -= 5  # 提前5秒退出
+            name = params.get("name")
+            logger.debug("worker task: %s, timeout %d", name, timeout)
+
             try:
                 async with async_timeout.timeout(timeout):
                     await cache.sys.hincrby(state, "worker_count")  # 标记worker执行次数
                     try:
                         ret = await f(params)
+                        cache.sys.hmset(state, "status", 1)  # 0运行，1成功，-1失败
                         return ret
                     except exception.WorkerException as e:
                         await secs_task_exit(state, e.msg)
@@ -88,3 +92,4 @@ async def sync_security_list(params: Dict):
     await mark_task_done(state, len(securities))
 
     logger.info("secs are fetched and saved.")
+    return True

@@ -105,12 +105,11 @@ async def sync_calendar():
 
 
 async def load_cron_task(scheduler: AsyncIOScheduler):
-    h, m = map(int, cfg.omega.sync.security_list.split(":"))
     scheduler.add_job(
         sync_calendar,  # 默认1点更新一次全部数据
         "cron",
-        hour=h,
-        minute=m,
+        hour=1,
+        minute=0,
         name="sync_calendar",
     )
     scheduler.add_job(

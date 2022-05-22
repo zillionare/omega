@@ -45,7 +45,7 @@ async def get_after_hour_sync_job_task() -> Optional[BarsSyncTask]:
         name=name,
         frame_type=[FrameType.MIN1, FrameType.DAY],
         end=end,
-        timeout=60 * 60 * 2,
+        timeout=3600 * 2,
         recs_per_sec=240 + 4,
         quota_type=2,  # 白天的同步任务
     )
@@ -102,13 +102,12 @@ async def get_sync_minute_bars_task() -> Optional[BarsSyncTask]:
     else:
         end, n_bars = ret
     name = "minute"
-    timeout = 60
     task = BarsSyncTask(
         event=Events.OMEGA_DO_SYNC_MIN,
         name=name,
         frame_type=[FrameType.MIN1],
         end=end,
-        timeout=timeout * n_bars,
+        timeout=60 * n_bars,
         n_bars=n_bars,
         recs_per_sec=n_bars,
         quota_type=2,  # 白天的同步任务
@@ -168,24 +167,21 @@ async def load_cron_task(scheduler):
         sync_minute_bars,
         "cron",
         hour=11,
-        # review: 设定30分结束同步，会导致无法同步到30分钟的数据
-        minute="0-31",
+        minute="0-31",  # 0-31，执行32次
         name=f"{FrameType.MIN1.value}:11:0-31",
     )
     scheduler.add_job(
         sync_minute_bars,
         "cron",
         hour="13-14",
-        # review: 1-59将导致整数点上的分钟线被延时同步
-        minute="0-59",
+        minute="*",
         name=f"{FrameType.MIN1.value}:13-14:*",
     )
     scheduler.add_job(
         sync_minute_bars,
         "cron",
         hour=15,
-        # review: 之前的实现会导致只同步到59分钟的数据
-        minute="0-1",
+        minute="0-1",  # 15:00,15:01，执行2次
         name=f"{FrameType.MIN1.value}:15:00",
     )
 
@@ -197,18 +193,12 @@ async def load_cron_task(scheduler):
         name="after_hour_sync_job",
     )
 
+    # 以下追赶性质的任务，应该单独执行，不能和日常同步任务混在一起，因为jqadaptor只有一个线程，定时器也只能触发一个同类型的任务
     scheduler.add_job(
-        sync_securities_list,  # 更新完交易时间之后，更新证券列表
+        sync_securities_list,
         "cron",
-        hour="1-8",
-        minute="*/5",  # 每5分钟执行一次
-        name="sync_securities",
-    )
-    scheduler.add_job(
-        sync_securities_list,  # 更新完交易时间之后，更新证券列表
-        "cron",
-        hour="16-23",
-        minute="*/5",  # 每5分钟执行一次
+        hour="1",
+        minute="30",
         name="sync_securities",
     )
 
