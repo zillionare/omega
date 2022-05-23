@@ -240,7 +240,7 @@ class BarsSyncTask:
 
     async def run(self):
         """分配任务并发送emit通知worker开始执行，然后阻塞等待"""
-        logger.info(f"{self.name}:{self.get_params()} 任务启动")
+        logger.info(f"{self.name}:{self.get_params()}, task starts")
         if await self.is_running():
             self.status = False
             return self.status
@@ -271,10 +271,12 @@ class BarsSyncTask:
             async with async_timeout.timeout(self.timeout + 5):
                 self.status = await self.check_done()
         except asyncio.exceptions.TimeoutError:  # pragma: no cover
-            logger.info("消费者超时退出")
+            logger.info("master task timeout!")
             self.status = False
         except Exception as e:  # noqa   # pragma: no cover
-            logger.error(f"消费者异常退出: {traceback.format_exc()}")
+            logger.error(
+                f"master task exception (check_done): {traceback.format_exc()}"
+            )
             self.status = False
         finally:
             await self.cleanup(self.status)
@@ -305,7 +307,7 @@ class BarsSyncTask:
                 if set(done_stock) != set(self._stock_scope):  # pragma: no cover
                     break
             else:  # for循环没有执行break，说明执行完了
-                logger.info(f"params:{self.params},耗时：{time.time() - t0}")
+                logger.info(f"params:{self.params}, time cost: {time.time() - t0}")
                 ret = True
                 break
 

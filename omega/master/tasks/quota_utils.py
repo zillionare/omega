@@ -10,8 +10,8 @@ logger = logging.getLogger(__name__)
 class QuotaMgmt:
     work_state = {}
     # work的状态,{'account': {'account': xxxx, 'quota': xxx, 'impl': 'jq', 'time': '2022-05-11 15:20:29'}}
-    quota_stat_q1 = 0  # 当日剩余配额，白天任务
-    quota_stat_q2 = 0  # 当日剩余配额，夜间任务
+    quota_stat_q1 = 0  # 当日剩余配额，交易时间段以外的全部任务
+    quota_stat_q2 = 0  # 当日剩余配额，白天的盘中任务
     quota_date = None
     quota_lock = Lock()  # 读写上面的quota_stat时，需要加锁
 
@@ -50,7 +50,7 @@ class QuotaMgmt:
         quota, total = cls.get_quota()
         if cls.quota_date is None or cls.quota_date != today:
             cls.quota_date = today  # 初始化当天的配额
-            reserved = int(total * 0.25)  # 保留25%给白天同步使用
+            reserved = int(total * 0.25)  # 保留25%给白天交易时段同步使用
             if reserved > quota:
                 cls.quota_stat_q1 = 0
                 cls.quota_stat_q2 = quota
@@ -62,9 +62,9 @@ class QuotaMgmt:
             q2 = cls.quota_stat_q2
             if quota < q1 + q2:  # 有其他任务占用了quota，需要重新计算
                 delta = (q1 + q2) - quota
-                q1 -= delta  # 扣除到晚上的配额上
-                if q1 < 0:  # 不够扣除，则扣除到白天的配额上
-                    q2 = quota  # 配额全部给白天的任务
+                q1 -= delta  # 扣除到非交易时段的配额上
+                if q1 < 0:  # 不够扣除，则扣除到交易时段的配额上
+                    q2 = quota  # 配额全部保留给交易时段的同步任务
                     q1 = 0
                 cls.quota_stat_q1 = q1
                 cls.quota_stat_q2 = q2
@@ -82,7 +82,7 @@ class QuotaMgmt:
 
             q1 = cls.quota_stat_q1
             q2 = cls.quota_stat_q2
-            if quota_type == 1:  # calibration tasks
+            if quota_type == 1:  # 非交易时段任务
                 if q1 > count:
                     cls.quota_stat_q1 = q1 - count
                     return True, q1 - count, count

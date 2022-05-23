@@ -29,7 +29,7 @@ class SecuritySyncTask:
         end: datetime.datetime,
         timeout: int = 60,
         recs_per_task: int = 240,  # 本地任务预计占用的配额
-        quota_type: int = 1,  # 默认为75%的配额，剩下的25%给白天时间段的同步和更新
+        quota_type: int = 1,  # 默认为非交易时段的任务
     ):
         """
         Args:
@@ -122,7 +122,7 @@ class SecuritySyncTask:
 
     async def run(self):
         """分配任务并发送emit通知worker开始执行，然后阻塞等待"""
-        logger.info(f"{self.name}:{self.get_params()} 任务启动")
+        logger.info(f"{self.name}:{self.get_params()}, task starts")
         if await self.is_running():
             self.status = False
             return self.status
@@ -158,13 +158,17 @@ class SecuritySyncTask:
                         break
                     if task_status == 1 or state.get("done_count") > 0:  # 执行完毕
                         ret = True
-                        logger.info(f"params:{self.params},耗时：{time.time() - t0}")
+                        logger.info(
+                            f"params:{self.params}, time cost: {time.time() - t0}"
+                        )
                         break
         except asyncio.exceptions.TimeoutError:  # pragma: no cover
-            logger.info("消费者超时退出")
+            logger.info("master task (secs) timeout!")
             ret = False
         except Exception:  # pragma: no cover
-            logger.error(f"消费者异常退出: {traceback.format_exc()}")
+            logger.error(
+                f"master task (secs) exception (check done): {traceback.format_exc()}"
+            )
             ret = False
         finally:
             await self.cleanup(ret)
