@@ -291,28 +291,34 @@ class BarsSyncTask:
         while True:
             state = await self._get_task_state()
             task_status, error = state.get("status"), state.get("error")
-            if error is not None or task_status == -1:
-                # 异常退出
+            if error is not None or task_status == -1:  # 异常退出
                 ret = False
                 break
 
-            # 如果所有证券已完成同步，则退出
-            for ft in self.frame_type:
-                # 当for循环检查没有任何一次break时，则说明任务全部完成了。有任何一次
-                await asyncio.sleep(0.5)
-                done_index = await self.get_sync_done_secs(SecurityType.INDEX, ft)
-                if set(done_index) != set(self._index_scope):
+            if task_status == 1:  # 任务已结束
+                # 如果所有证券已完成同步，则退出
+                for ft in self.frame_type:
+                    # 当for循环检查没有任何一次break时，则说明任务全部完成了。有任何一次
+                    done_index = await self.get_sync_done_secs(SecurityType.INDEX, ft)
+                    if set(done_index) != set(self._index_scope):
+                        break
+                    done_stock = await self.get_sync_done_secs(SecurityType.STOCK, ft)
+                    if set(done_stock) != set(self._stock_scope):  # pragma: no cover
+                        break
+                else:  # for循环没有执行break，说明执行完了
+                    logger.info(
+                        f"task success, params: {self.params}, time cost: {time.time() - t0}"
+                    )
+                    ret = True
                     break
-                done_stock = await self.get_sync_done_secs(SecurityType.STOCK, ft)
-                if set(done_stock) != set(self._stock_scope):  # pragma: no cover
-                    break
-            else:  # for循环没有执行break，说明执行完了
-                logger.info(f"params:{self.params}, time cost: {time.time() - t0}")
-                ret = True
+
+                # worker已经执行完毕，但是任务没完成
+                logger.error(
+                    f"task failed, params: {self.params}, time cost: {time.time() - t0}"
+                )
                 break
 
-            if task_status == 1:  # 任务已结束
-                break
+            await asyncio.sleep(0.5)
 
         return ret
 
