@@ -80,7 +80,7 @@ async def init():  # noqa
 
     scheduler = AsyncIOScheduler(timezone=cfg.tz)
     await heartbeat()
-    scheduler.add_job(heartbeat, "interval", seconds=5)
+    scheduler.add_job(heartbeat, "interval", seconds=10)
     # sync securities daily
     await load_cron_task(scheduler)
     scheduler.start()

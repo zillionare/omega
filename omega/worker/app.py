@@ -73,7 +73,7 @@ class Omega(object):
             os._exit(1)
 
         await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
-        self.scheduler.add_job(self.heart_beat, trigger="interval", seconds=5)
+        self.scheduler.add_job(self.heart_beat, trigger="interval", seconds=10)
         await load_cron_task(self.scheduler)
         self.scheduler.start()
 
