@@ -156,10 +156,13 @@ class SecuritySyncTask:
                         logger.info("worker exit with error")
                         ret = False
                         break
-                    if task_status == 1 or state.get("done_count") > 0:  # 执行完毕
-                        ret = True
+                    if task_status == 1:
+                        if state.get("done_count") > 0:  # 执行完毕
+                            ret = True
+                        else:
+                            ret = False
                         logger.info(
-                            f"params:{self.params}, time cost: {time.time() - t0}"
+                            f"task result: {ret}, params: {self.params}, time cost: {time.time() - t0}"
                         )
                         break
         except asyncio.exceptions.TimeoutError:  # pragma: no cover

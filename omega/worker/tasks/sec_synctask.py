@@ -37,6 +37,13 @@ async def secs_task_exit(state, error=None):
     await p.execute()
 
 
+async def secs_task_done(state, count=1):
+    p = cache.sys.pipeline()
+    p.hmset(state, "status", 1)
+    p.hmset(state, "done_count", count)
+    await p.execute()
+
+
 def worker_secs_task():
     def inner(f):
         @wraps(f)
@@ -50,14 +57,14 @@ def worker_secs_task():
                 async with async_timeout.timeout(timeout):
                     await cache.sys.hincrby(state, "worker_count")  # 标记worker执行次数
                     try:
-                        ret = await f(params)
-                        await cache.sys.hmset(state, "status", 1)  # 0运行，1成功，-1失败
-                        return ret
+                        secs_synced = await f(params)
+                        await secs_task_done(state, secs_synced)
+                        return True
                     except exception.WorkerException as e:
-                        await secs_task_exit(state, e.msg)
-                    except Exception as e:  # pragma: no cover
-                        logger.exception(e)
-                        await secs_task_exit(state)
+                        await secs_task_exit(state, error=str(e))
+                    except Exception as ex:  # pragma: no cover
+                        logger.exception(ex)
+                        await secs_task_exit(state, error=str(ex))
             except asyncio.exceptions.TimeoutError:  # pragma: no cover
                 await secs_task_exit(state, error="worker task timeout")
                 return False
@@ -67,29 +74,19 @@ def worker_secs_task():
     return inner
 
 
-async def mark_task_done(state, count=1):
-    p = cache.sys.pipeline()
-    p.hmset(state, "done_count", count)
-    await p.execute()
-
-
 @worker_secs_task()
 async def sync_security_list(params: Dict):
-    state = params.get("state")
     target_date = params.get("end")
 
     securities = await fetcher.get_security_list(target_date)
     if securities is None or len(securities) < 100:
         msg = "failed to get security list(%s)" % target_date.strftime("%Y-%m-%d")
         logger.error(msg)
-        await secs_task_exit(state, msg)
-        return False
+        raise Exception(msg)
 
     if arrow.now().date() == target_date:  # 更新今天的缓存数据
         await Security.update_secs_cache(securities)
 
     await Security.save_securities(securities, target_date)
-    await mark_task_done(state, len(securities))
-
     logger.info("secs are fetched and saved.")
-    return True
+    return len(securities)

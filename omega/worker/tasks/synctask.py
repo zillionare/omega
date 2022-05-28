@@ -70,11 +70,10 @@ def worker_syncbars_task():
                         await cache.sys.hmset(state, "status", 1)  # 0运行，1成功，-1失败
                         return ret
                     except exception.WorkerException as e:
-                        await worker_exit(state, scope, e.msg)
-                    except Exception as e:  # pragma: no cover
-                        # 说明消费者消费时错误了
-                        logger.exception(e)
-                        await worker_exit(state, scope)
+                        await worker_exit(state, scope, error=str(e))
+                    except Exception as ex:  # pragma: no cover
+                        logger.exception(ex)
+                        await worker_exit(state, scope, error=str(ex))
             except asyncio.exceptions.TimeoutError:  # pragma: no cover
                 await worker_exit(state, scope, error="worker task timeout")
                 return False
