@@ -144,8 +144,8 @@ async def load_cron_task(scheduler):
     scheduler.add_job(
         sync_trade_price_limits,
         "cron",
-        hour=8,
-        minute=30,
+        hour=9,
+        minute="1,31",
         name="sync_trade_price_limits",
     )
 
