@@ -121,6 +121,7 @@ def start(impl: str, cfg: dict = None, **fetcher_params):
         fetcher_params: contains info required by creating quotes worker
     """
     emit.register(Events.OMEGA_DO_SYNC_SECURITIES, sec_synctask.sync_security_list)
+    emit.register(Events.OMEGA_DO_SYNC_XRXD_REPORTS, sec_synctask.sync_xrxd_report_list)
     emit.register(
         Events.OMEGA_DO_SYNC_TRADE_PRICE_LIMITS, synctask.sync_trade_price_limits
     )

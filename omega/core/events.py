@@ -20,6 +20,7 @@ class Events:
     OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK = "omega/year_quarter_month_week"
     OMEGA_DO_SYNC_OTHER_MIN = "omega/min_5_15_30_60"
     OMEGA_DO_SYNC_SECURITIES = "omega/sycn_securites"
+    OMEGA_DO_SYNC_XRXD_REPORTS = "omega/sycn_xrxd_reports"
 
     OMEGA_HEART_BEAT = "omega/heart_beat"
 

@@ -58,10 +58,29 @@ class AbstractQuotesFetcher(QuotesFetcher):
         """
         securities = await cls.get_instance().get_security_list(date)
         if securities is None or len(securities) == 0:
-            logger.warning("failed to update securities. %s is returned.", securities)
+            logger.warning("failed to update securities. %s is returned.", date)
             return None
 
         return securities
+
+    @classmethod
+    async def get_finance_xr_xd_info(
+        cls, dt1: datetime.date, dt2: datetime.date
+    ) -> List:
+        """按如下格式返回分红送股公告事件。
+
+        code, a_xr_date, board_plan_bonusnote, bonus_ratio_rmb, dividend_ratio, transfer_ratio,
+            at_bonus_ratio_rmb, report_date, company_name, plan_progress, implementation_bonusnote, bonus_cancel_pub_date
+
+        Returns:
+            List: [description]
+        """
+        reports = await cls.get_instance().get_finance_xr_xd_info(dt1, dt2)
+        if reports is None or len(reports) == 0:
+            logger.warning("failed to get xr xd reports. %s is returned.", dt2)
+            return None
+
+        return reports
 
     @classmethod
     async def get_bars_batch(

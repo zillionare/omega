@@ -22,6 +22,7 @@ from omega.master.tasks.sync_other_bars import (
 )
 from omega.master.tasks.sync_price_limit import sync_trade_price_limits
 from omega.master.tasks.sync_securities import sync_securities_list
+from omega.master.tasks.sync_xr_xd_reports import sync_xrxd_reports
 from omega.master.tasks.synctask import BarsSyncTask, master_syncbars_task
 
 logger = logging.getLogger(__name__)
@@ -200,6 +201,13 @@ async def load_cron_task(scheduler):
         hour="1",
         minute="30",
         name="sync_securities",
+    )
+    scheduler.add_job(
+        sync_xrxd_reports,
+        "cron",
+        hour="1",
+        minute="45",
+        name="sync_xrxd",
     )
 
     scheduler.add_job(

@@ -1,20 +1,14 @@
 import datetime
 import logging
-import pickle
-from os import sync
 
 import arrow
-import cfg4py
-import numpy as np
 from coretypes import FrameType
 from omicron.dal import cache
 from omicron.models.stock import Security
 from omicron.models.timeframe import TimeFrame
 
 from omega.core import constants
-from omega.core.constants import MINIO_TEMPORAL
 from omega.core.events import Events
-from omega.master.dfs import Storage
 from omega.master.tasks.sec_synctask import SecuritySyncTask, master_secs_task
 
 logger = logging.getLogger(__name__)

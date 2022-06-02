@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import logging
 import traceback
 from functools import wraps
@@ -90,3 +91,19 @@ async def sync_security_list(params: Dict):
     await Security.save_securities(securities, target_date)
     logger.info("secs are fetched and saved.")
     return len(securities)
+
+
+@worker_secs_task()
+async def sync_xrxd_report_list(params: Dict):
+    dt2 = params.get("end")
+    dt1 = dt2 - datetime.timedelta(days=366)  # 取之前一年的数据
+
+    reports = await fetcher.get_finance_xr_xd_info(dt1, dt2)
+    if reports is None:
+        msg = "failed to get xr xd reports(%s)" % dt2.strftime("%Y-%m-%d")
+        logger.error(msg)
+        raise Exception(msg)
+
+    await Security.save_xrxd_reports(reports, dt2)
+    logger.info("xr xd reports are fetched and saved.")
+    return len(reports)
