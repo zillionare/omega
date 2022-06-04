@@ -29,7 +29,7 @@ async def get_xrxd_sync_task(sync_dt: datetime.datetime):
         name=name,
         end=sync_dt,
         timeout=60 * 2,  # 1年内的数据，大约数秒
-        recs_per_task=10000,  # 2022年6月，大约1万条数据
+        recs_per_task=5000,  # 2021年12月31日的年报，大约1500条数据
     )
     return task
 
@@ -52,5 +52,28 @@ async def sync_xrxd_reports():
         logger.error(f"{task.name}({task.end}), task failed, params: {task.params}")
     else:
         logger.info(f"{task.name}({task.end}), task finished, params: {task.params}")
+
+    logger.info("sync_xrxd_reports ends")
+
+
+@master_secs_task()
+async def sync_all_xrxd_reports():
+    """同步上市公司分红送股数据，聚宽每天8点更新，本程序取前一天的数据"""
+
+    logger.info("sync_all_xrxd_reports starts")
+
+    dt = datetime.date(2005, 6, 15)  # 开始日期
+    while dt.year < 2023:
+        task = await get_xrxd_sync_task(dt)
+        success = await run_xrxd_sync_task(task)
+        if not success:  # pragma: no cover
+            logger.error(f"{task.name}({task.end}), task failed, params: {task.params}")
+        else:
+            logger.info(
+                f"{task.name}({task.end}), task finished, params: {task.params}"
+            )
+
+        next_year = dt.year + 1
+        dt = dt.replace(year=next_year)
 
     logger.info("sync_xrxd_reports ends")

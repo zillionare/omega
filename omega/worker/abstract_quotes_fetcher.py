@@ -64,7 +64,7 @@ class AbstractQuotesFetcher(QuotesFetcher):
         return securities
 
     @classmethod
-    async def get_finance_xr_xd_info(
+    async def get_finance_xrxd_info(
         cls, dt1: datetime.date, dt2: datetime.date
     ) -> List:
         """按如下格式返回分红送股公告事件。
@@ -75,7 +75,7 @@ class AbstractQuotesFetcher(QuotesFetcher):
         Returns:
             List: [description]
         """
-        reports = await cls.get_instance().get_finance_xr_xd_info(dt1, dt2)
+        reports = await cls.get_instance().get_finance_xrxd_info(dt1, dt2)
         if reports is None or len(reports) == 0:
             logger.warning("failed to get xr xd reports. %s is returned.", dt2)
             return None

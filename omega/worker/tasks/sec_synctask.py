@@ -95,15 +95,15 @@ async def sync_security_list(params: Dict):
 
 @worker_secs_task()
 async def sync_xrxd_report_list(params: Dict):
-    dt2 = params.get("end")
-    dt1 = dt2 - datetime.timedelta(days=366)  # 取之前一年的数据
+    dt_end = params.get("end")
+    dt_start = dt_end - datetime.timedelta(days=366)  # 取之前一年的数据
 
-    reports = await fetcher.get_finance_xr_xd_info(dt1, dt2)
+    reports = await fetcher.get_finance_xrxd_info(dt_start, dt_end)
     if reports is None:
-        msg = "failed to get xr xd reports(%s)" % dt2.strftime("%Y-%m-%d")
+        msg = "failed to get xr xd reports(%s)" % dt_end.strftime("%Y-%m-%d")
         logger.error(msg)
         raise Exception(msg)
 
-    await Security.save_xrxd_reports(reports, dt2)
+    await Security.save_xrxd_reports(reports, dt_end)
     logger.info("xr xd reports are fetched and saved.")
     return len(reports)
