@@ -86,5 +86,5 @@ notify:
     mail_to:
         - ${MAIL_TO}
     mail_server: ${MAIL_SERVER}
-    dingtalk_access_token: {DINGTALK_ACCESS_TOKEN}
-    dingtalk_secret: {DINGTALK_SECRET}
+    dingtalk_access_token: ${DINGTALK_ACCESS_TOKEN}
+    dingtalk_secret: ${DINGTALK_SECRET}
