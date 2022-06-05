@@ -138,6 +138,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             "sync_week_bars",
             "sync_min_5_15_30_60",
             "sync_securities",
+            "sync_xrxd",
         }
         print(set([job.name for job in scheduler.get_jobs()]))
         self.assertSetEqual(base, set([job.name for job in scheduler.get_jobs()]))
@@ -193,9 +194,10 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
 
         # 测试数据为None 时邮件是否正常
         print("测试数据为None 时邮件是否正常")
+        email_content = ""
         with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
             with mock.patch(
-                "omega.worker.abstract_quotes_fetcher.AbstractQuotesFetcher.get_bars_batch",
+                "omega.worker.tasks.fetchers.fetcher.get_bars_batch",
                 return_value=None,
             ):
                 with mock.patch("arrow.now", return_value=end):

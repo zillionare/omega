@@ -62,7 +62,7 @@ def worker_secs_task():
                         await secs_task_done(state, secs_synced)
                         return True
                     except exception.WorkerException as e:
-                        await secs_task_exit(state, error=str(e))
+                        await secs_task_exit(state, error=e.msg)
                     except Exception as ex:  # pragma: no cover
                         logger.exception(ex)
                         await secs_task_exit(state, error=str(ex))

@@ -111,7 +111,7 @@ async def get_sync_minute_bars_task() -> Optional[BarsSyncTask]:
         name=name,
         frame_type=[FrameType.MIN1],
         end=end,
-        timeout=60 * n_bars,  # 实际观察大约130秒左右
+        timeout=60 * n_bars + 30,  # 增加30秒的超时
         n_bars=n_bars,
         recs_per_sec=n_bars,
         quota_type=2,  # 白天的同步任务
