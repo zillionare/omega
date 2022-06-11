@@ -116,6 +116,8 @@ async def sync_for_persist(typ: SecurityType, ft: FrameType, params: Dict):
     async for secs in get_secs_for_sync(limit, n, queue):
         # todo: is there better way to do the check? 校验和数据类型问题
         bars1 = await fetch_bars(secs, params.get("end"), n, ft)  # get_bars
+        logger.info("done sync: ft %s, %d secs, %d bars", ft, len(secs), len(bars1))
+
         # if ft in (FrameType.MIN1, FrameType.DAY):
         #     bars2 = await fetch_price(secs, params.get("end"), n, ft)  # get_price
         #     if not checksum(bars1, bars2):
@@ -125,7 +127,6 @@ async def sync_for_persist(typ: SecurityType, ft: FrameType, params: Dict):
         #     print(e)
         await cache_bars_for_aggregation(name, typ, ft, bars1)
         # 记录已完成的证券
-        logger.info("done sync: %s, %s", ft, secs)
         await cache.sys.lpush(done_queue, *secs)
 
 
@@ -203,4 +204,7 @@ async def cache_bars_for_aggregation(
     """
     queue = f"{MINIO_TEMPORAL}.{name}.{typ.value}.{ft.value}"
     data = pickle.dumps(bars, protocol=cfg.pickle.ver)
+    logger.info(
+        "cache bars aggregation: %d secs(%d bytes) -> %s", len(bars), len(data), queue
+    )
     await cache.temp.lpush(queue, data)

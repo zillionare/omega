@@ -175,14 +175,16 @@ class BarsSyncTask:
         body += "\n\n================================================\n\n"
         body += "all params in master task: " + str(self.params)
         body += "\n\n================================================\n\n"
+        logger.info(f"send mail, subject: {subject}, body: {body}")
 
         # review: 因为报告机制特别重要，所以不能因为读redis失败而导致发送失败。
         try:
             body += f"{await self.get_sync_failed_secs()}"
         except Exception as e:  # noqa   # pragma: no cover
-            body += "failed to get unfinished security list: " + traceback.format_exc()
+            msg = "failed to get unfinished security list: " + traceback.format_exc()
+            body += msg
+            logger.info(msg)
 
-        logger.info(f"send mail, subject: {subject}, body: {body}")
         await mail_notify(subject, body, html=True)
 
     async def init_state(self, **kwargs):

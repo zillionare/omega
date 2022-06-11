@@ -28,8 +28,14 @@ async def run_month_week_sync_task(tail_key: str, task: BarsSyncTask):
     ret = await task.run()
     if not ret:
         return False
+
+    logger.info(
+        "month_week_sync_task success, writing data to dfs: %s, %s", task.name, task.end
+    )
     await write_dfs(task.name, task.end, task.frame_type)
+
     await cache.sys.set(tail_key, task.end.strftime("%Y-%m-%d"))
+    logger.info("set %s to cache %s", task.end, tail_key)
 
 
 async def get_month_week_day_sync_date(tail_key: str, frame_type: FrameType):

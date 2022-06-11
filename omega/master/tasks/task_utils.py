@@ -108,7 +108,14 @@ async def write_dfs(
 
         # todo: now resmaple is disabled
         binary = pickle.dumps(all_bars, protocol=cfg.pickle.ver)
-        await dfs.write(get_bars_filename(typ, dt, ft), binary)
+        filename = get_bars_filename(typ, dt, ft)
+        logger.info(
+            "write bars to dfs: %d secs (%d bytes) -> %s",
+            len(all_bars),
+            len(binary),
+            filename,
+        )
+        await dfs.write(filename, binary)
         # todo: let worker do the resample
         # if resample and ft == FrameType.MIN1 and 1 == 0:
         #     for to_frame in (
