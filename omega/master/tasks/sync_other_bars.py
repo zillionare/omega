@@ -89,6 +89,26 @@ async def get_month_week_sync_task(
     return task
 
 
+async def get_min_5_15_30_60_sync_date(tail_key: str, frame_type: FrameType):
+    now = arrow.now().naive
+    while True:
+        tail = await cache.sys.get(tail_key)
+        if not tail:
+            tail = TimeFrame.int2date(TimeFrame.day_frames[0])
+        else:
+            tail = datetime.datetime.strptime(tail, "%Y-%m-%d")
+            tail = TimeFrame.shift(tail, 1, frame_type)
+        count_frame = TimeFrame.count_frames(
+            tail,
+            now.replace(hour=0, minute=0, second=0, microsecond=0),
+            frame_type,
+        )
+        if count_frame >= 2:  # 日线只能取上一个交易日的数据
+            yield tail
+        else:
+            break
+
+
 @master_syncbars_task()
 async def sync_min_5_15_30_60():
     """同步 5 15 30 60 分钟线"""
@@ -99,7 +119,7 @@ async def sync_min_5_15_30_60():
         FrameType.MIN30,
         FrameType.MIN60,
     ]
-    async for sync_date in get_month_week_day_sync_date(
+    async for sync_date in get_min_5_15_30_60_sync_date(
         constants.BAR_SYNC_OTHER_MIN_TAIL, FrameType.DAY  # 传日线进去就行，因为这个是按照天同步的
     ):
         # 初始化task
