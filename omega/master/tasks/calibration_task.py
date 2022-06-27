@@ -10,7 +10,7 @@ from omicron.models.timeframe import TimeFrame
 from omega.core import constants
 from omega.core.events import Events
 from omega.master.tasks.synctask import BarsSyncTask, master_syncbars_task
-from omega.master.tasks.task_utils import get_yesterday_or_pre_trade_day, write_dfs
+from omega.master.tasks.task_utils import get_previous_trade_day, write_dfs
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ async def get_sync_date():
 
         # todo: check if it can get right sync_dt
         now = arrow.now().naive.date()
-        pre_trade_day = get_yesterday_or_pre_trade_day(now)
+        pre_trade_day = get_previous_trade_day(now)
         if not head or not tail:
             # 任意一个缺失都不行
             logger.info("说明是首次同步，查找上一个已收盘的交易日")
@@ -126,10 +126,12 @@ async def daily_calibration_job():
     """
     logger.info("每日数据校准已启动")
     now = arrow.now().date()
+    pre_trade_date = get_previous_trade_day(now)
+
     async for sync_dt, head, tail in get_sync_date():
         # 创建task
         # 当天的校准启动前，先清除缓存。
-        if sync_dt.date() == TimeFrame.day_shift(now, -1):
+        if sync_dt.date() == pre_trade_date:
             await Stock.reset_cache()
 
         task = await get_daily_calibration_job_task(sync_dt)

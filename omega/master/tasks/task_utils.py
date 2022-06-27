@@ -18,9 +18,11 @@ logger = logging.getLogger(__name__)
 cfg: Config = cfg4py.get_instance()
 
 
-def get_yesterday_or_pre_trade_day(now):
-    """获取昨天或者上一个交易日"""
-    # todo: could be replaced by TimeFrame.day_shift(now, 0)?
+def get_previous_trade_day(now):
+    """获取上一个交易日
+    如果当天是周六，返回周五（交易日），如果当天是周一（交易日），返回周五
+    如果当天是周五，返回周四（交易日）
+    """
     if TimeFrame.date2int(now) in TimeFrame.day_frames:
         pre_trade_day = TimeFrame.day_shift(now, -1)
     else:
