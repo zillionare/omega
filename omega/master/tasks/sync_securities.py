@@ -19,7 +19,7 @@ async def get_security_sync_date():
 
     while True:
         # 取同步的时间头尾信息，head即更早的时间，tail是最新的时间
-        head, tail = (
+        head_str, tail_str = (
             await cache.sys.get(constants.SECS_SYNC_ARCHIVE_HEAD),
             await cache.sys.get(constants.SECS_SYNC_ARCHIVE_TAIL),
         )
@@ -28,41 +28,41 @@ async def get_security_sync_date():
         now = arrow.now().date()
         pre_trade_day = TimeFrame.day_shift(now, 0)
 
-        if not head or not tail:
-            # try to get date scope from db
+        if not head_str or not tail_str:
+            # try to get date scope from db, date(), not datetime()
             head, tail = await Security.get_datescope_from_db()
             if head is None or tail is None:
-                head = tail = None
+                head_str = tail_str = None
             else:
-                head = head.strftime("%Y-%m-%d")
+                head_str = head.strftime("%Y-%m-%d")
                 await cache.sys.set(constants.SECS_SYNC_ARCHIVE_HEAD, head)
-                tail = tail.strftime("%Y-%m-%d")
+                tail_str = tail.strftime("%Y-%m-%d")
                 await cache.sys.set(constants.SECS_SYNC_ARCHIVE_TAIL, tail)
 
-        if not head or not tail:
+        if not head_str or not tail_str:
             logger.info("首次同步，查找最新的交易日, %s", pre_trade_day.strftime("%Y-%m-%d"))
             sync_dt = datetime.datetime.combine(pre_trade_day, datetime.time(0, 0))
             head = tail = pre_trade_day  # 同步完之后更新redis的head和tail
         else:
             # 说明不是首次同步，检查tail到当前的上一个交易日有没有空洞
-            tail_date = datetime.datetime.strptime(tail, "%Y-%m-%d")
-            head_date = datetime.datetime.strptime(head, "%Y-%m-%d")
+            tail = datetime.datetime.strptime(tail_str, "%Y-%m-%d")
+            head = datetime.datetime.strptime(head_str, "%Y-%m-%d")
             frames = TimeFrame.count_frames(
-                tail_date,
+                tail,
                 pre_trade_day,
                 FrameType.DAY,
             )
             if frames > 1:
                 # 最后同步时间到当前最新的交易日之间有空洞
-                tail_date = datetime.datetime.combine(
-                    TimeFrame.day_shift(tail_date, 1), datetime.time(0, 0)
+                tail = datetime.datetime.combine(
+                    TimeFrame.day_shift(tail, 1), datetime.time(0, 0)
                 )
-                sync_dt = tail = tail_date
+                sync_dt = tail
                 head = None  # 不更新redis中head的日期，保持不变
             else:
                 # 已同步到最后一个交易日，向前追赶
                 sync_dt = head = datetime.datetime.combine(
-                    TimeFrame.day_shift(head_date, -1), datetime.time(0, 0)
+                    TimeFrame.day_shift(head, -1), datetime.time(0, 0)
                 )
                 tail = None  # 不更新redis中tail的日期，保持不变
 
@@ -126,19 +126,13 @@ async def get_security_sync_task(sync_dt: datetime.datetime):
 
 """
 2005-12-31 1410
-2006-12-31 1488
-2007-12-31 1647
-2008-12-31 1744
 2009-12-31 1945
-2010-12-31 2408
 2011-12-31 2871
 2012-12-31 3208
-2013-12-31 3346
 2014-12-31 3601
 2015-12-31 4118
 2016-12-31 4426
 2017-12-31 4938
-2018-12-31 5042
 2019-12-31 5331
 2020-12-31 5603
 2021-12-31 6262
@@ -151,7 +145,6 @@ async def sync_securities_list():
 
     logger.info("sync_securities_list starts")
 
-    sync_days_count = 0
     async for sync_dt, head, tail in get_security_sync_date():
         logger.info(
             "sync_securities_list, target date: %s", sync_dt.strftime("%Y-%m-%d")
@@ -172,10 +165,7 @@ async def sync_securities_list():
                 await cache.sys.set(
                     constants.SECS_SYNC_ARCHIVE_TAIL, tail.strftime("%Y-%m-%d")
                 )
-            sync_days_count += 1
-            logger.info(f"{task.name}({task.end})同步完成,参数为{task.params}")
 
-            # if sync_days_count >= 300:  # 3 * 75s，大约4~5分钟
-            #    break
+            logger.info(f"{task.name}({task.end})同步完成,参数为{task.params}")
 
     logger.info("sync_securities_list ends")
