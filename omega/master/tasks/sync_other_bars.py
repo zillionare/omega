@@ -98,15 +98,22 @@ async def get_min_5_15_30_60_sync_date(tail_key: str, frame_type: FrameType):
         else:
             tail = datetime.datetime.strptime(tail, "%Y-%m-%d")
             tail = TimeFrame.shift(tail, 1, frame_type)
+
+        # get frame count
         count_frame = TimeFrame.count_frames(
-            tail,
-            now.replace(hour=0, minute=0, second=0, microsecond=0),
-            frame_type,
+            tail, now.replace(hour=0, minute=0, second=0, microsecond=0), frame_type
         )
-        if count_frame >= 2:  # 日线只能取上一个交易日的数据
-            yield tail
+
+        if TimeFrame.is_trade_day(now):
+            if count_frame >= 2:  # 交易日需要间隔一天
+                yield tail
+            else:
+                break
         else:
-            break
+            if count_frame >= 1:  # 非交易日只需要取上一个交易日即可
+                yield tail
+            else:
+                break
 
 
 @master_syncbars_task()
