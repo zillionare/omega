@@ -60,10 +60,17 @@ async def get_month_week_day_sync_date(tail_key: str, frame_type: FrameType):
             now.replace(hour=0, minute=0, second=0, microsecond=0),
             frame_type,
         )
-        if count_frame >= 1:
-            yield tail
+
+        if TimeFrame.is_trade_day(now):
+            if count_frame >= 2:  # 交易日需要间隔一天
+                yield tail
+            else:
+                break
         else:
-            break
+            if count_frame >= 1:  # 非交易日只需要取上一个交易日即可
+                yield tail
+            else:
+                break
 
 
 async def get_month_week_sync_task(
@@ -153,8 +160,9 @@ async def sync_week_bars():
         constants.BAR_SYNC_WEEK_TAIL, frame_type
     ):
         # 初始化task
+        end = datetime.datetime(sync_date.year, sync_date.month, sync_date.day, hour=15)
         task = await get_month_week_sync_task(
-            Events.OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK, sync_date, frame_type
+            Events.OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK, end, frame_type
         )
         await run_month_week_sync_task(constants.BAR_SYNC_WEEK_TAIL, task)
         if not task.status:
@@ -169,8 +177,9 @@ async def sync_month_bars():
         constants.BAR_SYNC_MONTH_TAIL, frame_type
     ):
         # 初始化task
+        end = datetime.datetime(sync_date.year, sync_date.month, sync_date.day, hour=15)
         task = await get_month_week_sync_task(
-            Events.OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK, sync_date, frame_type
+            Events.OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK, end, frame_type
         )
         await run_month_week_sync_task(constants.BAR_SYNC_MONTH_TAIL, task)
         if not task.status:
