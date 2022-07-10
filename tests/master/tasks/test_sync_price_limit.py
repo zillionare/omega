@@ -105,7 +105,7 @@ class TestSyncJobs_PriceLimit(unittest.IsolatedAsyncioTestCase):
             side_effect=[task],
         ):
             with mock.patch(
-                "omega.master.tasks.sync_price_limit.get_month_week_day_sync_date",
+                "omega.master.tasks.sync_price_limit.get_trade_price_limits_sync_date",
                 side_effect=get_week_sync_date_mock,
             ):
                 await sync_trade_price_limits()

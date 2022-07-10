@@ -17,10 +17,7 @@ from omega.core import constants
 from omega.core.constants import MINIO_TEMPORAL
 from omega.core.events import Events
 from omega.master.dfs import Storage
-from omega.master.tasks.sync_other_bars import (
-    get_month_week_day_sync_date,
-    get_month_week_sync_task,
-)
+from omega.master.tasks.sync_other_bars import get_month_week_sync_task
 from omega.master.tasks.synctask import BarsSyncTask, master_syncbars_task
 from omega.master.tasks.task_utils import delete_temporal_bars
 
@@ -93,11 +90,36 @@ async def run_sync_trade_price_limits_task(
         )
 
 
+async def get_trade_price_limits_sync_date(tail_key: str, frame_type: FrameType):
+    epoch_start = {
+        FrameType.DAY: TimeFrame.int2date(TimeFrame.day_frames[0]),
+        FrameType.WEEK: TimeFrame.int2date(TimeFrame.week_frames[0]),
+        FrameType.MONTH: TimeFrame.int2date(TimeFrame.month_frames[0]),
+    }
+    while True:
+        tail = await cache.sys.get(tail_key)
+        now = arrow.now().naive
+        if not tail:
+            tail = epoch_start.get(frame_type)
+        else:
+            tail = datetime.datetime.strptime(tail, "%Y-%m-%d")
+            tail = TimeFrame.shift(tail, 1, frame_type)
+        count_frame = TimeFrame.count_frames(
+            tail,
+            now.replace(hour=0, minute=0, second=0, microsecond=0),
+            frame_type,
+        )
+        if count_frame >= 1:
+            yield tail
+        else:
+            break
+
+
 @master_syncbars_task()
 async def sync_trade_price_limits():
     """每天9:01/09:31各同步一次今日涨跌停并写入redis"""
     frame_type = FrameType.DAY
-    async for sync_date in get_month_week_day_sync_date(
+    async for sync_date in get_trade_price_limits_sync_date(
         constants.BAR_SYNC_TRADE_PRICE_TAIL, frame_type
     ):
         logger.info("9:01, sync price limits first time")
