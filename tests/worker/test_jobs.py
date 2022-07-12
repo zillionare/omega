@@ -38,11 +38,8 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         await worker_job.load_cron_task(scheduler)
         print(set([job.name for job in scheduler.get_jobs()]))
         base = {
-            "sync_fund_net_value",
             "sync_calendar",
-            "sync_funds",
-            "sync_fund_share_daily",
-            "sync_fund_portfolio_stock",
+            "sync_seclist_today",
         }
         self.assertSetEqual(base, set([job.name for job in scheduler.get_jobs()]))
 

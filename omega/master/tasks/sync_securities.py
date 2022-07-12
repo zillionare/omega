@@ -10,6 +10,7 @@ from omicron.models.timeframe import TimeFrame
 from omega.core import constants
 from omega.core.events import Events
 from omega.master.tasks.sec_synctask import SecuritySyncTask, master_secs_task
+from omega.master.tasks.task_utils import get_previous_trade_day
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ async def get_security_sync_date():
 
         # 获取前一个交易日
         now = arrow.now().date()
-        pre_trade_day = TimeFrame.day_shift(now, 0)
+        pre_trade_day = get_previous_trade_day(now)
 
         if not head_str or not tail_str:
             # try to get date scope from db, date(), not datetime()
@@ -61,16 +62,17 @@ async def get_security_sync_date():
                 head = None  # 不更新redis中head的日期，保持不变
             else:
                 # 已同步到最后一个交易日，向前追赶
+
+                # 检查时间是否小于 2005年，小于则说明同步完成了
+                day_frame = TimeFrame.day_frames[0]
+                if TimeFrame.date2int(head) <= day_frame:
+                    logger.info("sync_securities_list: 所有数据已同步完毕")
+                    break
+
                 sync_dt = head = datetime.datetime.combine(
                     TimeFrame.day_shift(head, -1), datetime.time(0, 0)
                 )
                 tail = None  # 不更新redis中tail的日期，保持不变
-
-        # 检查时间是否小于 2005年，小于则说明同步完成了
-        day_frame = TimeFrame.day_frames[0]
-        if TimeFrame.date2int(sync_dt) <= day_frame:
-            logger.info("sync_securities_list: 所有数据已同步完毕")
-            break
 
         yield sync_dt, head, tail
 
@@ -141,7 +143,7 @@ async def get_security_sync_task(sync_dt: datetime.datetime):
 
 @master_secs_task()
 async def sync_securities_list():
-    """同步证券列表，每天凌晨执行一次，利用多余的quota每天追赶一部分数据"""
+    """同步证券列表，每天8点执行一次，存昨日的数据到db，取今日的数据到缓存（包含今日上市）"""
 
     logger.info("sync_securities_list starts")
 

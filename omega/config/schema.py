@@ -105,8 +105,6 @@ class Config(object):
 
         mail_server: Optional[str] = None
 
-        class dingtalk_access_token:
-            DINGTALK_ACCESS_TOKEN = None
+        dingtalk_access_token: Optional[str] = None
 
-        class dingtalk_secret:
-            DINGTALK_SECRET = None
+        dingtalk_secret: Optional[str] = None

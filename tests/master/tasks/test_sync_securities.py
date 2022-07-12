@@ -80,7 +80,7 @@ class TestSyncJobs_Securities(unittest.IsolatedAsyncioTestCase):
 
     async def test_sync_secslist_date2(self, *args):
         # 测试交易日
-        end = arrow.get("2005-07-11")  # Monday
+        end = arrow.get("2005-07-12")  # Tuesday
         idx = 1
         with mock.patch("arrow.now", return_value=end):
             await cache.sys.set(constants.SECS_SYNC_ARCHIVE_HEAD, "2005-07-01"),

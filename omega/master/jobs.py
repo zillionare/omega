@@ -145,14 +145,7 @@ async def sync_minute_bars():
 
 
 async def load_cron_task(scheduler):
-    scheduler.add_job(
-        sync_trade_price_limits,
-        "cron",
-        hour=9,
-        minute="1,31",
-        name="sync_trade_price_limits",
-    )
-
+    # 交易日交易时间段的数据同步任务
     scheduler.add_job(
         sync_minute_bars,
         "cron",
@@ -197,14 +190,8 @@ async def load_cron_task(scheduler):
         name="after_hour_sync_job",
     )
 
-    # 以下追赶性质的任务，应该单独执行，不能和日常同步任务混在一起，因为jqadaptor只有一个线程，定时器也只能触发一个同类型的任务
-    scheduler.add_job(
-        sync_securities_list,
-        "cron",
-        hour="1",
-        minute="30",
-        name="sync_securities",
-    )
+    # 以下追赶性质的任务，应该单独执行，不能和日常同步任务混在一起，
+    # 因为jqadaptor只有一个线程，定时器也只能触发一个同类型的任务
     scheduler.add_job(
         sync_xrxd_reports,
         "cron",
@@ -241,3 +228,50 @@ async def load_cron_task(scheduler):
         minute=30,
         name="sync_min_5_15_30_60",
     )
+
+    scheduler.add_job(
+        sync_securities_list,
+        "cron",
+        hour="8",
+        minute="5",
+        name="sync_securities",  # 聚宽8点更新，写入昨日数据到db，今日数据到cache
+    )
+
+    scheduler.add_job(
+        sync_trade_price_limits,
+        "cron",
+        hour=9,
+        minute="1,31",  # 第一次为了交易界面方便使用，第二次是正确的数据（修正后）
+        name="sync_trade_price_limits",
+    )
+
+    """
+    scheduler.add_job(
+        sync_fund_net_value,
+        "cron",
+        hour=4,
+        minute=15,
+        name="sync_fund_net_value",
+    )
+    scheduler.add_job(
+        sync_funds,
+        "cron",
+        hour=4,
+        minute=0,
+        name="sync_funds",
+    )
+    scheduler.add_job(
+        sync_fund_share_daily,
+        "cron",
+        hour=4,
+        minute=5,
+        name="sync_fund_share_daily",
+    )
+    scheduler.add_job(
+        sync_fund_portfolio_stock,
+        "cron",
+        hour=4,
+        minute=10,
+        name="sync_fund_portfolio_stock",
+    )
+    """

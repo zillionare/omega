@@ -85,12 +85,6 @@ async def sync_security_list(params: Dict):
         logger.error(msg)
         raise Exception(msg)
 
-    if arrow.now().date() == target_date.date():  # 更新今天的缓存数据
-        logger.info(
-            "save security data into cache: %s", target_date.strftime("%Y-%m-%d")
-        )
-        await Security.update_secs_cache(target_date.date(), securities)
-
     await Security.save_securities(securities, target_date)
     logger.info("secs are fetched and saved, %s", target_date)
     return len(securities)

@@ -76,7 +76,7 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
     async def test_get_month_week_day_sync_date(self):
         tail_key = "test_sync_tail"
         await cache.sys.delete(tail_key)
-        with mock.patch("arrow.now", return_value=arrow.get("2005-01-05 02:05:00")):
+        with mock.patch("arrow.now", return_value=arrow.get("2005-01-06 02:05:00")):
             generator = get_month_week_day_sync_date(tail_key, FrameType.DAY)
             tail = await generator.__anext__()
             await cache.sys.set(tail_key, tail.strftime("%Y-%m-%d"))
@@ -288,6 +288,7 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
             await dfs.delete(get_bars_filename(typ, end.naive, ft))
 
         await task.cleanup(success=True)
+        await cache.sys.delete(constants.BAR_SYNC_OTHER_MIN_TAIL)
         with mock.patch(
             "omega.master.tasks.sync_other_bars.BarsSyncTask",
             side_effect=[task],
