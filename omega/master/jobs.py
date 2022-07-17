@@ -242,6 +242,7 @@ async def load_cron_task(scheduler):
         "cron",
         hour=9,
         minute="1,31",  # 第一次为了交易界面方便使用，第二次是正确的数据（修正后）
+        second=10,
         name="sync_trade_price_limits",
     )
 

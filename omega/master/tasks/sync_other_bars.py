@@ -38,7 +38,7 @@ async def run_month_week_sync_task(tail_key: str, task: BarsSyncTask):
     logger.info("set %s to cache %s", task.end, tail_key)
 
 
-async def get_month_week_day_sync_date(tail_key: str, frame_type: FrameType):
+async def get_month_week_sync_date(tail_key: str, frame_type: FrameType):
     """获取周月的同步日期，通常情况下，周月数据相对较少，一天的quota足够同步完所有的数据，所以直接从2005年开始同步至今
     做成生成器方式，不停的获取时间
     """
@@ -62,12 +62,12 @@ async def get_month_week_day_sync_date(tail_key: str, frame_type: FrameType):
         )
 
         if TimeFrame.is_trade_day(now):
-            if count_frame >= 2:  # 交易日需要间隔一天
+            if count_frame >= 2:  # 交易日的情况下取上一个交易日
                 yield tail
             else:
                 break
         else:
-            if count_frame >= 1:  # 非交易日只需要取上一个交易日即可
+            if count_frame >= 1:  # 非交易日的情况下取上一个交易日
                 yield tail
             else:
                 break
@@ -156,10 +156,10 @@ async def sync_week_bars():
     """同步周线"""
     # 检查周线 tail
     frame_type = FrameType.WEEK
-    async for sync_date in get_month_week_day_sync_date(
+    async for sync_date in get_month_week_sync_date(
         constants.BAR_SYNC_WEEK_TAIL, frame_type
     ):
-        # 初始化task
+        # 初始化task，强制15点
         end = datetime.datetime(sync_date.year, sync_date.month, sync_date.day, hour=15)
         task = await get_month_week_sync_task(
             Events.OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK, end, frame_type
@@ -173,10 +173,10 @@ async def sync_week_bars():
 async def sync_month_bars():
     """同步月线"""
     frame_type = FrameType.MONTH
-    async for sync_date in get_month_week_day_sync_date(
+    async for sync_date in get_month_week_sync_date(
         constants.BAR_SYNC_MONTH_TAIL, frame_type
     ):
-        # 初始化task
+        # 初始化task，强制15点
         end = datetime.datetime(sync_date.year, sync_date.month, sync_date.day, hour=15)
         task = await get_month_week_sync_task(
             Events.OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK, end, frame_type

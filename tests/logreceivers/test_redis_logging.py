@@ -3,9 +3,9 @@ import logging
 import os
 import shutil
 import unittest
+from unittest import mock
 
 import rlog
-from unittest import mock
 
 from omega.logreceivers.redis import RedisLogReceiver
 from tests import init_test_env

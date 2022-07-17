@@ -22,7 +22,7 @@ from omega.core import constants
 from omega.core.events import Events
 from omega.master.dfs import Storage
 from omega.master.tasks.sync_other_bars import (
-    get_month_week_day_sync_date,
+    get_month_week_sync_date,
     sync_min_5_15_30_60,
     sync_month_bars,
     sync_week_bars,
@@ -73,11 +73,11 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
         params = fetcher_info["workers"][0]
         await aq.create_instance(impl, **params)
 
-    async def test_get_month_week_day_sync_date(self):
+    async def test_get_month_week_sync_date(self):
         tail_key = "test_sync_tail"
         await cache.sys.delete(tail_key)
         with mock.patch("arrow.now", return_value=arrow.get("2005-01-06 02:05:00")):
-            generator = get_month_week_day_sync_date(tail_key, FrameType.DAY)
+            generator = get_month_week_sync_date(tail_key, FrameType.DAY)
             tail = await generator.__anext__()
             await cache.sys.set(tail_key, tail.strftime("%Y-%m-%d"))
             tail = await generator.__anext__()
@@ -85,7 +85,7 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(tail, datetime.date(2005, 1, 5))
 
         with mock.patch("arrow.now", return_value=arrow.get("2005-01-05 02:05:00")):
-            generator = get_month_week_day_sync_date(tail_key, FrameType.DAY)
+            generator = get_month_week_sync_date(tail_key, FrameType.DAY)
             try:
                 await generator.__anext__()
             except Exception as e:
@@ -97,7 +97,7 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
         "omega.master.tasks.synctask.QuotaMgmt.check_quota",
         return_value=((True, 500000, 1000000)),
     )
-    @mock.patch("omega.master.tasks.sync_other_bars.get_month_week_day_sync_date")
+    @mock.patch("omega.master.tasks.sync_other_bars.get_month_week_sync_date")
     @mock.patch("omega.master.tasks.synctask.mail_notify")
     async def test_sync_week_bars(self, mail_notify, get_week_sync_date, *args):
         emit.register(
@@ -174,7 +174,7 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
         "omega.master.tasks.synctask.QuotaMgmt.check_quota",
         return_value=((True, 500000, 1000000)),
     )
-    @mock.patch("omega.master.tasks.sync_other_bars.get_month_week_day_sync_date")
+    @mock.patch("omega.master.tasks.sync_other_bars.get_month_week_sync_date")
     @mock.patch("omega.master.tasks.synctask.mail_notify")
     async def test_sync_month_bars(self, mail_notify, get_week_sync_date, *args):
         emit.register(
@@ -251,7 +251,7 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
         "omega.master.tasks.synctask.QuotaMgmt.check_quota",
         return_value=((True, 500000, 1000000)),
     )
-    @mock.patch("omega.master.tasks.sync_other_bars.get_month_week_day_sync_date")
+    @mock.patch("omega.master.tasks.sync_other_bars.get_month_week_sync_date")
     @mock.patch("omega.master.tasks.synctask.mail_notify")
     async def test_sync_min_5_15_30_60(self, mail_notify, get_week_sync_date, *args):
         emit.register(

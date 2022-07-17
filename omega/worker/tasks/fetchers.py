@@ -5,6 +5,7 @@ from typing import Dict, List, Union
 import cfg4py
 import numpy as np
 from coretypes import FrameType, SecurityType
+from omicron.models.timeframe import TimeFrame
 from retrying import retry
 
 from omega.worker import exception
@@ -70,6 +71,16 @@ async def fetch_bars(
     )
     if bars is None:  # pragma: no cover
         raise exception.GotNoneData()
+
+    if hasattr(end, "date"):
+        d0 = end.date()
+        d1 = end.date()
+    else:
+        d0 = end
+        d1 = end
+    if frame_type in (FrameType.WEEK, FrameType.MONTH):
+        d0, d1 = TimeFrame.get_frame_scope(end, frame_type)
+
     for k in list(bars.keys()):
         if not len(bars[k]):
             del bars[k]
@@ -77,15 +88,19 @@ async def fetch_bars(
         if np.any(np.isnan(bars[k]["amount"])) or np.any(np.isnan(bars[k]["volume"])):
             del bars[k]
             continue
-        # 判断日期是否是end
+
+        # 周线和月线，数据必须在范围内，日线只需要判断是否为end即可
         frame = bars[k]["frame"][0]
         if hasattr(frame, "date"):
             frame = frame.date()
-        if hasattr(end, "date"):
-            end = end.date()
-        if frame != end:
-            del bars[k]
-            continue
+        if frame_type == FrameType.WEEK or frame_type == FrameType.MONTH:
+            if frame < d0 or frame > d1:
+                del bars[k]
+                continue
+        else:
+            if frame != d0:
+                del bars[k]
+                continue
     return bars
 
 
@@ -94,8 +109,16 @@ async def get_trade_price_limits(secs, end):
     """获取涨跌停价
     由于inflaxdb无法处理浮点数 nan 所以需要提前将nan转换为0
     """
-    # todo: 可以重命名为get_trade_limit_price
+    # end必须为datetime.date
     bars = await fetcher.get_trade_price_limits(secs, end)
-    bars["low_limit"] = np.nan_to_num(bars["low_limit"])
-    bars["high_limit"] = np.nan_to_num(bars["high_limit"])
+
+    # 滤掉无效数据
+    bars = bars[~np.isnan(bars["low_limit"])]
+    bars = bars[~np.isnan(bars["high_limit"])]
+    bars = bars[bars["frame"] == end]
+
+    # 放弃以前的做法
+    # bars["low_limit"] = np.nan_to_num(bars["low_limit"])
+    # bars["high_limit"] = np.nan_to_num(bars["high_limit"])
+
     return bars

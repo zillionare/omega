@@ -74,7 +74,7 @@ async def write_trade_price_limits_to_dfs(name: str, dt: datetime.datetime):
 
 
 async def run_sync_trade_price_limits_task(
-    task: BarsSyncTask, second_update: bool = False
+    task: BarsSyncTask, update_timestamp: bool = False
 ):
     """用来启动涨跌停的方法，接收一个task实例"""
     ret = await task.run()
@@ -84,10 +84,12 @@ async def run_sync_trade_price_limits_task(
         return False
     await write_trade_price_limits_to_dfs(task.name, task.end)
 
-    if second_update is False:
+    if update_timestamp:
         await cache.sys.set(
             constants.BAR_SYNC_TRADE_PRICE_TAIL, task.end.strftime("%Y-%m-%d")
         )
+
+    return True
 
 
 async def get_trade_price_limits_sync_date(tail_key: str, frame_type: FrameType):
@@ -103,12 +105,15 @@ async def get_trade_price_limits_sync_date(tail_key: str, frame_type: FrameType)
             tail = epoch_start.get(frame_type)
         else:
             tail = datetime.datetime.strptime(tail, "%Y-%m-%d")
-            tail = TimeFrame.shift(tail, 1, frame_type)
+            tail = TimeFrame.shift(tail, 1, frame_type)  # 返回datetime.date
         count_frame = TimeFrame.count_frames(
             tail,
             now.replace(hour=0, minute=0, second=0, microsecond=0),
             frame_type,
         )
+
+        # 交易日取当天，非交易日取前一个交易日，涨跌停价格获取是9点开始，因此取当天
+        # 非交易日执行时，此处count_frame == 0
         if count_frame >= 1:
             yield tail
         else:
@@ -119,24 +124,34 @@ async def get_trade_price_limits_sync_date(tail_key: str, frame_type: FrameType)
 async def sync_trade_price_limits():
     """每天9:01/09:31各同步一次今日涨跌停并写入redis"""
     frame_type = FrameType.DAY
-    async for sync_date in get_trade_price_limits_sync_date(
-        constants.BAR_SYNC_TRADE_PRICE_TAIL, frame_type
-    ):
-        logger.info("9:01, sync price limits first time")
-        task = await get_month_week_sync_task(
-            Events.OMEGA_DO_SYNC_TRADE_PRICE_LIMITS, sync_date, frame_type
-        )
-        task._quota_type = 2  # 白天的同步任务
-        await run_sync_trade_price_limits_task(task)  # 持久化涨跌停到dfs
 
-    # 9:01同步一次，9:31再次同步（除权除息等造成的更新）
+    # 9:01同步一次
     now = datetime.datetime.now()
-    dt = now.date()
+    dt = now.date()  # dt is datetime.date
     if TimeFrame.is_trade_day(dt):
-        if now.hour == 9 and now.minute > 30:
-            logger.info("9:31, sync price limits second time")
+        if now.hour == 9 and now.minute < 15:
+            logger.info("9:01, sync price limits first time")
+
             task = await get_month_week_sync_task(
                 Events.OMEGA_DO_SYNC_TRADE_PRICE_LIMITS, dt, frame_type
             )
             task._quota_type = 2  # 白天的同步任务
-            await run_sync_trade_price_limits_task(task, True)  # 持久化涨跌停到dfs
+
+            await run_sync_trade_price_limits_task(task)  # 持久化涨跌停到dfs
+            return True
+
+    # 9:31再次同步（除权除息等造成的更新）
+    async for sync_date in get_trade_price_limits_sync_date(
+        constants.BAR_SYNC_TRADE_PRICE_TAIL, frame_type
+    ):
+        logger.info("9:31, sync price limits second time")
+
+        task = await get_month_week_sync_task(
+            Events.OMEGA_DO_SYNC_TRADE_PRICE_LIMITS, sync_date, frame_type
+        )
+        task._quota_type = 2  # 白天的同步任务
+
+        # 持久化涨跌停到dfs，更新时间戳
+        rc = await run_sync_trade_price_limits_task(task, True)
+        if not rc:  # 执行出错，下次再尝试
+            break
