@@ -156,7 +156,7 @@ class TestSyncJobs_Calibration(unittest.IsolatedAsyncioTestCase):
         with mock.patch(
             "omega.master.tasks.calibration_task.BarsSyncTask", side_effect=[task]
         ):
-            with mock.patch("arrow.now", return_value=end.naive):
+            with mock.patch("arrow.now", return_value=end):
                 await daily_calibration_job()
                 base_dir = os.path.join(
                     test_dir(), "data", "test_daily_calibration_sync"

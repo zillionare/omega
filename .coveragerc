@@ -5,6 +5,7 @@ omit =
     */cli.py
     */config/*
     omega/interfaces/*
+    */sync_funds.py
 [report]
 exclude_lines =
     pragma: no cover
