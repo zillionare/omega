@@ -113,9 +113,14 @@ async def get_trade_price_limits(secs, end):
     bars = await fetcher.get_trade_price_limits(secs, end)
 
     # 滤掉无效数据
+    if isinstance(end, datetime.datetime):
+        target_date = end.date()
+    else:
+        target_date = end
+
     bars = bars[~np.isnan(bars["low_limit"])]
     bars = bars[~np.isnan(bars["high_limit"])]
-    bars = bars[bars["frame"] == end]
+    bars = bars[bars["frame"] == target_date]
 
     # 放弃以前的做法
     # bars["low_limit"] = np.nan_to_num(bars["low_limit"])
