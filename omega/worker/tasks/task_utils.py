@@ -118,10 +118,6 @@ async def sync_for_persist(typ: SecurityType, ft: FrameType, params: Dict):
         bars1 = await fetch_bars(secs, params.get("end"), n, ft)  # get_bars
         logger.info("done sync: ft %s, %d secs, %d bars", ft, len(secs), len(bars1))
 
-        # if ft in (FrameType.MIN1, FrameType.DAY):
-        #     bars2 = await fetch_price(secs, params.get("end"), n, ft)  # get_price
-        #     if not checksum(bars1, bars2):
-        #         raise exception.ChecksumFail()
         await Stock.persist_bars(ft, bars1)
         # except Exception as e:
         #     print(e)
@@ -152,34 +148,6 @@ async def get_secs_for_sync(limit: int, n_bars: int, name: str):
         if not len(secs):
             break
         yield secs
-
-
-def checksum(bars1, bars2) -> bool:
-    for code in bars1:
-        bar1 = bars1[code]
-        bar2 = bars2[code]
-        if len(bar1) != len(bar2):
-            logger.error("长度不相等，错误")
-            break
-        for item1, item2 in zip(bar1, bar2):
-            # 判断字段是否相等
-            for field in ["frame", "open", "high", "low", "close", "volume", "amount"]:
-                if field == "frame":
-                    if item1[field].strftime("%Y-%m-%d") != item2[field].strftime(
-                        "%Y-%m-%d"
-                    ):
-                        logger.error(f"不相等 item1:{item1}, item2:{item2}, field:{field}")
-                        return False
-                else:
-                    i1 = math_round(item1[field], 2)
-                    i2 = math_round(item2[field], 2)
-                    if i1 != i2:
-                        logger.error(
-                            f"不相等 item1:{item1}, {i1}, item2:{item2}, {i2}, field:{field}, code:{code}"
-                        )
-                        return False
-
-    return True
 
 
 async def cache_bars_for_aggregation(
