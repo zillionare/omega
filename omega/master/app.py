@@ -3,29 +3,36 @@
 import asyncio
 import logging
 import os
+import signal
 import time
+from functools import partial
 from typing import Optional
 
+import arrow
 import cfg4py
 import fire
 import omicron
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from pyemit import emit
 
-from omega.common.process_utils import find_jobs_process
+from omega import scripts
 from omega.config import get_config_dir
+from omega.core.constants import PROC_LOCK_OMEGA_MASTER
 from omega.core.events import Events
 from omega.logreceivers.redis import RedisLogReceiver
 from omega.master.jobs import load_cron_task
 from omega.master.tasks.quota_utils import QuotaMgmt
+from omega.master.tasks.rebuild_unclosed import rebuild_unclosed_bars
 
 logger = logging.getLogger(__name__)
-cfg = cfg4py.get_instance()
-scheduler: Optional[AsyncIOScheduler] = None
+config_dir = get_config_dir()
+cfg = cfg4py.init(get_config_dir(), False)
+scheduler: AsyncIOScheduler = AsyncIOScheduler(timezone=cfg.tz)
 receiver: RedisLogReceiver = None
 
 
 async def start_logging():
+    """enable receive logging from redis"""
     global receiver
     if getattr(cfg, "logreceiver") is None:
         return
@@ -40,6 +47,22 @@ async def start_logging():
         await receiver.start()
 
         logger.info("%s is working now", cfg.logreceiver.klass)
+        return receiver
+
+
+async def check_running():
+    """检查master process是否已经运行。
+
+    只允许全局运行一个master进程。如果已在运行中，本进程将退出。
+    """
+    try:
+        await omicron.cache.init()
+        success = await omicron.cache.sys.setnx(PROC_LOCK_OMEGA_MASTER, 1)
+        if not success:
+            print("omega master is already running, exiting...")
+            os._exit(1)
+    finally:
+        await omicron.cache.close()
 
 
 async def heartbeat():
@@ -56,11 +79,10 @@ async def handle_work_heart_beat(params: dict):
     logger.info("update worker state: %s -> %s", account, params)
 
 
-async def init():  # noqa
+async def init():
     global scheduler
-    config_dir = get_config_dir()
-    cfg4py.init(get_config_dir(), False)
 
+    await check_running()
     # logger receiver使用单独的redis配置项，可以先行启动
     await start_logging()
     logger.info("init omega-master process with config at %s", config_dir)
@@ -68,6 +90,11 @@ async def init():  # noqa
     # try to load omicron and init redis connection pool
     try:
         await omicron.init()
+        await scripts.load_lua_script()
+
+        # 延时执行未收盘数据的重建。如果omega是在交易时间启动的，这将允许omega先完成分钟线的同步，再进行未收盘数据的重建，从而避免因缺失部分分钟线数据导致的误差。当然，这里的方法并不是完全精确的。
+        execution_time = (arrow.now().shift(minutes=5)).datetime
+        scheduler.add_job(rebuild_unclosed_bars, "date", run_date=execution_time)
     except Exception as e:
         print(
             'No calendar and securities in cache, make sure you have called "omega init" first:\n',
@@ -78,7 +105,6 @@ async def init():  # noqa
     emit.register(Events.OMEGA_HEART_BEAT, handle_work_heart_beat)
     await emit.start(emit.Engine.REDIS, dsn=cfg.redis.dsn)
 
-    scheduler = AsyncIOScheduler(timezone=cfg.tz)
     await heartbeat()
     scheduler.add_job(heartbeat, "interval", seconds=10)
     # sync securities daily
@@ -87,21 +113,36 @@ async def init():  # noqa
     logger.info("omega master finished initialization")
 
 
-def start():  # pragma: no cover
-    logger.info("starting omega master ...")
-    mypid = os.getpid()
-    pid = find_jobs_process()
-    if pid != mypid:
-        print("find master process: %s" % pid)
-        print("only 1 master process can be running, exiting...")
-        os._exit(1)
+async def on_exit():
+    """退出omega master进程，释放非锁资源。"""
+    print("omega master is shutdowning...")
+
+    await omicron.cache.sys.delete(PROC_LOCK_OMEGA_MASTER)
+
+    if receiver is not None:
+        await receiver.stop()
+
+    await emit.stop()
+    await omicron.close()
 
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(init())
-    logger.info("omega 启动")
-    loop.run_forever()
+    loop.stop()
+    loop.close()
+    print("omega master shutdowned successfully")
 
-    logger.info("omega master exited.")
+
+def start():  # pragma: no cover
+    logger.info("starting omega master ...")
+    loop = asyncio.get_event_loop()
+
+    for signame in {"SIGINT", "SIGTERM", "SIGQUIT"}:
+        loop.add_signal_handler(
+            getattr(signal, signame), lambda: asyncio.create_task(on_exit())
+        )
+
+    loop.create_task(init())
+    loop.run_forever()
+    print("omega master exited.")
 
 
 if __name__ == "__main__":
