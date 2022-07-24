@@ -48,7 +48,7 @@ class RebuildUnclosedTest(unittest.IsolatedAsyncioTestCase):
         keys = await cache.security.keys("bars:5m:*")
         self.assertSetEqual(
             set(keys),
-            set([f"bars:5m:{code}" for code in self.secs] + [f"bars:5m:unclosed"]),
+            set([f"bars:5m:{code}" for code in self.secs] + ["bars:5m:unclosed"]),
         )
 
         unclosed = await cache.security.hgetall("bars:5m:unclosed")

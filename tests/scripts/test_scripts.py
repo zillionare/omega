@@ -104,7 +104,6 @@ class ScriptTest(unittest.IsolatedAsyncioTestCase):
 
         # now unclosed bar should have
         unclosed = await cache.security.hgetall("bars:5m:unclosed")
-        closed = await cache.security.hgetall("bars:5m:000001.XSHE")
         exp = f"202207180933,7,7.22,6.88,7.04,{3e6:.0f},{1e6*21.3:.0f},1"
         self.assertEqual(exp, unclosed["000001.XSHE"])
 
