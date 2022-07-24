@@ -5751,5 +5751,29 @@ def assert_bars_equal(exp, actual):
 
 
 def test_dir():
+    from pathlib import Path
+
     home = os.path.dirname(__file__)
-    return home
+    return Path(home)
+
+
+async def reset_influxdb():
+    """clean up influxdb"""
+    import itertools
+
+    from omicron import tf
+    from omicron.dal.influx.influxclient import InfluxClient
+    from omicron.models.stock import Stock
+
+    # create influxdb client
+    url, token, bucket, org = (
+        cfg.influxdb.url,
+        cfg.influxdb.token,
+        cfg.influxdb.bucket_name,
+        cfg.influxdb.org,
+    )
+    client = InfluxClient(url, token, bucket, org)
+
+    await client.delete_bucket()
+    await client.create_bucket()
+    return client

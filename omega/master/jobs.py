@@ -8,9 +8,8 @@ from typing import Optional
 import arrow
 import cfg4py
 from cfg4py.config import Config
-from coretypes import FrameType
-from omicron.dal import cache
-from omicron.models.timeframe import TimeFrame
+from coretypes import Frame, FrameType
+from omicron import cache, tf
 
 from omega.core import constants
 from omega.core.events import Events
@@ -27,6 +26,7 @@ from omega.master.tasks.sync_xr_xd_reports import (
     sync_xrxd_reports,
 )
 from omega.master.tasks.synctask import BarsSyncTask, master_syncbars_task
+from omega.scripts import close_frame, update_unclosed_bar
 
 logger = logging.getLogger(__name__)
 cfg: Config = cfg4py.get_instance()
@@ -35,10 +35,10 @@ cfg: Config = cfg4py.get_instance()
 async def get_after_hour_sync_job_task() -> Optional[BarsSyncTask]:
     """获取盘后同步的task实例"""
     now = arrow.now().naive
-    if not TimeFrame.is_trade_day(now):  # pragma: no cover
+    if not tf.is_trade_day(now):  # pragma: no cover
         logger.info("非交易日，不同步")
         return
-    end = TimeFrame.last_min_frame(now, FrameType.MIN1)
+    end = tf.last_min_frame(now, FrameType.MIN1)
     if now < end:  # pragma: no cover
         logger.info("当天未收盘，禁止同步")
         return
@@ -74,14 +74,14 @@ async def get_sync_minute_date():
     end = arrow.now().naive.replace(second=0, microsecond=0)
     first = end.replace(hour=9, minute=30, second=0, microsecond=0)
     # 检查当前时间是否在交易时间内
-    if not TimeFrame.is_trade_day(end):  # pragma: no cover
+    if not tf.is_trade_day(end):  # pragma: no cover
         logger.info("非交易日，不同步")
         return False
     if end < first:  # pragma: no cover
         logger.info("时间过早，不能拿到k线数据")
         return False
 
-    end = TimeFrame.floor(end, FrameType.MIN1)
+    end = tf.floor(end, FrameType.MIN1)
     tail = await cache.sys.get(constants.BAR_SYNC_MINUTE_TAIL)
     # tail = "2022-02-22 13:29:00"
     if tail:
@@ -93,8 +93,8 @@ async def get_sync_minute_date():
         tail = first
 
     # 取上次同步截止时间+1 计算出n_bars
-    tail = TimeFrame.floor(tail + datetime.timedelta(minutes=1), FrameType.MIN1)
-    n_bars = TimeFrame.count_frames(tail, end, FrameType.MIN1)  # 获取到一共有多少根k线
+    tail = tf.floor(tail + datetime.timedelta(minutes=1), FrameType.MIN1)
+    n_bars = tf.count_frames(tail, end, FrameType.MIN1)  # 获取到一共有多少根k线
     return end, n_bars
 
 
@@ -128,6 +128,20 @@ async def run_sync_minute_bars_task(task: BarsSyncTask):
             constants.BAR_SYNC_MINUTE_TAIL,
             task.end.strftime("%Y-%m-%d %H:%M:00"),
         )
+        frame = task.end
+        for frame_type in (
+            FrameType.MIN5,
+            FrameType.MIN15,
+            FrameType.MIN30,
+            FrameType.MIN60,
+            FrameType.DAY,
+            FrameType.WEEK,
+            FrameType.MONTH,
+        ):
+            update_unclosed_bar(frame_type, frame)
+
+            if frame == tf.ceiling(frame, frame_type):
+                close_frame(frame_type, frame)
 
     return task
 

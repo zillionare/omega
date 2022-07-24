@@ -78,7 +78,7 @@ livereload = {version = "^2.6.3", optional = true}
 minio = "^7.1.2"
 zillionare-core-types = "^0.4.1"
 msgpack = {version = "^1.0.3", optional = true}
-zillionare-omega-adaptors-jq = "^1.0.14"
+zillionare-omega-adaptors-jq = "^1.1.0"
 APScheduler = "^3.8.1"
 Cython = "^0.29.28"
 numpy = "^1.22"
@@ -123,6 +123,7 @@ exclude = '''
   | \.mypy_cache
   | \.tox
   | \.venv
+  | \.history
   | _build
   | buck-out
   | build
