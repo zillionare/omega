@@ -72,7 +72,9 @@ class RebuildUnclosedTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(keys, ["bars:1d:unclosed"])
 
         # test error handling
-        with mock.patch("omicron.models.stock.Stock._get_cached_bars", side_effect=Exception):
+        with mock.patch(
+            "omicron.models.stock.Stock._get_cached_bars", side_effect=Exception
+        ):
             await _rebuild_min_level_unclosed_bars()
 
         with mock.patch("omicron.models.stock.Stock.resample", side_effect=Exception):
@@ -111,7 +113,9 @@ class RebuildUnclosedTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(keys, ["bars:1w:unclosed"])
 
         # test error handling: should raise no exception
-        with mock.patch("omicron.models.stock.Stock._get_persisted_bars", side_effect=Exception):
+        with mock.patch(
+            "omicron.models.stock.Stock._get_persisted_bars", side_effect=Exception
+        ):
             await _rebuild_day_level_unclosed_bars()
 
         with mock.patch("omicron.models.stock.Stock.resample", side_effect=Exception):

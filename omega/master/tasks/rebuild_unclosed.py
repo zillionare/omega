@@ -70,10 +70,12 @@ async def _rebuild_day_level_unclosed_bars():
             )
         except Exception as e:
             logger.exception(e)
-            logger.warning("failed to get persisted bars for %s from %s to %s", code, start, end)
+            logger.warning(
+                "failed to get persisted bars for %s from %s to %s", code, start, end
+            )
             errors += 1
             continue
-    
+
         try:
             unclosed_day = await Stock._get_cached_day_bar(code)
             bars = np.concatenate([bars, unclosed_day])

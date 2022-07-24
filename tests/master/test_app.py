@@ -121,18 +121,18 @@ class AppTest(unittest.IsolatedAsyncioTestCase):
         )
 
         # do the check
-        for _ in range(20):
+        for _ in range(60):
             result = await omicron.cache.sys.get(PROC_LOCK_OMEGA_MASTER)
             if result:
                 break
             await asyncio.sleep(0.5)
-        else:
+        else: # failed to start omega master in 30 seconds
             self.assertTrue(False)
 
         # kill proc, check if the lock is released
         self.assertTrue(find_process("omega.master"))
         proc.terminate()
-        for _ in range(20):
+        for _ in range(60):
             result = await omicron.cache.sys.get(PROC_LOCK_OMEGA_MASTER)
             if result is None:
                 break
