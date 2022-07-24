@@ -26,3 +26,7 @@ first stable release
 * 向外提供服务时，支持load-balance（需要配置http网关，如nginx)。
 * 自动实时行情同步。
 * 仅支持JoinQuant作为上游数据源
+
+## 2.0
+
+海量数据架构（支持分钟线）。
