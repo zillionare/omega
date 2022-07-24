@@ -44,7 +44,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         self.assertSetEqual(base, set([job.name for job in scheduler.get_jobs()]))
 
     @mock.patch("omega.master.tasks.synctask.mail_notify")
-    @mock.patch("omega.master.jobs.TimeFrame.save_calendar")
+    @mock.patch("omega.master.jobs.tf.save_calendar")
     @mock.patch("jqadaptor.fetcher.Fetcher.get_all_trade_days")
     async def test_sync_calendar(self, get_all_trade_days, *args):
         # all_trade_days.npy
