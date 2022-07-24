@@ -1,10 +1,12 @@
 import unittest
-from omega.worker.tasks.task_utils import cache_init
-from tests import init_test_env
+
+import cfg4py
 import omicron
 from omicron import cache
-import cfg4py
+
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
+from omega.worker.tasks.task_utils import cache_init
+from tests import init_test_env
 
 
 class TaskUtilsTest(unittest.IsolatedAsyncioTestCase):

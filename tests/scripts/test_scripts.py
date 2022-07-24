@@ -9,10 +9,10 @@ import cfg4py
 import numpy as np
 import omicron
 import pandas as pd
-from omicron import cache
 from coretypes import FrameType
+from omicron import cache
 
-from omega.scripts import load_lua_script, update_unclosed_bar, close_frame
+from omega.scripts import close_frame, load_lua_script, update_unclosed_bar
 from tests import init_test_env
 
 cfg = cfg4py.get_instance()

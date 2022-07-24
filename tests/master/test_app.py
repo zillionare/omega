@@ -8,8 +8,8 @@ from unittest import mock
 
 import cfg4py
 import omicron
-import rlog
 import psutil
+import rlog
 
 import omega
 from omega.core.constants import PROC_LOCK_OMEGA_MASTER
@@ -126,7 +126,7 @@ class AppTest(unittest.IsolatedAsyncioTestCase):
             if result:
                 break
             await asyncio.sleep(0.5)
-        else: # failed to start omega master in 30 seconds
+        else:  # failed to start omega master in 30 seconds
             self.assertTrue(False)
 
         # kill proc, check if the lock is released

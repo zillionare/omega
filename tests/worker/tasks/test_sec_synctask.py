@@ -1,11 +1,13 @@
-import unittest
-from tests import init_test_env
-import omicron
-from omega.worker.tasks.sec_synctask import sync_xrxd_report_list
 import datetime
-from omicron import cache
+import unittest
+
 import cfg4py
+import omicron
+from omicron import cache
+
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
+from omega.worker.tasks.sec_synctask import sync_xrxd_report_list
+from tests import init_test_env
 
 
 class SecSyncTaskTest(unittest.IsolatedAsyncioTestCase):

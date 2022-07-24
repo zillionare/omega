@@ -1,16 +1,18 @@
-import unittest
-from tests import init_test_env, test_dir
-import omicron
-from omicron.models.stock import Stock
-from coretypes import FrameType
 import pickle
+import unittest
 from unittest import mock
-from omega.master.tasks.rebuild_unclosed import (
-    _rebuild_min_level_unclosed_bars,
-    _rebuild_day_level_unclosed_bars,
-)
+
 import arrow
+import omicron
+from coretypes import FrameType
 from omicron import cache
+from omicron.models.stock import Stock
+
+from omega.master.tasks.rebuild_unclosed import (
+    _rebuild_day_level_unclosed_bars,
+    _rebuild_min_level_unclosed_bars,
+)
+from tests import init_test_env, test_dir
 
 
 class RebuildUnclosedTest(unittest.IsolatedAsyncioTestCase):
