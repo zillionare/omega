@@ -6,17 +6,17 @@
 {{#parametersExist}}
 Args:
 {{#args}}
-    {{var}} : {{descriptionPlaceholder}}
+    {{var}}: 
 {{/args}}
 {{#kwargs}}
-    {{var}} : {{descriptionPlaceholder}}.
+    {{var}}: 
 {{/kwargs}}
 {{/parametersExist}}
 
 {{#exceptionsExist}}
 Raises:
 {{#exceptions}}
-    {{type}}: {{descriptionPlaceholder}}
+    {{type}}: 
 {{/exceptions}}
 {{/exceptionsExist}}
 
