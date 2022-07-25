@@ -16,7 +16,3 @@ class WorkerException(Exception):
 
 class GotNoneData(WorkerException):
     msg = "Got None Data"
-
-
-class ChecksumFail(WorkerException):
-    msg = "Checksum Fail"

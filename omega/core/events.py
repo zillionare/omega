@@ -9,7 +9,6 @@ class Events:
 
     OMEGA_DO_SYNC = "omega/sync_bars_worker"
     OMEGA_VALIDATION_PROGRESS = "omega/do_validation"
-    OMEGA_DO_CHECKSUM = "omega/do_checksum"
     OMEGA_VALIDATION_ERROR = "omega/validation_error"
 
     OMEGA_DO_SYNC_MIN = "omega/sync_min"
@@ -23,11 +22,3 @@ class Events:
     OMEGA_DO_SYNC_XRXD_REPORTS = "omega/sycn_xrxd_reports"
 
     OMEGA_HEART_BEAT = "omega/heart_beat"
-
-
-class ValidationError:
-    NO_CHECKSUM = 0
-    REMOTE_MISS = 1
-    LOCAL_MISS = 2
-    MISMATCH = 3
-    UNKNOWN = 4

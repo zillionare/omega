@@ -47,14 +47,20 @@ class AbstractQuotesFetcher(QuotesFetcher):
         return cls._instances[i]
 
     @classmethod
-    async def get_security_list(cls, date: datetime.date) -> Union[None, np.ndarray]:
-        """按如下格式返回证券列表。
+    async def get_security_list(
+        cls, date: datetime.date = None
+    ) -> Optional[np.ndarray]:
+        """获取证券列表
+
+        按如下格式返回证券列表。
 
         code         display_name   name   start_date   end_date   type
         000001.XSHE   平安银行       PAYH   1991-04-03   2200-01-01 stock
 
+        Args:
+            date: 查询日期，如果为None，则返回最新的证券列表。
         Returns:
-            Union[None, np.ndarray]: [description]
+            `date`日对应的证券列表。
         """
         securities = await cls.get_instance().get_security_list(date)
         if securities is None or len(securities) == 0:
