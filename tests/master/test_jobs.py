@@ -71,12 +71,17 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         "omega.master.tasks.synctask.QuotaMgmt.check_quota",
         return_value=((True, 500000, 1000000)),
     )
-    @mock.patch("omega.master.tasks.synctask.mail_notify")
-    async def test_sync_minute_bars(self, mail_notify, *args):
+    @mock.patch("omega.master.tasks.synctask.BarsSyncTask.parse_bars_sync_scope")
+    async def test_sync_minute_bars(self, parse_bars_scope, *args):
         emit.register(Events.OMEGA_DO_SYNC_MIN, workjobs.sync_minute_bars)
         name = "minute"
         timeout = 60
         end = arrow.get("2022-02-18 09:31:00")
+
+        seclist1 = ["000001.XSHE", "300001.XSHE"]
+        seclist2 = ["000001.XSHG"]
+        parse_bars_scope.side_effect = [seclist1, seclist2, seclist1, seclist2]
+
         await Stock.reset_cache()
         task = BarsSyncTask(
             event=Events.OMEGA_DO_SYNC_MIN,
@@ -126,7 +131,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
 
         await syncjobs.load_cron_task(scheduler)
         base = {
-            "daily_calibration_sync",
+            "daily_bars_sync",
             "1m:10:*",
             "1m:11:0-31",
             "1m:13-14:*",
@@ -139,6 +144,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             "sync_min_5_15_30_60",
             "sync_securities",
             "sync_xrxd",
+            "day_sync_task",
         }
         print(set([job.name for job in scheduler.get_jobs()]))
         self.assertSetEqual(base, set([job.name for job in scheduler.get_jobs()]))
@@ -148,8 +154,22 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         return_value=((True, 500000, 1000000)),
     )
     @mock.patch("omega.master.tasks.synctask.mail_notify")
-    async def test_after_hour_sync_job(self, mail_notify, *args):
+    @mock.patch("omega.master.tasks.synctask.BarsSyncTask.parse_bars_sync_scope")
+    async def test_after_hour_sync_job(self, parse_bars_scope, mail_notify, *args):
         email_content = ""
+
+        seclist1 = ["000001.XSHE", "300001.XSHE"]
+        seclist2 = ["000001.XSHG"]
+        parse_bars_scope.side_effect = [
+            seclist1,
+            seclist2,
+            seclist1,
+            seclist2,
+            seclist1,
+            seclist2,
+            seclist1,
+            seclist2,
+        ]
 
         async def mail_notify_mock(subject, body, **kwargs):
             nonlocal email_content
@@ -230,8 +250,13 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         return_value=((False, 500000, 1000000)),
     )
     @mock.patch("omega.master.tasks.synctask.mail_notify")
-    async def test_quota_case1(self, mail_notify, *args):
+    @mock.patch("omega.master.tasks.synctask.BarsSyncTask.parse_bars_sync_scope")
+    async def test_quota_case1(self, parse_bars_scope, mail_notify, *args):
         email_content = ""
+
+        seclist1 = ["000001.XSHE", "300001.XSHE"]
+        seclist2 = ["000001.XSHG"]
+        parse_bars_scope.side_effect = [seclist1, seclist2]
 
         async def mail_notify_mock(subject, body, **kwargs):
             nonlocal email_content

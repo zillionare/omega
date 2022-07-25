@@ -13,7 +13,7 @@ from omicron import cache, tf
 
 from omega.core import constants
 from omega.core.events import Events
-from omega.master.tasks.calibration_task import daily_calibration_job
+from omega.master.tasks.calibration_task import sync_daily_bars_1m, sync_daily_bars_day
 from omega.master.tasks.sync_other_bars import (
     sync_min_5_15_30_60,
     sync_month_bars,
@@ -21,10 +21,7 @@ from omega.master.tasks.sync_other_bars import (
 )
 from omega.master.tasks.sync_price_limit import sync_trade_price_limits
 from omega.master.tasks.sync_securities import sync_securities_list
-from omega.master.tasks.sync_xr_xd_reports import (
-    sync_all_xrxd_reports,
-    sync_xrxd_reports,
-)
+from omega.master.tasks.sync_xr_xd_reports import sync_xrxd_reports
 from omega.master.tasks.synctask import BarsSyncTask, master_syncbars_task
 from omega.scripts import close_frame, update_unclosed_bar
 
@@ -138,10 +135,10 @@ async def run_sync_minute_bars_task(task: BarsSyncTask):
             FrameType.WEEK,
             FrameType.MONTH,
         ):
-            update_unclosed_bar(frame_type, frame)
+            await update_unclosed_bar(frame_type, frame)
 
             if frame == tf.ceiling(frame, frame_type):
-                close_frame(frame_type, frame)
+                await close_frame(frame_type, frame)
 
     return task
 
@@ -207,40 +204,39 @@ async def load_cron_task(scheduler):
     # 以下追赶性质的任务，应该单独执行，不能和日常同步任务混在一起，
     # 因为jqadaptor只有一个线程，定时器也只能触发一个同类型的任务
     scheduler.add_job(
-        sync_xrxd_reports,
-        "cron",
-        hour="1",
-        minute="45",
-        name="sync_xrxd",
-    )
-
-    scheduler.add_job(
-        sync_week_bars,
-        "cron",
-        hour=2,
-        minute=5,
-        name="sync_week_bars",
-    )
-    scheduler.add_job(
         sync_month_bars,
         "cron",
-        hour=2,
-        minute=5,
+        hour=1,
+        minute=15,
         name="sync_month_bars",
     )
     scheduler.add_job(
-        daily_calibration_job,
+        sync_week_bars,
         "cron",
-        hour=2,
-        minute=5,
-        name="daily_calibration_sync",
+        hour=1,
+        minute=30,
+        name="sync_week_bars",
+    )
+    scheduler.add_job(
+        sync_daily_bars_1m,
+        "cron",
+        hour=1,
+        minute=45,
+        name="daily_bars_sync",
     )
     scheduler.add_job(
         sync_min_5_15_30_60,
         "cron",
         hour=2,
-        minute=30,
+        minute=1,
         name="sync_min_5_15_30_60",
+    )
+    scheduler.add_job(
+        sync_daily_bars_day,  # 下载日线，并从MIN1中提取factor
+        "cron",
+        hour=2,
+        minute=45,
+        name="day_sync_task",
     )
 
     scheduler.add_job(
@@ -250,7 +246,13 @@ async def load_cron_task(scheduler):
         minute="5",
         name="sync_securities",  # 聚宽8点更新，写入昨日数据到db，今日数据到cache
     )
-
+    scheduler.add_job(
+        sync_xrxd_reports,
+        "cron",
+        hour="8",
+        minute="11",
+        name="sync_xrxd",
+    )
     scheduler.add_job(
         sync_trade_price_limits,
         "cron",

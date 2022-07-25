@@ -77,11 +77,16 @@ class TestSyncJobs_PriceLimit(unittest.IsolatedAsyncioTestCase):
         "omega.master.tasks.synctask.QuotaMgmt.check_quota",
         return_value=((True, 500000, 1000000)),
     )
-    async def test_sync_trade_price_limits(self, *args):
+    @mock.patch("omega.master.tasks.synctask.BarsSyncTask.parse_bars_sync_scope")
+    async def test_sync_trade_price_limits(self, parse_bars_scope, *args):
         emit.register(
             Events.OMEGA_DO_SYNC_TRADE_PRICE_LIMITS, workjobs.sync_trade_price_limits
         )
         end = arrow.get("2022-02-18")
+
+        seclist1 = ["000001.XSHE", "300001.XSHE"]
+        seclist2 = ["000001.XSHG"]
+        parse_bars_scope.side_effect = [seclist1, seclist2]
 
         async def get_week_sync_date_mock(*args, **kwargs):
             for sync_date in [end.naive]:

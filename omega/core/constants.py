@@ -12,6 +12,10 @@ TASK_SECS_PREFIX = "master.task.secs"
 BAR_SYNC_ARCHIVE_HEAD = "jobs.bars_sync.archive.head"
 BAR_SYNC_ARCHIVE_TAIL = "jobs.bars_sync.archive.tail"
 
+# bars:1d sync
+BAR_SYNC_DAY_HEAD = "jobs.bars_sync.day.head"
+BAR_SYNC_DAY_TAIL = "jobs.bars_sync.day.tail"
+
 # prefix name of queue that stores temporal bars for minio
 MINIO_TEMPORAL = "temp.minio"
 

@@ -13,6 +13,7 @@ import cfg4py
 from cfg4py.config import Config
 from coretypes import FrameType, SecurityType
 from omicron.dal import cache
+from omicron.models.security import Security
 from omicron.models.stock import Stock
 from omicron.notify.mail import mail_notify
 from pyemit import emit
@@ -58,8 +59,6 @@ class BarsSyncTask:
         self.n_bars = n_bars
         self.end = end
         self.frame_type = frame_type
-        self._stock_scope = self.parse_bars_sync_scope(SecurityType.STOCK)
-        self._index_scope = self.parse_bars_sync_scope(SecurityType.INDEX)
 
         self._recs_per_sec = recs_per_sec
         self._quota_type = quota_type  # 1夜间校准和同步, 2白天
@@ -134,7 +133,7 @@ class BarsSyncTask:
             }
         return state
 
-    def parse_bars_sync_scope(self, _type: SecurityType):
+    async def parse_bars_sync_scope(self, _type: SecurityType):
         """生成待同步行情数据的证券列表
 
         该列表由以下方式生成：
@@ -155,7 +154,11 @@ class BarsSyncTask:
         end = self.end
         if isinstance(self.end, datetime.datetime):
             end = self.end.date()
-        codes = Stock.choose_listed(end, [_type.value])
+
+        query = Security.select(end)
+        query.types([_type.value])
+        codes = await query.eval()
+
         exclude = getattr(cfg.omega.sync.bars, "exclude", "")
         if exclude:
             exclude = map(lambda x: x, exclude.split(" "))
@@ -241,6 +244,10 @@ class BarsSyncTask:
         return self.params
 
     async def run(self):
+        # 获取指定日期的股票列表（每个交易日可能不同）
+        self._stock_scope = await self.parse_bars_sync_scope(SecurityType.STOCK)
+        self._index_scope = await self.parse_bars_sync_scope(SecurityType.INDEX)
+
         """分配任务并发送emit通知worker开始执行，然后阻塞等待"""
         logger.info(f"{self.name}:{self.get_params()}, task starts")
         if await self.is_running():

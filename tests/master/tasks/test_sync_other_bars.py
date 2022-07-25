@@ -98,13 +98,17 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
         return_value=((True, 500000, 1000000)),
     )
     @mock.patch("omega.master.tasks.sync_other_bars.get_month_week_sync_date")
-    @mock.patch("omega.master.tasks.synctask.mail_notify")
-    async def test_sync_week_bars(self, mail_notify, get_week_sync_date, *args):
+    @mock.patch("omega.master.tasks.synctask.BarsSyncTask.parse_bars_sync_scope")
+    async def test_sync_week_bars(self, parse_bars_scope, get_week_sync_date, *args):
         emit.register(
             Events.OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK,
             workjobs.sync_year_quarter_month_week,
         )
         end = arrow.get("2022-02-18").date()
+
+        seclist1 = ["000001.XSHE", "300001.XSHE"]
+        seclist2 = ["000001.XSHG"]
+        parse_bars_scope.side_effect = [seclist1, seclist2]
 
         async def get_week_sync_date_mock(*args, **kwargs):
             for sync_date in [end]:
@@ -175,8 +179,8 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
         return_value=((True, 500000, 1000000)),
     )
     @mock.patch("omega.master.tasks.sync_other_bars.get_month_week_sync_date")
-    @mock.patch("omega.master.tasks.synctask.mail_notify")
-    async def test_sync_month_bars(self, mail_notify, get_week_sync_date, *args):
+    @mock.patch("omega.master.tasks.synctask.BarsSyncTask.parse_bars_sync_scope")
+    async def test_sync_month_bars(self, parse_bars_scope, get_week_sync_date, *args):
         emit.register(
             Events.OMEGA_DO_SYNC_YEAR_QUARTER_MONTH_WEEK,
             workjobs.sync_year_quarter_month_week,
@@ -184,6 +188,10 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
 
         # todo 测试同步月线 周线 写，minio inflaxdb 并读出来对比数据是否正确
         end = arrow.get("2022-01-28").date()
+
+        seclist1 = ["000001.XSHE", "300001.XSHE"]
+        seclist2 = ["000001.XSHG"]
+        parse_bars_scope.side_effect = [seclist1, seclist2]
 
         async def get_week_sync_date_mock(*args, **kwargs):
             for sync_date in [end]:
@@ -252,13 +260,19 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
         return_value=((True, 500000, 1000000)),
     )
     @mock.patch("omega.master.tasks.sync_other_bars.get_month_week_sync_date")
-    @mock.patch("omega.master.tasks.synctask.mail_notify")
-    async def test_sync_min_5_15_30_60(self, mail_notify, get_week_sync_date, *args):
+    @mock.patch("omega.master.tasks.synctask.BarsSyncTask.parse_bars_sync_scope")
+    async def test_sync_min_5_15_30_60(
+        self, parse_bars_scope, get_week_sync_date, *args
+    ):
         emit.register(
             Events.OMEGA_DO_SYNC_OTHER_MIN,
             workjobs.sync_min_5_15_30_60,
         )
         end = arrow.get("2022-02-18 15:00:00")
+
+        seclist1 = ["000001.XSHE", "300001.XSHE"]
+        seclist2 = ["000001.XSHG"]
+        parse_bars_scope.side_effect = [seclist1, seclist2]
 
         async def get_week_sync_date_mock(*args, **kwargs):
             for sync_date in [end]:
@@ -296,9 +310,7 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
             with mock.patch("arrow.now", return_value=end):
                 await sync_min_5_15_30_60()
                 self.assertTrue(task.status)
-                base_dir = os.path.join(
-                    test_dir(), "data", "test_daily_calibration_sync"
-                )
+                base_dir = os.path.join(test_dir(), "data", "test_daily_bars_sync")
                 for typ, ft in itertools.product(
                     [SecurityType.STOCK, SecurityType.INDEX],
                     frame_type,

@@ -146,5 +146,6 @@ class AppTest(unittest.IsolatedAsyncioTestCase):
             [sys.executable, "-m", "omega.master.app", "start"],
         )
 
-        await asyncio.sleep(0.5)
-        self.assertTrue(find_process("omega.master") != proc.pid)
+        await asyncio.sleep(5)
+        _pid = find_process("omega.master")
+        self.assertTrue(_pid != proc.pid)

@@ -19,7 +19,7 @@ import omega.worker.tasks.synctask as workjobs
 from omega.core import constants
 from omega.core.events import Events
 from omega.master.dfs import Storage
-from omega.master.tasks.calibration_task import daily_calibration_job, get_sync_date
+from omega.master.tasks.calibration_task import get_sync_date, sync_daily_bars_1m
 from omega.master.tasks.synctask import BarsSyncTask
 from omega.master.tasks.task_utils import get_bars_filename
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
@@ -68,10 +68,12 @@ class TestSyncJobs_Calibration(unittest.IsolatedAsyncioTestCase):
         await aq.create_instance(impl, **params)
 
     async def test_get_sync_date(self):
+        key_head = constants.BAR_SYNC_ARCHIVE_HEAD
+        key_tail = constants.BAR_SYNC_ARCHIVE_TAIL
         await cache.sys.delete(constants.BAR_SYNC_ARCHIVE_HEAD)
         await cache.sys.delete(constants.BAR_SYNC_ARCHIVE_TAIL)
         with mock.patch("arrow.now", return_value=arrow.get("2022-02-18 15:05:00")):
-            generator = get_sync_date()
+            generator = get_sync_date(key_head, key_tail)
             sync_dt, head, tail = await generator.__anext__()
             print(sync_dt, head, tail)
             await cache.sys.set(
@@ -82,7 +84,7 @@ class TestSyncJobs_Calibration(unittest.IsolatedAsyncioTestCase):
             )
 
         with mock.patch("arrow.now", return_value=arrow.get("2022-02-22 02:05:00")):
-            generator = get_sync_date()
+            generator = get_sync_date(key_head, key_tail)
             sync_dt, head, tail = await generator.__anext__()
             print(sync_dt, head, tail)
             self.assertIsNone(head)
@@ -102,8 +104,8 @@ class TestSyncJobs_Calibration(unittest.IsolatedAsyncioTestCase):
 
         await cache.sys.delete(constants.BAR_SYNC_ARCHIVE_HEAD)
         await cache.sys.delete(constants.BAR_SYNC_ARCHIVE_TAIL)
-        with mock.patch("arrow.now", return_value=arrow.get("2005-01-05 02:05:00")):
-            generator = get_sync_date()
+        with mock.patch("arrow.now", return_value=arrow.get("2005-01-04 02:05:00")):
+            generator = get_sync_date(key_head, key_tail)
             try:
                 await generator.__anext__()
             except Exception as e:
@@ -111,13 +113,13 @@ class TestSyncJobs_Calibration(unittest.IsolatedAsyncioTestCase):
             else:
                 self.assertEqual(1, 0)
 
-    @mock.patch("omega.master.tasks.synctask.mail_notify")
     @mock.patch(
         "omega.master.tasks.synctask.QuotaMgmt.check_quota",
         return_value=((True, 500000, 1000000)),
     )
+    @mock.patch("omega.master.tasks.synctask.BarsSyncTask.parse_bars_sync_scope")
     @mock.patch("omega.master.tasks.calibration_task.get_sync_date")
-    async def test_daily_calibration_sync(self, get_sync_date, *args):
+    async def test_daily_bars_sync(self, get_sync_date, parse_bars_scope, *args):
         emit.register(
             Events.OMEGA_DO_SYNC_DAILY_CALIBRATION, workjobs.sync_daily_calibration
         )
@@ -128,14 +130,15 @@ class TestSyncJobs_Calibration(unittest.IsolatedAsyncioTestCase):
                 yield item
 
         get_sync_date.side_effect = get_sync_date_mock
+
+        seclist1 = ["000001.XSHE", "300001.XSHE"]
+        seclist2 = ["000001.XSHG"]
+        parse_bars_scope.side_effect = [seclist1, seclist2]
+
         name = "calibration_sync"
         frame_type = [
             FrameType.MIN1,
-            # FrameType.MIN5,
-            # FrameType.MIN15,
-            # FrameType.MIN30,
-            # FrameType.MIN60,
-            FrameType.DAY,
+            # FrameType.DAY,
         ]
         task = BarsSyncTask(
             event=Events.OMEGA_DO_SYNC_DAILY_CALIBRATION,
@@ -157,10 +160,8 @@ class TestSyncJobs_Calibration(unittest.IsolatedAsyncioTestCase):
             "omega.master.tasks.calibration_task.BarsSyncTask", side_effect=[task]
         ):
             with mock.patch("arrow.now", return_value=end):
-                await daily_calibration_job()
-                base_dir = os.path.join(
-                    test_dir(), "data", "test_daily_calibration_sync"
-                )
+                await sync_daily_bars_1m()
+                base_dir = os.path.join(test_dir(), "data", "test_daily_bars_sync")
                 for typ, ft in itertools.product(
                     [SecurityType.STOCK, SecurityType.INDEX],
                     frame_type,
@@ -193,10 +194,3 @@ class TestSyncJobs_Calibration(unittest.IsolatedAsyncioTestCase):
                     print(f"influx_{ft.value}.pik")
 
                     self.assertEqual(influx_bars, local_influx_bars)
-
-                    # influx_bars_ = pickle.loads(influx_bars)
-                    # local_influx_bars_ = pickle.loads(local_influx_bars)
-                    # for code, bars in influx_bars_.items():
-                    #     bars_ = local_influx_bars_.get(code)
-                    #     assert_bars_equal(bars, bars_)
-                    # self.assertSetEqual(set(influx_bars_.keys()), set(local_influx_bars_.keys()))

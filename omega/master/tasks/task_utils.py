@@ -18,11 +18,14 @@ logger = logging.getLogger(__name__)
 cfg: Config = cfg4py.get_instance()
 
 
-def get_previous_trade_day(now):
+def get_previous_trade_day(now: datetime.date):
     """获取上一个交易日
     如果当天是周六，返回周五（交易日），如果当天是周一（交易日），返回周五
     如果当天是周五，返回周四（交易日）
     """
+    if now == datetime.date(2005, 1, 4):
+        return now
+
     if TimeFrame.date2int(now) in TimeFrame.day_frames:
         pre_trade_day = TimeFrame.day_shift(now, -1)
     else:

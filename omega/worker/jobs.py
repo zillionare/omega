@@ -82,7 +82,7 @@ async def load_cron_task(scheduler: AsyncIOScheduler):
         sync_calendar,  # 默认1点更新一次全部数据
         "cron",
         hour=1,
-        minute=0,
+        minute=2,
         name="sync_calendar",
     )
 
