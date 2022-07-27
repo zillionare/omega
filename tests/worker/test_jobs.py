@@ -29,8 +29,9 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         cfg = cfg4py.get_instance()
         fetcher_info = cfg.quotes_fetchers[0]
         impl = fetcher_info["impl"]
-        params = fetcher_info["workers"][0]
-        await aq.create_instance(impl, **params)
+        account = fetcher_info["account"]
+        password = fetcher_info["password"]
+        await aq.create_instance(impl, account=account, password=password)
 
     async def test_load_cron_task(self):
         scheduler = AsyncIOScheduler(timezone=cfg.tz)

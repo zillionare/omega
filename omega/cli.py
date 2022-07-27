@@ -7,18 +7,15 @@
 import asyncio
 import logging
 import os
+import subprocess
+import sys
 from typing import Any, Callable, List, Union
 
 import cfg4py
 import fire
-import omicron
-from pyemit import emit
-from ruamel.yaml import YAML
 from termcolor import colored
 
-from omega.common.process_utils import find_jobs_process
 from omega.config import get_config_dir
-from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
@@ -61,16 +58,47 @@ async def first_init(service: str = ""):
 
     from omega.worker.app import init_data
 
-    for fetcher in cfg.quotes_fetchers:
-        impl = fetcher.get("impl")
-        workers = fetcher.get("workers")
-        for group in workers:
-            account = group.get("account")
-            password = group.get("password")
-            await init_data(impl, account=account, password=password)
-            break
+    if not cfg.quotes_fetchers:  # 无数据，直接退出
+        print("系统数据初始化错误，请配置正确的quotes_fetcher...")
+        return
+
+    fetcher = cfg.quotes_fetchers[0]
+    impl = fetcher.get("impl")
+    account = fetcher.get("account")
+    password = fetcher.get("password")
+    await init_data(impl, account=account, password=password)
 
     print(f"系统数据初始化完毕 {colored(service, 'green')}...")
+
+
+async def start_worker():
+    print("prepare to start Omega worker process ...")
+
+    config_dir = get_config_dir()
+    cfg4py.init(config_dir, False)
+
+    if not cfg.quotes_fetchers:  # 无数据，直接退出
+        print("系统数据初始化错误，请配置正确的quotes_fetcher...")
+        return
+
+    fetcher = cfg.quotes_fetchers[0]
+    impl = fetcher.get("impl")
+    account = fetcher.get("account")
+    password = fetcher.get("password")
+    subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "omega.worker.app",
+            "start",
+            f"--impl={impl}",
+            f"--account={account}",
+            f"--password={password}",
+        ],
+        stdout=subprocess.DEVNULL,
+    )
+
+    print("Omega worker process started ...")
 
 
 def run(func):
@@ -87,6 +115,7 @@ def main():
     fire.Fire(
         {
             "init": run(first_init),
+            "worker": run(start_worker),
         }
     )
 

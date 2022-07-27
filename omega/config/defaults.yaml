@@ -58,12 +58,8 @@ omega:
 
 quotes_fetchers:
   - impl: jqadaptor    # there must be a create_instance method in this module
-    workers:
-      - account: ${JQ_ACCOUNT}
-        password: ${JQ_PASSWORD}
-        port: 3181
-        # note! for the first group, if you set n, then you'll get n + 1 workers
-        sessions: 1
+    account: ${JQ_ACCOUNT}
+    password: ${JQ_PASSWORD}
 
 dfs:
   engine: minio

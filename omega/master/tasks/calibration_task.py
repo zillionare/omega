@@ -4,6 +4,7 @@ import logging
 import arrow
 from coretypes import FrameType
 from omicron.dal import cache
+from omicron.models.security import Security
 from omicron.models.stock import Stock
 from omicron.models.timeframe import TimeFrame
 
@@ -125,7 +126,7 @@ async def sync_daily_bars_1m():
 
     runs at every day at 2:00 am
     """
-    logger.info("每日分钟线重新下载启动")
+    logger.info("每日分钟线下载启动")
     now = arrow.now().date()
     pre_trade_date = get_previous_trade_day(now)
 
@@ -155,7 +156,7 @@ async def sync_daily_bars_1m():
 @master_syncbars_task()
 async def sync_daily_bars_day():
     """scheduled task entry, for bars:1d only!"""
-    logger.info("日线重新下载启动")
+    logger.info("日线下载启动")
 
     key_head = constants.BAR_SYNC_DAY_HEAD
     key_tail = constants.BAR_SYNC_DAY_TAIL
@@ -171,6 +172,47 @@ async def sync_daily_bars_day():
                 await cache.sys.set(key_head, head.strftime("%Y-%m-%d"))
             if tail is not None:
                 await cache.sys.set(key_tail, tail.strftime("%Y-%m-%d"))
+
             logger.info(f"{task.name}({task.end})同步完成,参数为{task.params}")
+
+    logger.info("exit sync_daily_bars_day")
+
+
+@master_syncbars_task()
+async def sync_day_bar_factors():
+    """scheduled task entry, for bars:1d only!"""
+    logger.info("日线修补factor启动")
+
+    # 修补日线如果出错，采取邮件和钉钉消息双路通知，一定要补齐，否则只能由周末的检查程序扫描结果
+    now = arrow.now().date()
+    pre_trade_date = get_previous_trade_day(now)
+    if now != pre_trade_date + datetime.timedelta(days=1):  # 是否只相邻一天
+        logger.info("sync_day_bar_factors, skip non trade day: %s", now)
+        return False  # 不处理
+
+    # 检查是否有分红送股的情况
+    rc = await Security.get_xrxd_info(pre_trade_date)
+    if not rc:
+        logger.info("sync_day_bar_factors, no xr xd info in : %s", pre_trade_date)
+        return False  # 无分红送股，不用二次纠正数据（factor）
+
+    # 重新下载日线
+    sync_dt = datetime.datetime.combine(pre_trade_date, datetime.time(15, 0))
+    task = await get_daily_bars_sync_task(sync_dt, FrameType.DAY)
+    success = await run_daily_bars_sync_task(task)
+    if success:
+        logger.info("sync_day_bar_factors, success : %s", pre_trade_date)
+        return True
+
+    # 发送错误信息
+    msg = f"failed to re-download bars:1d for {pre_trade_date}, check log for detailed information"
+    from omicron.notify.dingtalk import DingTalkMessage
+
+    DingTalkMessage.text(msg)
+
+    from omicron.notify.mail import mail_notify
+
+    subject = "failed to update factors for bars:1d"
+    await mail_notify(subject=subject, body=msg)
 
     logger.info("exit sync_daily_bars_day")

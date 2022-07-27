@@ -26,7 +26,7 @@ def get_previous_trade_day(now: datetime.date):
     if now == datetime.date(2005, 1, 4):
         return now
 
-    if TimeFrame.date2int(now) in TimeFrame.day_frames:
+    if TimeFrame.is_trade_day(now):
         pre_trade_day = TimeFrame.day_shift(now, -1)
     else:
         pre_trade_day = TimeFrame.day_shift(now, 0)

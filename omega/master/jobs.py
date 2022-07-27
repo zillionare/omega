@@ -13,7 +13,11 @@ from omicron import cache, tf
 
 from omega.core import constants
 from omega.core.events import Events
-from omega.master.tasks.calibration_task import sync_daily_bars_1m, sync_daily_bars_day
+from omega.master.tasks.calibration_task import (
+    sync_daily_bars_1m,
+    sync_daily_bars_day,
+    sync_day_bar_factors,
+)
 from omega.master.tasks.sync_other_bars import (
     sync_min_5_15_30_60,
     sync_month_bars,
@@ -214,9 +218,17 @@ async def load_cron_task(scheduler):
         sync_week_bars,
         "cron",
         hour=1,
-        minute=30,
+        minute=25,
         name="sync_week_bars",
     )
+    scheduler.add_job(
+        sync_daily_bars_day,  # 下载日线
+        "cron",
+        hour=1,
+        minute=35,
+        name="day_sync_task",
+    )
+
     scheduler.add_job(
         sync_daily_bars_1m,
         "cron",
@@ -228,15 +240,8 @@ async def load_cron_task(scheduler):
         sync_min_5_15_30_60,
         "cron",
         hour=2,
-        minute=1,
+        minute=15,
         name="sync_min_5_15_30_60",
-    )
-    scheduler.add_job(
-        sync_daily_bars_day,  # 下载日线，并从MIN1中提取factor
-        "cron",
-        hour=2,
-        minute=45,
-        name="day_sync_task",
     )
 
     scheduler.add_job(
@@ -252,6 +257,13 @@ async def load_cron_task(scheduler):
         hour="8",
         minute="11",
         name="sync_xrxd",
+    )
+    scheduler.add_job(
+        sync_day_bar_factors,  # 修正factor
+        "cron",
+        hour=9,
+        minute=30,
+        name="day_factor_fix_task",
     )
     scheduler.add_job(
         sync_trade_price_limits,

@@ -64,8 +64,9 @@ class TestSyncJobs_Calibration(unittest.IsolatedAsyncioTestCase):
         cfg = cfg4py.get_instance()
         fetcher_info = cfg.quotes_fetchers[0]
         impl = fetcher_info["impl"]
-        params = fetcher_info["workers"][0]
-        await aq.create_instance(impl, **params)
+        account = fetcher_info["account"]
+        password = fetcher_info["password"]
+        await aq.create_instance(impl, account=account, password=password)
 
     async def test_get_sync_date(self):
         key_head = constants.BAR_SYNC_ARCHIVE_HEAD

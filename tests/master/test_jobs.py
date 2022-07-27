@@ -64,8 +64,9 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         cfg = cfg4py.get_instance()
         fetcher_info = cfg.quotes_fetchers[0]
         impl = fetcher_info["impl"]
-        params = fetcher_info["workers"][0]
-        await aq.create_instance(impl, **params)
+        account = fetcher_info["account"]
+        password = fetcher_info["password"]
+        await aq.create_instance(impl, account=account, password=password)
 
     @mock.patch(
         "omega.master.tasks.synctask.QuotaMgmt.check_quota",
@@ -145,6 +146,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             "sync_securities",
             "sync_xrxd",
             "day_sync_task",
+            "day_factor_fix_task",
         }
         print(set([job.name for job in scheduler.get_jobs()]))
         self.assertSetEqual(base, set([job.name for job in scheduler.get_jobs()]))

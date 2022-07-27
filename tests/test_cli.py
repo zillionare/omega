@@ -52,8 +52,9 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
         cfg = cfg4py.get_instance()
         fetcher_info = cfg.quotes_fetchers[0]
         impl = fetcher_info["impl"]
-        params = fetcher_info["workers"][0]
-        await aq.create_instance(impl, **params)
+        account = fetcher_info["account"]
+        password = fetcher_info["password"]
+        await aq.create_instance(impl, account=account, password=password)
 
     async def asyncTearDown(self) -> None:
         await emit.stop()
@@ -67,18 +68,6 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
             return stream.getvalue()
         finally:
             stream.close()
-
-    def _count_configured_sessions(self):
-        count = 0
-        for group in self.cfg.quotes_fetchers:
-            workers = group.get("workers", None)
-            if not workers:
-                continue
-
-            for worker in workers:
-                count += worker.get("sessions", 1)
-
-        return count
 
     async def test_omega_lifecycle(self):
         await cli.start("worker")
@@ -118,18 +107,6 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
         value = "shanghai"
         cli.update_config(settings, key, value)
         self.assertEqual(settings[key], value)
-
-    def test_config_fetcher(self):
-        settings = {}
-        with mock.patch(
-            "builtins.input", side_effect=["account", "password", "1", "n", "c"]
-        ):
-            cli.config_fetcher(settings)
-
-        impl = settings["quotes_fetchers"][0]["impl"]
-        worker = settings["quotes_fetchers"][0]["workers"][0]
-        self.assertEqual("jqadaptor", impl)
-        self.assertEqual("account", worker["account"])
 
     def test_check_environment(self):
         os.environ[cfg4py.envar] = ""
