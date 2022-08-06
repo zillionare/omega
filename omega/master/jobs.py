@@ -23,7 +23,10 @@ from omega.master.tasks.sync_other_bars import (
     sync_month_bars,
     sync_week_bars,
 )
-from omega.master.tasks.sync_price_limit import sync_trade_price_limits
+from omega.master.tasks.sync_price_limit import (
+    sync_cache_price_limits,
+    sync_trade_price_limits,
+)
 from omega.master.tasks.sync_securities import sync_securities_list
 from omega.master.tasks.sync_xr_xd_reports import sync_xrxd_reports
 from omega.master.tasks.synctask import BarsSyncTask, master_syncbars_task
@@ -228,19 +231,26 @@ async def load_cron_task(scheduler):
         minute=35,
         name="day_sync_task",
     )
+    scheduler.add_job(
+        sync_trade_price_limits,
+        "cron",
+        hour=1,
+        minute="45",  # 同步前一个交易日的涨跌停数据
+        name="sync_trade_price_limits",
+    )
 
     scheduler.add_job(
         sync_daily_bars_1m,
         "cron",
-        hour=1,
-        minute=45,
+        hour=2,
+        minute=0,
         name="daily_bars_sync",
     )
     scheduler.add_job(
         sync_min_5_15_30_60,
         "cron",
         hour=2,
-        minute=15,
+        minute=20,
         name="sync_min_5_15_30_60",
     )
 
@@ -266,12 +276,12 @@ async def load_cron_task(scheduler):
         name="day_factor_fix_task",
     )
     scheduler.add_job(
-        sync_trade_price_limits,
+        sync_cache_price_limits,
         "cron",
         hour=9,
         minute="1,31",  # 第一次为了交易界面方便使用，第二次是正确的数据（修正后）
         second=10,
-        name="sync_trade_price_limits",
+        name="sync_cache_price_limits",
     )
 
     """

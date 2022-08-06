@@ -34,7 +34,9 @@ def get_trade_limit_filename(
     return "/".join(filename)
 
 
-async def write_trade_price_limits_to_dfs(name: str, dt: datetime.datetime):
+async def write_price_limits_to_dfs(
+    name: str, dt: datetime.date, cache_only: bool = False
+):
     """
     将涨跌停写入dfs
     Args:
@@ -45,7 +47,9 @@ async def write_trade_price_limits_to_dfs(name: str, dt: datetime.datetime):
     dfs = Storage()
     if dfs is None:  # pragma: no cover
         return
-    today = datetime.datetime.now().date()
+
+    # clear cache if necessory: cache only, or dt = date_in_cache
+    await Stock.reset_price_limits_cache(cache_only, dt)
 
     for typ, ft in itertools.product(
         [SecurityType.STOCK, SecurityType.INDEX], [FrameType.DAY]
@@ -61,30 +65,29 @@ async def write_trade_price_limits_to_dfs(name: str, dt: datetime.datetime):
             assert isinstance(bars, np.ndarray)
             all_bars.append(bars)
         bars = np.concatenate(all_bars)
+
         # 涨跌停写入inflaxdb 和 cache
-        await Stock.save_trade_price_limits(bars, to_cache=False)
-        if dt == today:
-            logger.info(
-                f"{typ.value}.{ft.value}, today is trade day, write results into redis"
-            )
-            await Stock.save_trade_price_limits(bars, to_cache=True)
-        binary = pickle.dumps(bars, protocol=cfg.pickle.ver)
-        await dfs.write(get_trade_limit_filename(typ, dt), binary)
-        await cache.temp.delete(queue_name)
+        if cache_only:
+            logger.info(f"{typ.value}.{ft.value}, sync data to cache only!")
+            await Stock.save_trade_price_limits(bars, dt, to_cache=True)
+        else:
+            await Stock.save_trade_price_limits(bars, dt, to_cache=False)
+
+            binary = pickle.dumps(bars, protocol=cfg.pickle.ver)
+            await dfs.write(get_trade_limit_filename(typ, dt), binary)
+            await cache.temp.delete(queue_name)
 
 
-async def run_sync_trade_price_limits_task(
-    task: BarsSyncTask, update_timestamp: bool = False
-):
+async def run_sync_price_limits_task(task: BarsSyncTask, cache_only: bool = False):
     """用来启动涨跌停的方法，接收一个task实例"""
     ret = await task.run()
     if not ret:
         # 执行失败需要删除数据队列
         await delete_temporal_bars(task.name, task.frame_type)
         return False
-    await write_trade_price_limits_to_dfs(task.name, task.end)
+    await write_price_limits_to_dfs(task.name, task.end, cache_only)
 
-    if update_timestamp:
+    if cache_only is False:  # 正常任务，不是当天刷新cache的临时任务
         await cache.sys.set(
             constants.BAR_SYNC_TRADE_PRICE_TAIL, task.end.strftime("%Y-%m-%d")
         )
@@ -106,29 +109,57 @@ async def get_trade_price_limits_sync_date(tail_key: str, frame_type: FrameType)
         else:
             tail = datetime.datetime.strptime(tail, "%Y-%m-%d")
             tail = TimeFrame.shift(tail, 1, frame_type)  # 返回datetime.date
+
+        # 计算交易日间隔
         count_frame = TimeFrame.count_frames(
             tail,
             now.replace(hour=0, minute=0, second=0, microsecond=0),
             frame_type,
         )
 
-        # 交易日取当天，非交易日取前一个交易日，涨跌停价格获取是9点开始，因此取当天
-        # 非交易日执行时，此处count_frame == 0
-        if count_frame >= 1:
-            yield tail
+        if TimeFrame.is_trade_day(now):
+            if count_frame >= 2:  # 交易日需要间隔一天
+                yield tail
+            else:
+                break
         else:
-            break
+            if count_frame >= 1:  # 非交易日只需要取上一个交易日即可
+                yield tail
+            else:
+                break
 
 
 @master_syncbars_task()
 async def sync_trade_price_limits():
+    """每天1:45同步一次上一个交易日的涨跌停"""
+    frame_type = FrameType.DAY
+
+    async for sync_date in get_trade_price_limits_sync_date(
+        constants.BAR_SYNC_TRADE_PRICE_TAIL, frame_type
+    ):
+        # sync_data, datetime.date
+        logger.info("sync_trade_price_limits, for %s", sync_date)
+
+        task = await get_month_week_sync_task(
+            Events.OMEGA_DO_SYNC_TRADE_PRICE_LIMITS, sync_date, frame_type
+        )
+        task._quota_type = 2  # 白天的同步任务
+
+        # 持久化涨跌停到dfs，更新时间戳
+        rc = await run_sync_price_limits_task(task, False)
+        if not rc:  # 执行出错，下次再尝试
+            break
+
+
+@master_syncbars_task()
+async def sync_cache_price_limits():
     """每天9:01/09:31各同步一次今日涨跌停并写入redis"""
     frame_type = FrameType.DAY
 
-    # 9:01同步一次
     now = datetime.datetime.now()
     dt = now.date()  # dt is datetime.date
     if TimeFrame.is_trade_day(dt):
+        # 9:01同步一次
         if now.hour == 9 and now.minute < 15:
             logger.info("9:01, sync price limits first time")
 
@@ -137,21 +168,17 @@ async def sync_trade_price_limits():
             )
             task._quota_type = 2  # 白天的同步任务
 
-            await run_sync_trade_price_limits_task(task)  # 持久化涨跌停到dfs
+            await run_sync_price_limits_task(task, True)
             return True
 
-    # 9:31再次同步（除权除息等造成的更新）
-    async for sync_date in get_trade_price_limits_sync_date(
-        constants.BAR_SYNC_TRADE_PRICE_TAIL, frame_type
-    ):
-        logger.info("9:31, sync price limits second time")
+        # 9:31再次同步（除权除息等造成的更新）
+        if now.hour == 9 and now.minute > 30:
+            logger.info("9:31, sync price limits second time")
 
-        task = await get_month_week_sync_task(
-            Events.OMEGA_DO_SYNC_TRADE_PRICE_LIMITS, sync_date, frame_type
-        )
-        task._quota_type = 2  # 白天的同步任务
+            task = await get_month_week_sync_task(
+                Events.OMEGA_DO_SYNC_TRADE_PRICE_LIMITS, dt, frame_type
+            )
+            task._quota_type = 2  # 白天的同步任务
 
-        # 持久化涨跌停到dfs，更新时间戳
-        rc = await run_sync_trade_price_limits_task(task, True)
-        if not rc:  # 执行出错，下次再尝试
-            break
+            await run_sync_price_limits_task(task, True)
+            return True
