@@ -133,7 +133,7 @@ async def sync_daily_bars_1m():
     key_head = constants.BAR_SYNC_ARCHIVE_HEAD
     key_tail = constants.BAR_SYNC_ARCHIVE_TAIL
 
-    async for sync_dt, head, tail in get_sync_date():
+    async for sync_dt, head, tail in get_sync_date(key_head, key_tail):
         # 当天的校准启动前，先清除缓存。
         if sync_dt.date() == pre_trade_date:
             await Stock.reset_cache()
