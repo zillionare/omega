@@ -4,9 +4,8 @@ import asyncio
 import logging
 import os
 import signal
+import functools
 import time
-from functools import partial
-from typing import Optional
 
 import arrow
 import cfg4py
@@ -117,32 +116,35 @@ async def on_exit():
     """退出omega master进程，释放非锁资源。"""
     print("omega master is shutdowning...")
 
-    await omicron.cache.sys.delete(PROC_LOCK_OMEGA_MASTER)
+    try:
+        await omicron.cache.sys.delete(PROC_LOCK_OMEGA_MASTER)
+    except Exception:
+        pass
 
     if receiver is not None:
         await receiver.stop()
 
     await emit.stop()
     await omicron.close()
-
-    loop = asyncio.get_event_loop()
-    loop.stop()
-    loop.close()
     print("omega master shutdowned successfully")
 
+def stop(loop):
+    loop.stop()
 
 def start():  # pragma: no cover
     logger.info("starting omega master ...")
     loop = asyncio.get_event_loop()
 
-    for signame in {"SIGINT", "SIGTERM", "SIGQUIT"}:
-        loop.add_signal_handler(
-            getattr(signal, signame), lambda: asyncio.create_task(on_exit())
-        )
+    for s in {signal.SIGINT, signal.SIGTERM, signal.SIGQUIT}:
+        loop.add_signal_handler(s, functools.partial(stop, loop))
 
     loop.create_task(init())
-    loop.run_forever()
-    print("omega master exited.")
+    try:
+        loop.run_forever()
+    finally:
+        loop.run_until_complete(on_exit())
+
+    loop.close()
 
 
 if __name__ == "__main__":

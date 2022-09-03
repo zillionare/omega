@@ -1,4 +1,3 @@
-import asyncio
 import datetime
 import itertools
 import logging
@@ -23,9 +22,10 @@ import omega.worker.tasks.synctask as workjobs
 from omega.core import constants
 from omega.core.events import Events
 from omega.master.tasks.synctask import BarsSyncTask
+from omega.scripts import load_lua_script
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omega.worker.tasks.task_utils import cache_init
-from tests import init_test_env, test_dir
+from tests import dir_test_home, init_test_env
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
@@ -42,6 +42,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         await omicron.cache.init()
         await cache_init()
         await omicron.init()
+        await load_lua_script()
 
         # create influxdb client
         url, token, bucket, org = (
@@ -93,7 +94,6 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             timeout=timeout,
         )
         await task.cleanup(success=True)
-        print("after_hour_sync_job, normal case")
         await cache.sys.delete(constants.BAR_SYNC_MINUTE_TAIL)
         with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task, task]):
             with mock.patch("arrow.now", return_value=end):
@@ -103,21 +103,26 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                     await cache.sys.get(constants.BAR_SYNC_MINUTE_TAIL),
                     "2022-02-18 09:31:00",
                 )
-                base_dir = os.path.join(test_dir(), "data", "test_sync_minute_bars")
-                bars = pickle.dumps(
-                    await Stock.batch_get_bars(
-                        codes=["000001.XSHE", "300001.XSHE", "000001.XSHG"],
-                        n=1,
-                        frame_type=FrameType.MIN1,
-                        end=end.naive,
-                    ),
-                    protocol=cfg.pickle.ver,
+                base_dir = os.path.join(
+                    dir_test_home(), "data", "test_sync_minute_bars"
                 )
+                start = datetime.datetime(2022, 2, 18, 9, 31)
+                actual = {}
+                async for code, bar in Stock.batch_get_min_level_bars_in_range(
+                    ["000001.XSHE", "300001.XSHE", "000001.XSHG"],
+                    FrameType.MIN1,
+                    start,
+                    end.naive,
+                ):
+                    actual[code] = bar
+
                 with open(os.path.join(base_dir, "min_data.pik"), "rb") as f:
-                    self.assertEqual(bars, f.read())
+                    exp = pickle.load(f)
+                    self.assertSetEqual(set(actual.keys()), set(exp.keys()))
+                    # fixme: add bars equality
             end = arrow.get("2022-02-18 09:32:00")
             task.status = None
-            task.end = end.naive
+            task.end = end
             with mock.patch("arrow.now", return_value=end):
                 # 第二次调用 redis有tail
                 await syncjobs.sync_minute_bars()
@@ -198,18 +203,22 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                 await syncjobs.after_hour_sync_job()
                 self.assertTrue(task.status)
                 # 将redis数据读出来，并序列化之后和准备的文件做对比
-                influx_bars = await Stock.batch_get_bars(
+                start = tf.combine_time(end, 9, 31)
+                influx_bars = {}
+                async for code, bars in Stock.batch_get_min_level_bars_in_range(
                     codes=["000001.XSHE", "300001.XSHE", "000001.XSHG"],
-                    n=240,
                     frame_type=FrameType.MIN1,
+                    start=start,
                     end=end.naive.replace(minute=0),
-                )
+                ):
+                    influx_bars[code] = bars
+                    
                 bars1 = pickle.dumps(
                     influx_bars,
                     protocol=cfg.pickle.ver,
                 )
                 with open(
-                    f"{test_dir()}/data/test_after_hour_sync_job/after_hour_sync_job.pik",
+                    f"{dir_test_home()}/data/test_after_hour_sync_job/after_hour_sync_job.pik",
                     "rb",
                 ) as f:
                     bars2 = f.read()

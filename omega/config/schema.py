@@ -40,11 +40,6 @@ class Config(object):
     class redis:
         dsn: Optional[str] = None
 
-    class postgres:
-        dsn: Optional[str] = None
-
-        enabled: Optional[bool] = None
-
     class pickle:
         ver: Optional[int] = None
 
@@ -97,6 +92,8 @@ class Config(object):
         bucket_name: Optional[str] = None
 
         enable_compress: Optional[bool] = None
+
+        max_query_size: Optional[int] = None
 
     class notify:
         mail_from: Optional[str] = None

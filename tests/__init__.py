@@ -1,16 +1,7 @@
-import asyncio
-import json
 import logging
 import os
-import signal
-import socket
-import subprocess
-import sys
-from contextlib import closing
 
-import aiohttp
 import aioredis
-import arrow
 import cfg4py
 from coretypes import FrameType, bars_dtype
 from numpy.testing import assert_array_almost_equal, assert_array_equal
@@ -5698,8 +5689,6 @@ async def init_test_env():
     os.environ[cfg4py.envar] = "DEV"
 
     cfg4py.init(get_config_dir(), False)
-    # enable postgres for unittest
-    cfg.postgres.enabled = True
 
     handler = logging.StreamHandler()
     fmt = "%(asctime)s %(levelname)-1.1s %(name)s:%(funcName)s:%(lineno)s | %(message)s"
@@ -5750,7 +5739,7 @@ def assert_bars_equal(exp, actual):
             assert_array_almost_equal(exp[field], actual[field], 2)
 
 
-def test_dir():
+def dir_test_home():
     from pathlib import Path
 
     home = os.path.dirname(__file__)
@@ -5759,12 +5748,9 @@ def test_dir():
 
 async def reset_influxdb():
     """clean up influxdb"""
-    import itertools
-
-    from omicron import tf
+    
     from omicron.dal.influx.influxclient import InfluxClient
-    from omicron.models.stock import Stock
-
+    
     # create influxdb client
     url, token, bucket, org = (
         cfg.influxdb.url,

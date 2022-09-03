@@ -20,7 +20,7 @@ async def _rebuild_min_level_unclosed_bars():
     for key in keys:
         try:
             sec = key.split(":")[2]
-            bars = await Stock._get_cached_bars(sec, end, 240, FrameType.MIN1)
+            bars = await Stock._get_cached_bars_n(sec, 240, FrameType.MIN1, end)
         except Exception as e:
             logger.exception(e)
             logger.warning("failed to get cached bars for %s", sec)
@@ -30,7 +30,7 @@ async def _rebuild_min_level_unclosed_bars():
         try:
             for frame_type in tf.minute_level_frames[1:]:
                 resampled = Stock.resample(bars, FrameType.MIN1, frame_type)
-                if tf.is_bar_closed(resampled[-1]["frame"], frame_type):
+                if tf.is_bar_closed(resampled[-1]["frame"].item(), frame_type):
                     await Stock.cache_bars(sec, frame_type, resampled)
                 else:
                     await Stock.cache_bars(sec, frame_type, resampled[:-1])
@@ -65,8 +65,8 @@ async def _rebuild_day_level_unclosed_bars():
     errors = 0
     for code in codes:
         try:
-            bars = await Stock._get_persisted_bars(
-                code, FrameType.DAY, begin=start, end=end
+            bars = await Stock._get_persisted_bars_in_range(
+                code, FrameType.DAY, start=start, end=end
             )
         except Exception as e:
             logger.exception(e)
@@ -77,7 +77,7 @@ async def _rebuild_day_level_unclosed_bars():
             continue
 
         try:
-            unclosed_day = await Stock._get_cached_day_bar(code)
+            unclosed_day = await Stock._get_cached_bars_n(code, 1, FrameType.DAY)
             bars = np.concatenate([bars, unclosed_day])
 
             week = Stock.resample(bars, FrameType.DAY, FrameType.WEEK)

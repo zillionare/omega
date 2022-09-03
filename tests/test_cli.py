@@ -7,9 +7,7 @@ from unittest import mock
 import aioredis
 import arrow
 import cfg4py
-import omicron
 import pytest
-from omicron import tf
 from pyemit import emit
 from ruamel.yaml import YAML
 
@@ -29,12 +27,6 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
         os.environ["TZ"] = "Asia/Shanghai"
         os.environ["REDIS_HOST"] = "127.0.0.1"
         os.environ["REDIS_PORT"] = "6379"
-        os.environ["POSTGRES_USER"] = "zillionare"
-        os.environ["POSTGRES_PASSWORD"] = "123456"
-        os.environ["POSTGRES_HOST"] = "127.0.0.1"
-        os.environ["POSTGRES_PORT"] = "5432"
-        os.environ["POSTGRES_DB"] = "zillionare"
-        os.environ["POSTGRES_ENABLED"] = "True"
 
         # disable catch up sync, since test_cli, jobs will be launched many times and cache might by empty
         redis = await aioredis.create_redis(self.cfg.redis.dsn)
@@ -98,10 +90,6 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
     def test_update_config(self):
         settings = cli.load_factory_settings()
 
-        key = "postgres.dsn"
-        value = "postgres://blah"
-        cli.update_config(settings, key, value)
-        self.assertEqual(settings["postgres"]["dsn"], value)
 
         key = "tz"
         value = "shanghai"
@@ -153,49 +141,6 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
 
             self.assertEqual(2, os.makedirs.call_count)
 
-    async def test_config_postgres(self):
-        settings = {}
-        with mock.patch(
-            "builtins.input",
-            side_effect=["R", "127.0.0.1", "6380", "account", "password", "zillionare"],
-        ):
-            with mock.patch("omega.cli.check_postgres", side_effect=[True]):
-                await cli.config_postgres(settings)
-                expected = "postgres://account:password@127.0.0.1:6380/zillionare"
-                self.assertEqual(expected, settings["postgres"]["dsn"])
-
-        # test continue with wrong config
-        with mock.patch(
-            "builtins.input",
-            side_effect=[
-                "R",
-                "127.0.0.1",
-                "6380",
-                "account",
-                "password",
-                "zillionare",
-                "C",
-            ],
-        ):
-            await cli.config_postgres(settings)
-            expected = "postgres://account:password@127.0.0.1:6380/zillionare"
-            self.assertEqual(expected, settings["postgres"]["dsn"])
-
-        # check connection to postgres. Need provide right info in ut
-        host = os.environ.get("POSTGRES_HOST")
-        port = os.environ.get("POSTGRES_PORT")
-        db = os.environ.get("POSTGRES_DB")
-        user = os.environ.get("POSTGRES_USER")
-        password = os.environ.get("POSTGRES_PASSWORD")
-
-        with mock.patch(
-            "builtins.input",
-            side_effect=["R", host, port, user, password, db],
-        ):
-            result = await cli.config_postgres(settings)
-            # should be no exceptions
-            self.assertTrue(result)
-
     async def test_config_redis(self):
         # 1. normla case
         settings = {}
@@ -211,50 +156,3 @@ class TestCLI(unittest.IsolatedAsyncioTestCase):
             with mock.patch("omega.cli.logger.exception"):
                 await cli.config_redis(settings)
                 self.assertDictEqual({}, settings)
-
-    @pytest.mark.skip()
-    async def test_setup(self):
-        # clear cache to simulate first setup
-        redis = await aioredis.create_redis("redis://localhost:6379")
-        await redis.flushall()
-        redis.close()
-        await redis.wait_closed()
-
-        # backup configuration files
-        origin = os.path.join(get_config_dir(), "defaults.yaml")
-        bak = os.path.join(get_config_dir(), "defaults.bak")
-
-        def save_config(settings):
-            os.rename(origin, bak)
-            with open(origin, "w") as f:
-                f.writelines(self.yaml_dumps(settings))
-
-        with mock.patch("omega.cli.save_config", save_config):
-            with mock.patch(
-                "builtins.input",
-                side_effect=[
-                    "/var/log/zillionare/",  # logging
-                    os.environ.get("JQ_ACCOUNT"),
-                    os.environ.get("JQ_PASSWORD"),
-                    "1",
-                    "n",  # config no more account
-                    os.environ.get("REDIS_HOST"),
-                    os.environ.get("REDIS_PORT"),
-                    "",  # redis password
-                    "",  # continue on postgres config
-                    os.environ.get("POSTGRES_HOST"),
-                    os.environ.get("POSTGRES_PORT"),
-                    os.environ.get("POSTGRES_USER"),
-                    os.environ.get("POSTGRES_PASSWORD"),
-                    os.environ.get("POSTGRES_DB"),
-                ],
-            ):
-                try:
-                    await cli.setup(force=True)
-                finally:
-                    os.remove(origin)
-                    os.rename(bak, origin)
-
-                    # setup has started servers
-                    print("stopping omega servers")
-                    await cli.stop()

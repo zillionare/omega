@@ -24,7 +24,7 @@ from omega.master.tasks.synctask import BarsSyncTask
 from omega.master.tasks.task_utils import get_bars_filename
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omega.worker.tasks.task_utils import cache_init
-from tests import init_test_env, test_dir
+from tests import dir_test_home, init_test_env
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
@@ -162,7 +162,7 @@ class TestSyncJobs_Calibration(unittest.IsolatedAsyncioTestCase):
         ):
             with mock.patch("arrow.now", return_value=end):
                 await sync_daily_bars_1m()
-                base_dir = os.path.join(test_dir(), "data", "test_daily_bars_sync")
+                base_dir = os.path.join(dir_test_home(), "data", "test_daily_bars_sync")
                 for typ, ft in itertools.product(
                     [SecurityType.STOCK, SecurityType.INDEX],
                     frame_type,
@@ -180,12 +180,20 @@ class TestSyncJobs_Calibration(unittest.IsolatedAsyncioTestCase):
                     frame_type, (240, 240 // 5, 240 // 15, 240 // 30, 240 // 60, 1)
                 ):
                     # 从dfs查询 并对比
-                    influx_bars = await Stock.batch_get_bars(
+                    influx_bars = {}
+                    start = tf.shift(end, -n_bars + 1, ft)
+                    if ft in tf.minute_level_frames:
+                        batch_get_bars = Stock.batch_get_min_level_bars_in_range
+                    else:
+                        batch_get_bars = Stock.batch_get_day_level_bars_in_range
+                        
+                    async for code, bars in batch_get_bars(
                         codes=["000001.XSHE", "300001.XSHE", "000001.XSHG"],
-                        n=n_bars,
                         frame_type=ft,
+                        start = start,
                         end=end.naive,
-                    )
+                    ):
+                        influx_bars[code] = bars
 
                     influx_bars = pickle.dumps(influx_bars, protocol=cfg.pickle.ver)
                     with open(
