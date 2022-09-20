@@ -9,7 +9,6 @@ from unittest import mock
 import arrow
 import cfg4py
 import omicron
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from coretypes import FrameType, SecurityType
 from omicron.dal.cache import cache
 from omicron.dal.influx.influxclient import InfluxClient
@@ -31,7 +30,7 @@ from omega.master.tasks.synctask import BarsSyncTask
 from omega.master.tasks.task_utils import get_bars_filename
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omega.worker.tasks.task_utils import cache_init
-from tests import assert_bars_equal, init_test_env, test_dir
+from tests import assert_bars_equal, init_test_env, dir_test_home
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
@@ -140,15 +139,19 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(
                     await cache.sys.get(constants.BAR_SYNC_WEEK_TAIL), "2022-02-18"
                 )
-                base_dir = os.path.join(test_dir(), "data", "test_sync_week_bars")
+                base_dir = os.path.join(dir_test_home(), "data", "test_sync_week_bars")
 
                 # 从dfs查询 并对比
-                actual = await Stock.batch_get_bars(
+                actual = {}
+                start = tf.shift(end, -1, FrameType.WEEK)  # original n
+                async for code, bars in Stock.batch_get_day_level_bars_in_range(
                     codes=["000001.XSHE", "300001.XSHE", "000001.XSHG"],
-                    n=1,
                     frame_type=FrameType.WEEK,
+                    start=start,
                     end=end,
-                )
+                ):
+                    actual[code] = bars
+
                 expected = {}
                 with open(os.path.join(base_dir, "influx_1w.pik"), "rb") as f:
                     expected = pickle.load(f)
@@ -223,14 +226,18 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(
                     await cache.sys.get(constants.BAR_SYNC_MONTH_TAIL), "2022-01-28"
                 )
-                base_dir = os.path.join(test_dir(), "data", "test_sync_month_bars")
+                base_dir = os.path.join(dir_test_home(), "data", "test_sync_month_bars")
                 # 从dfs查询 并对比
-                actual = await Stock.batch_get_bars(
+                actual = {}
+                start = tf.shift(end, -1, FrameType.MONTH)
+                async for code, bars in await Stock.batch_get_bars(
                     codes=["000001.XSHE", "300001.XSHE", "000001.XSHG"],
-                    n=1,
                     frame_type=FrameType.MONTH,
+                    start=start,
                     end=end,
-                )
+                ):
+                    actual[code] = bars
+
                 expected = {}
                 with open(os.path.join(base_dir, "influx_1M.pik"), "rb") as f:
                     expected = pickle.load(f)
@@ -311,7 +318,7 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
             with mock.patch("arrow.now", return_value=end):
                 await sync_min_5_15_30_60()
                 self.assertTrue(task.status)
-                base_dir = os.path.join(test_dir(), "data", "test_daily_bars_sync")
+                base_dir = os.path.join(dir_test_home(), "data", "test_daily_bars_sync")
                 for typ, ft in itertools.product(
                     [SecurityType.STOCK, SecurityType.INDEX],
                     frame_type,

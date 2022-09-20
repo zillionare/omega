@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 import subprocess
 import sys
 import unittest
@@ -13,7 +12,7 @@ import rlog
 
 import omega
 from omega.core.constants import PROC_LOCK_OMEGA_MASTER
-from omega.master.app import check_running, start_logging
+from omega.master.app import start_logging
 from tests import init_test_env
 
 
@@ -118,6 +117,7 @@ class AppTest(unittest.IsolatedAsyncioTestCase):
         # 测试能否在本机正常启动，退出时能否释放锁
         proc = subprocess.Popen(
             [sys.executable, "-m", "omega.master.app", "start"],
+            shell = False
         )
 
         # do the check
@@ -130,13 +130,15 @@ class AppTest(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(False)
 
         # kill proc, check if the lock is released
+        await asyncio.sleep(0.5)
         self.assertTrue(find_process("omega.master"))
         proc.terminate()
+        proc.wait()
         for _ in range(60):
             result = await omicron.cache.sys.get(PROC_LOCK_OMEGA_MASTER)
             if result is None:
                 break
-            await asyncio.sleep(2)
+            await asyncio.sleep(0.5)
         else:
             self.assertTrue(False)
 
@@ -146,6 +148,7 @@ class AppTest(unittest.IsolatedAsyncioTestCase):
             [sys.executable, "-m", "omega.master.app", "start"],
         )
 
-        await asyncio.sleep(5)
+        await asyncio.sleep(3)
         _pid = find_process("omega.master")
         self.assertTrue(_pid != proc.pid)
+        await omicron.cache.sys.delete(PROC_LOCK_OMEGA_MASTER)

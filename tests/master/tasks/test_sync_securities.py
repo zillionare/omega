@@ -1,5 +1,4 @@
 import datetime
-import itertools
 import logging
 import unittest
 from unittest import mock
@@ -10,7 +9,6 @@ import omicron
 from omicron.dal.cache import cache
 from omicron.dal.influx.influxclient import InfluxClient
 from omicron.models.security import Security
-from omicron.models.timeframe import TimeFrame as tf
 from pyemit import emit
 
 import omega.worker.tasks.sec_synctask as workjobs
@@ -23,7 +21,7 @@ from omega.master.tasks.sync_securities import (
 )
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omega.worker.tasks.task_utils import cache_init
-from tests import init_test_env, test_dir
+from tests import init_test_env
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()

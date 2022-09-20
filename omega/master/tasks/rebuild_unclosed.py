@@ -31,7 +31,7 @@ async def _rebuild_min_level_unclosed_bars():
         try:
             for frame_type in tf.minute_level_frames[1:]:
                 resampled = Stock.resample(bars, FrameType.MIN1, frame_type)
-                if tf.is_bar_closed(resampled[-1]["frame"], frame_type):
+                if tf.is_bar_closed(resampled[-1]["frame"].item(), frame_type):
                     await Stock.cache_bars(sec, frame_type, resampled)
                 else:
                     await Stock.cache_bars(sec, frame_type, resampled[:-1])

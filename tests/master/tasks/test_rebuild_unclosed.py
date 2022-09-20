@@ -7,12 +7,13 @@ import omicron
 from coretypes import FrameType
 from omicron import cache
 from omicron.models.stock import Stock
+from coretypes import bars_dtype
 
 from omega.master.tasks.rebuild_unclosed import (
     _rebuild_day_level_unclosed_bars,
     _rebuild_min_level_unclosed_bars,
 )
-from tests import init_test_env, test_dir
+from tests import init_test_env, dir_test_home
 
 
 class RebuildUnclosedTest(unittest.IsolatedAsyncioTestCase):
@@ -21,17 +22,17 @@ class RebuildUnclosedTest(unittest.IsolatedAsyncioTestCase):
         await omicron.init()
         await Stock.reset_cache()
 
-        file = test_dir() / "data" / "test_rebuild_unclosed" / "days.pkl"
+        file = dir_test_home() / "data" / "test_rebuild_unclosed" / "days.pkl"
         with open(file, "rb") as f:
             barss = pickle.load(f)
             self.secs = list(barss.keys())
             await Stock.persist_bars(FrameType.DAY, barss)
 
-        file = test_dir() / "data" / "test_rebuild_unclosed" / "1m.pkl"
+        file = dir_test_home() / "data" / "test_rebuild_unclosed" / "1m.pkl"
         with open(file, "rb") as f:
             barss = pickle.load(f)
             for code, bars in barss.items():
-                await Stock.cache_bars(code, FrameType.MIN1, bars)
+                await Stock.cache_bars(code, FrameType.MIN1, bars.astype(bars_dtype))
 
     async def asyncTearDown(self) -> None:
         await omicron.close()
@@ -75,7 +76,7 @@ class RebuildUnclosedTest(unittest.IsolatedAsyncioTestCase):
 
         # test error handling
         with mock.patch(
-            "omicron.models.stock.Stock._get_cached_bars", side_effect=Exception
+            "omicron.models.stock.Stock._get_cached_bars_n", side_effect=Exception
         ):
             await _rebuild_min_level_unclosed_bars()
 
@@ -116,7 +117,8 @@ class RebuildUnclosedTest(unittest.IsolatedAsyncioTestCase):
 
         # test error handling: should raise no exception
         with mock.patch(
-            "omicron.models.stock.Stock._get_persisted_bars", side_effect=Exception
+            "omicron.models.stock.Stock._get_persisted_bars_in_range",
+            side_effect=Exception,
         ):
             await _rebuild_day_level_unclosed_bars()
 

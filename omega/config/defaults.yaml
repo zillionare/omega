@@ -36,7 +36,6 @@ logreceiver:
 
 redis:
   dsn: redis://${REDIS_HOST}:${REDIS_PORT}
-
 pickle:
   ver: 4
 

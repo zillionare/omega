@@ -27,7 +27,7 @@ from omega.master.tasks.sync_price_limit import (
 from omega.master.tasks.synctask import BarsSyncTask
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
 from omega.worker.tasks.task_utils import cache_init
-from tests import assert_bars_equal, init_test_env, test_dir
+from tests import assert_bars_equal, init_test_env, dir_test_home
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
@@ -122,7 +122,7 @@ class TestSyncJobs_PriceLimit(unittest.IsolatedAsyncioTestCase):
                 )
                 # todo inflaxdb读出来看对不对
                 base_dir = os.path.join(
-                    test_dir(), "data", "test_sync_trade_price_limits"
+                    dir_test_home(), "data", "test_sync_trade_price_limits"
                 )
                 # 从dfs查询 并对比
                 actual = await Stock.get_trade_price_limits(

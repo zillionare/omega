@@ -9,7 +9,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from omega.worker import jobs as worker_job
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
-from tests import init_test_env, test_dir
+from tests import init_test_env, dir_test_home
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
@@ -50,7 +50,9 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
     async def test_sync_calendar(self, get_all_trade_days, *args):
         # all_trade_days.npy
         async def get_all_trade_days_mock():
-            return np.load(f"{test_dir()}/data/all_trade_days.npy", allow_pickle=True)
+            return np.load(
+                f"{dir_test_home()}/data/all_trade_days.npy", allow_pickle=True
+            )
 
         get_all_trade_days.side_effect = get_all_trade_days_mock
         await worker_job.sync_calendar()
