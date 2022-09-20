@@ -58,7 +58,7 @@ async def get_month_week_sync_date(tail_key: str, frame_type: FrameType):
         count_frame = TimeFrame.count_frames(
             tail,
             now.replace(hour=0, minute=0, second=0, microsecond=0),
-            frame_type,
+            FrameType.DAY,
         )
 
         if TimeFrame.is_trade_day(now):

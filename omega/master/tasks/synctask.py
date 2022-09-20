@@ -136,20 +136,8 @@ class BarsSyncTask:
     async def parse_bars_sync_scope(self, _type: SecurityType):
         """生成待同步行情数据的证券列表
 
-        该列表由以下方式生成：
-        1. 通过_type指定证券类型（stock或index）
-        2. 通过exclude排除指定的证券。
-        3. 通过include指定包含的证券。
+        该列表由以下方式生成：通过_type指定证券类型（stock或index）
 
-        当exclude和include同时存在时，include优先。
-        exclude和include在配置文件的`omega.sync.bars`条目下指定，使用空格分隔，示例如下：
-        ```
-        omega:
-            sync:
-                bars:
-                    include: 000001.XSHE
-                    exclude: 000001.XSHE 000002.XSHE
-        ```
         """
         end = self.end
         if isinstance(self.end, datetime.datetime):
@@ -158,15 +146,6 @@ class BarsSyncTask:
         query = Security.select(end)
         query.types([_type.value])
         codes = await query.eval()
-
-        exclude = getattr(cfg.omega.sync.bars, "exclude", "")
-        if exclude:
-            exclude = map(lambda x: x, exclude.split(" "))
-            codes = list(set(codes) - set(exclude))
-        include = getattr(cfg.omega.sync.bars, "include", "")
-        if include:
-            include = list(filter(lambda x: x, cfg.omega.sync.bars.include.split(" ")))
-            codes.extend(include)
         return list(set(codes))
 
     async def send_email(self, error=None):

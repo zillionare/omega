@@ -1,6 +1,6 @@
+import datetime
 import logging
 
-import arrow
 import numpy as np
 from coretypes import FrameType
 from omicron import cache, tf
@@ -13,14 +13,15 @@ logger = logging.getLogger(__name__)
 
 async def _rebuild_min_level_unclosed_bars():
     """根据缓存中的分钟线，重建当日已收盘或者未收盘的分钟级别及日线级别数据"""
-    end = tf.floor(arrow.now().naive, FrameType.MIN1)
+    now = datetime.datetime.now()
+    end = tf.floor(now, FrameType.MIN1)
     keys = await cache.security.keys("bars:1m:*")
 
     errors = 0
     for key in keys:
         try:
             sec = key.split(":")[2]
-            bars = await Stock._get_cached_bars(sec, end, 240, FrameType.MIN1)
+            bars = await Stock._get_cached_bars_n(sec, 240, FrameType.MIN1, end)
         except Exception as e:
             logger.exception(e)
             logger.warning("failed to get cached bars for %s", sec)
@@ -57,27 +58,26 @@ async def _rebuild_day_level_unclosed_bars():
         最终我们需要实时更新年线和季线。目前数据库还没有同步这两种k线。
     """
     codes = await Security.select().eval()
-    end = arrow.now().date()
+    end = datetime.datetime.now().date()
     # just to cover one month's day bars at most
     n = 30
-    start = tf.day_shift(end, -n)
 
     errors = 0
     for code in codes:
         try:
-            bars = await Stock._get_persisted_bars(
-                code, FrameType.DAY, begin=start, end=end
-            )
+            bars = await Stock._get_persisted_bars_n(code, FrameType.DAY, n, end=end)
         except Exception as e:
             logger.exception(e)
             logger.warning(
-                "failed to get persisted bars for %s from %s to %s", code, start, end
+                "failed to get persisted bars for %s from %s[%d]", code, end, n
             )
             errors += 1
             continue
 
         try:
-            unclosed_day = await Stock._get_cached_day_bar(code)
+            unclosed_day = await Stock._get_cached_bars_n(
+                code, n, FrameType.DAY, end=end
+            )
             bars = np.concatenate([bars, unclosed_day])
 
             week = Stock.resample(bars, FrameType.DAY, FrameType.WEEK)

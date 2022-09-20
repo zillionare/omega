@@ -5724,16 +5724,6 @@ async def init_test_env():
 
 
 async def is_local_omega_alive():
-    # try:
-    #     url = f"{cfg.omega.urls.quotes_server}/sys/version"
-    #     async with aiohttp.ClientSession() as client:
-    #         async with client.get(url) as resp:
-    #             if resp.status == 200:
-    #                 return True
-    # except Exception:
-    #     pass
-    #
-    # return False
     return True
 
 

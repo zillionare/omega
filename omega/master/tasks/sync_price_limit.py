@@ -69,9 +69,9 @@ async def write_price_limits_to_dfs(
         # 涨跌停写入inflaxdb 和 cache
         if cache_only:
             logger.info(f"{typ.value}.{ft.value}, sync data to cache only!")
-            await Stock.save_trade_price_limits(bars, dt, to_cache=True)
+            await Stock.save_trade_price_limits(bars, to_cache=True)
         else:
-            await Stock.save_trade_price_limits(bars, dt, to_cache=False)
+            await Stock.save_trade_price_limits(bars, to_cache=False)
 
             binary = pickle.dumps(bars, protocol=cfg.pickle.ver)
             await dfs.write(get_trade_limit_filename(typ, dt), binary)

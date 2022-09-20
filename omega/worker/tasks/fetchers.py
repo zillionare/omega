@@ -90,7 +90,7 @@ async def fetch_bars(
             continue
 
         # 周线和月线，数据必须在范围内，日线只需要判断是否为end即可
-        frame = bars[k]["frame"][0]
+        frame = bars[k]["frame"][0].item().date()
         if hasattr(frame, "date"):
             frame = frame.date()
         if frame_type == FrameType.WEEK or frame_type == FrameType.MONTH:

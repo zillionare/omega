@@ -283,34 +283,3 @@ async def load_cron_task(scheduler):
         second=10,
         name="sync_cache_price_limits",
     )
-
-    """
-    scheduler.add_job(
-        sync_fund_net_value,
-        "cron",
-        hour=4,
-        minute=15,
-        name="sync_fund_net_value",
-    )
-    scheduler.add_job(
-        sync_funds,
-        "cron",
-        hour=4,
-        minute=0,
-        name="sync_funds",
-    )
-    scheduler.add_job(
-        sync_fund_share_daily,
-        "cron",
-        hour=4,
-        minute=5,
-        name="sync_fund_share_daily",
-    )
-    scheduler.add_job(
-        sync_fund_portfolio_stock,
-        "cron",
-        hour=4,
-        minute=10,
-        name="sync_fund_portfolio_stock",
-    )
-    """
