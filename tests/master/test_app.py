@@ -116,8 +116,7 @@ class AppTest(unittest.IsolatedAsyncioTestCase):
         await omicron.cache.sys.delete(PROC_LOCK_OMEGA_MASTER)
         # 测试能否在本机正常启动，退出时能否释放锁
         proc = subprocess.Popen(
-            [sys.executable, "-m", "omega.master.app", "start"],
-            shell = False
+            [sys.executable, "-m", "omega.master.app", "start"], shell=False
         )
 
         # do the check

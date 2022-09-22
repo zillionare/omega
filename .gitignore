@@ -111,3 +111,4 @@ nohup.out
 dev.env
 
 mydemo.py
+.tox_env

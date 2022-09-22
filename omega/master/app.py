@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import asyncio
+import functools
 import logging
 import os
 import signal
-import functools
 import time
 
 import arrow
@@ -128,8 +128,10 @@ async def on_exit():
     await omicron.close()
     print("omega master shutdowned successfully")
 
+
 def stop(loop):
     loop.stop()
+
 
 def start():  # pragma: no cover
     logger.info("starting omega master ...")

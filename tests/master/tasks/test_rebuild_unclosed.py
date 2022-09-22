@@ -2,18 +2,17 @@ import pickle
 import unittest
 from unittest import mock
 
-import arrow
 import omicron
-from coretypes import FrameType
+from coretypes import FrameType, bars_dtype
+from freezegun import freeze_time
 from omicron import cache
 from omicron.models.stock import Stock
-from coretypes import bars_dtype
 
 from omega.master.tasks.rebuild_unclosed import (
     _rebuild_day_level_unclosed_bars,
     _rebuild_min_level_unclosed_bars,
 )
-from tests import init_test_env, dir_test_home
+from tests import dir_test_home, init_test_env
 
 
 class RebuildUnclosedTest(unittest.IsolatedAsyncioTestCase):
@@ -37,8 +36,8 @@ class RebuildUnclosedTest(unittest.IsolatedAsyncioTestCase):
     async def asyncTearDown(self) -> None:
         await omicron.close()
 
-    @mock.patch("arrow.now", return_value=arrow.get(2022, 7, 21, 11, 14))
-    async def test_rebuild_min_level_unclosed_bars(self, _):
+    @freeze_time("2022-07-21 11:14:00")
+    async def test_rebuild_min_level_unclosed_bars(self):
         # ensure there's no cache-related data in the database
         keys = await cache.security.keys("bars:5m:*")
         self.assertEqual(len(keys), 0)
@@ -83,8 +82,8 @@ class RebuildUnclosedTest(unittest.IsolatedAsyncioTestCase):
         with mock.patch("omicron.models.stock.Stock.resample", side_effect=Exception):
             await _rebuild_min_level_unclosed_bars()
 
-    @mock.patch("arrow.now", return_value=arrow.get(2022, 7, 21, 11, 14))
-    async def test_rebuild_day_level_unclosed_bars(self, _):
+    @freeze_time("2022-07-21 11:14:00")
+    async def test_rebuild_day_level_unclosed_bars(self):
         await _rebuild_min_level_unclosed_bars()
 
         # ensure there's no cache-related data in the database

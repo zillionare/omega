@@ -22,9 +22,10 @@ from omega.master.dfs import Storage
 from omega.master.tasks.calibration_task import get_sync_date, sync_daily_bars_1m
 from omega.master.tasks.synctask import BarsSyncTask
 from omega.master.tasks.task_utils import get_bars_filename
-from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
+from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher
 from omega.worker.tasks.task_utils import cache_init
-from tests import dir_test_home, init_test_env
+from tests import dir_test_home, init_test_env, mock_jq_data
+from tests.demo_fetcher.demo_fetcher import DemoFetcher
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
@@ -61,12 +62,9 @@ class TestSyncJobs_Calibration(unittest.IsolatedAsyncioTestCase):
         await emit.stop()
 
     async def create_quotes_fetcher(self):
-        cfg = cfg4py.get_instance()
-        fetcher_info = cfg.quotes_fetchers[0]
-        impl = fetcher_info["impl"]
-        account = fetcher_info["account"]
-        password = fetcher_info["password"]
-        await aq.create_instance(impl, account=account, password=password)
+        self.aq = AbstractQuotesFetcher()
+        instance = DemoFetcher()
+        self.aq._instances.append(instance)
 
     async def test_get_sync_date(self):
         key_head = constants.BAR_SYNC_ARCHIVE_HEAD
@@ -120,11 +118,14 @@ class TestSyncJobs_Calibration(unittest.IsolatedAsyncioTestCase):
     )
     @mock.patch("omega.master.tasks.synctask.BarsSyncTask.parse_bars_sync_scope")
     @mock.patch("omega.master.tasks.calibration_task.get_sync_date")
-    async def test_daily_bars_sync(self, get_sync_date, parse_bars_scope, *args):
+    @mock.patch("tests.demo_fetcher.demo_fetcher.DemoFetcher.get_bars_batch")
+    async def test_daily_bars_sync(
+        self, _get_bars_batch, get_sync_date, parse_bars_scope, *args
+    ):
         emit.register(
             Events.OMEGA_DO_SYNC_DAILY_CALIBRATION, workjobs.sync_daily_calibration
         )
-        end = arrow.get("2022-02-18 15:00:00")
+        end = arrow.get("2022-02-23 15:00:00")
 
         async def get_sync_date_mock(*args, **kwargs):
             for item in [(end.naive, end.naive, end.naive)]:
@@ -139,7 +140,6 @@ class TestSyncJobs_Calibration(unittest.IsolatedAsyncioTestCase):
         name = "calibration_sync"
         frame_type = [
             FrameType.MIN1,
-            # FrameType.DAY,
         ]
         task = BarsSyncTask(
             event=Events.OMEGA_DO_SYNC_DAILY_CALIBRATION,
@@ -157,12 +157,17 @@ class TestSyncJobs_Calibration(unittest.IsolatedAsyncioTestCase):
         ):
             await dfs.delete(get_bars_filename(typ, end.naive, ft))
 
+        mock_data1 = mock_jq_data("000001_300001_0223_1m.pik")
+        mock_data2 = mock_jq_data("000001_idx_0223_1m.pik")
+        _get_bars_batch.side_effect = [mock_data1, mock_data2]
+
         with mock.patch(
             "omega.master.tasks.calibration_task.BarsSyncTask", side_effect=[task]
         ):
             with mock.patch("arrow.now", return_value=end):
                 await sync_daily_bars_1m()
-                base_dir = os.path.join(dir_test_home(), "data", "test_daily_bars_sync")
+                base_dir_jq = os.path.join(dir_test_home(), "jq_data")
+                base_dir_local = os.path.join(dir_test_home(), "local_data")
                 for typ, ft in itertools.product(
                     [SecurityType.STOCK, SecurityType.INDEX],
                     frame_type,
@@ -171,14 +176,16 @@ class TestSyncJobs_Calibration(unittest.IsolatedAsyncioTestCase):
                     filename = get_bars_filename(typ, end.naive, ft)
                     data = await dfs.read(filename)
 
+                    _prefix = "000001_300001_0223"
+                    if typ == SecurityType.INDEX:
+                        _prefix = "000001_idx_0223"
                     with open(
-                        os.path.join(base_dir, f"dfs_{typ.value}_{ft.value}.pik"), "rb"
+                        os.path.join(base_dir_jq, f"{_prefix}_{ft.value}.pik"), "rb"
                     ) as f:
                         local_data = f.read()
+
                     self.assertEqual(data, local_data)
-                for ft, n_bars in zip(
-                    frame_type, (240, 240 // 5, 240 // 15, 240 // 30, 240 // 60, 1)
-                ):
+                for ft, n_bars in zip(frame_type, (240, 1)):
                     # 从dfs查询 并对比
                     influx_bars = {}
                     start = tf.shift(end, -n_bars + 1, ft)
@@ -186,20 +193,24 @@ class TestSyncJobs_Calibration(unittest.IsolatedAsyncioTestCase):
                         batch_get_bars = Stock.batch_get_min_level_bars_in_range
                     else:
                         batch_get_bars = Stock.batch_get_day_level_bars_in_range
-                        
+
                     async for code, bars in batch_get_bars(
                         codes=["000001.XSHE", "300001.XSHE", "000001.XSHG"],
                         frame_type=ft,
-                        start = start,
+                        start=start,
                         end=end.naive,
                     ):
                         influx_bars[code] = bars
 
-                    influx_bars = pickle.dumps(influx_bars, protocol=cfg.pickle.ver)
+                    influx_bars_dump = pickle.dumps(
+                        influx_bars, protocol=cfg.pickle.ver
+                    )
+
+                    _prefix = "000001_300001_000001_0223"
                     with open(
-                        os.path.join(base_dir, f"influx_{ft.value}.pik"), "rb"
+                        os.path.join(base_dir_local, f"{_prefix}_{ft.value}_local.pik"),
+                        "rb",
                     ) as f:
                         local_influx_bars = f.read()
-                    print(f"influx_{ft.value}.pik")
 
-                    self.assertEqual(influx_bars, local_influx_bars)
+                    self.assertEqual(influx_bars_dump, local_influx_bars)

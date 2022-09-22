@@ -25,9 +25,10 @@ from omega.master.tasks.sync_price_limit import (
     sync_trade_price_limits,
 )
 from omega.master.tasks.synctask import BarsSyncTask
-from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
+from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher
 from omega.worker.tasks.task_utils import cache_init
-from tests import assert_bars_equal, init_test_env, dir_test_home
+from tests import dir_test_home, init_test_env, mock_jq_data
+from tests.demo_fetcher.demo_fetcher import DemoFetcher
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
@@ -67,19 +68,17 @@ class TestSyncJobs_PriceLimit(unittest.IsolatedAsyncioTestCase):
         await emit.stop()
 
     async def create_quotes_fetcher(self):
-        cfg = cfg4py.get_instance()
-        fetcher_info = cfg.quotes_fetchers[0]
-        impl = fetcher_info["impl"]
-        account = fetcher_info["account"]
-        password = fetcher_info["password"]
-        await aq.create_instance(impl, account=account, password=password)
+        self.aq = AbstractQuotesFetcher()
+        instance = DemoFetcher()
+        self.aq._instances.append(instance)
 
     @mock.patch(
         "omega.master.tasks.synctask.QuotaMgmt.check_quota",
         return_value=((True, 500000, 1000000)),
     )
     @mock.patch("omega.master.tasks.synctask.BarsSyncTask.parse_bars_sync_scope")
-    async def test_sync_trade_price_limits(self, parse_bars_scope, *args):
+    @mock.patch("tests.demo_fetcher.demo_fetcher.DemoFetcher.get_trade_price_limits")
+    async def test_sync_trade_price_limits(self, _fetch_bars, parse_bars_scope, *args):
         emit.register(
             Events.OMEGA_DO_SYNC_TRADE_PRICE_LIMITS, workjobs.sync_trade_price_limits
         )
@@ -103,6 +102,11 @@ class TestSyncJobs_PriceLimit(unittest.IsolatedAsyncioTestCase):
             recs_per_sec=2,
         )
         await task.cleanup(success=True)
+
+        mock_data1 = mock_jq_data("000001_300001_0218_limit.pik")
+        mock_data2 = mock_jq_data("000001_idx_0218_limit.pik")
+        _fetch_bars.side_effect = [mock_data1, mock_data2]
+
         dfs = Storage()
         await dfs.delete(get_trade_limit_filename(SecurityType.INDEX, end.naive))
         await dfs.delete(get_trade_limit_filename(SecurityType.STOCK, end.naive))

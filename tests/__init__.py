@@ -1,8 +1,11 @@
+import datetime
 import logging
 import os
+import pickle
 
 import aioredis
 import cfg4py
+import numpy as np
 from coretypes import FrameType, bars_dtype
 from numpy.testing import assert_array_almost_equal, assert_array_equal
 
@@ -5717,16 +5720,24 @@ async def is_local_omega_alive():
 
 
 def assert_bars_equal(exp, actual):
-    assert_array_equal(exp["frame"], actual["frame"])
+    assert_array_equal(exp["frame"].item().date(), actual["frame"][0])
 
-    for field, _ in bars_dtype:
-        if field == "frame":
-            continue
+    assert_array_almost_equal(exp["volume"], actual["volume"][0], decimal=-1)
+    assert_array_almost_equal(exp["amount"], actual["amount"][0], decimal=-1)
+    assert_array_almost_equal(exp["open"], actual["open"][0], 2)
+    assert_array_almost_equal(exp["high"], actual["high"][0], 2)
 
-        if field in ["volume", "amount"]:
-            assert_array_almost_equal(exp[field], actual[field], decimal=-1)
-        else:
-            assert_array_almost_equal(exp[field], actual[field], 2)
+
+def assert_daybars_equal(exp, actual):
+    _a = []
+    for _item in actual["frame"]:
+        _a.append(_item.item().date())
+    assert_array_equal(exp["frame"], _a)
+
+    assert_array_almost_equal(exp["volume"], actual["volume"], decimal=-1)
+    assert_array_almost_equal(exp["amount"], actual["amount"], decimal=-1)
+    assert_array_almost_equal(exp["open"], actual["open"], 2)
+    assert_array_almost_equal(exp["high"], actual["high"], 2)
 
 
 def dir_test_home():
@@ -5753,3 +5764,13 @@ async def reset_influxdb():
     await client.delete_bucket()
     await client.create_bucket()
     return client
+
+
+def mock_jq_data(filename: str):
+    module_dir = os.path.dirname(__file__)
+    _dir = os.path.normpath(os.path.join(module_dir, "jq_data"))
+
+    target_file = f"{_dir}/{filename}"
+    with open(target_file, "rb") as f:
+        all_secs = pickle.load(f)
+        return all_secs

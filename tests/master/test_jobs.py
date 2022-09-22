@@ -11,6 +11,7 @@ import cfg4py
 import omicron
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from coretypes import FrameType
+from freezegun import freeze_time
 from omicron.dal.cache import cache
 from omicron.dal.influx.influxclient import InfluxClient
 from omicron.models.stock import Stock
@@ -23,9 +24,10 @@ from omega.core import constants
 from omega.core.events import Events
 from omega.master.tasks.synctask import BarsSyncTask
 from omega.scripts import load_lua_script
-from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
+from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher
 from omega.worker.tasks.task_utils import cache_init
-from tests import dir_test_home, init_test_env
+from tests import dir_test_home, init_test_env, mock_jq_data
+from tests.demo_fetcher.demo_fetcher import DemoFetcher
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
@@ -62,19 +64,17 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         await emit.stop()
 
     async def create_quotes_fetcher(self):
-        cfg = cfg4py.get_instance()
-        fetcher_info = cfg.quotes_fetchers[0]
-        impl = fetcher_info["impl"]
-        account = fetcher_info["account"]
-        password = fetcher_info["password"]
-        await aq.create_instance(impl, account=account, password=password)
+        self.aq = AbstractQuotesFetcher()
+        instance = DemoFetcher()
+        self.aq._instances.append(instance)
 
     @mock.patch(
         "omega.master.tasks.synctask.QuotaMgmt.check_quota",
         return_value=((True, 500000, 1000000)),
     )
     @mock.patch("omega.master.tasks.synctask.BarsSyncTask.parse_bars_sync_scope")
-    async def test_sync_minute_bars(self, parse_bars_scope, *args):
+    @mock.patch("omega.worker.tasks.fetchers.fetcher.get_bars_batch")
+    async def test_sync_minute_bars(self, _fetch_bars, parse_bars_scope, *args):
         emit.register(Events.OMEGA_DO_SYNC_MIN, workjobs.sync_minute_bars)
         name = "minute"
         timeout = 60
@@ -82,6 +82,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
 
         seclist1 = ["000001.XSHE", "300001.XSHE"]
         seclist2 = ["000001.XSHG"]
+        # 两次调用任务
         parse_bars_scope.side_effect = [seclist1, seclist2, seclist1, seclist2]
 
         await Stock.reset_cache()
@@ -95,36 +96,48 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         )
         await task.cleanup(success=True)
         await cache.sys.delete(constants.BAR_SYNC_MINUTE_TAIL)
+
         with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task, task]):
             with mock.patch("arrow.now", return_value=end):
+                mock_data1 = mock_jq_data("000001_300001_0218_0931_n1.pik")
+                mock_data2 = mock_jq_data("000001_idx_0218_0931_n1.pik")
+                _fetch_bars.side_effect = [mock_data1, mock_data2]
+
                 await syncjobs.sync_minute_bars()
                 self.assertTrue(task.status)
                 self.assertEqual(
                     await cache.sys.get(constants.BAR_SYNC_MINUTE_TAIL),
                     "2022-02-18 09:31:00",
                 )
+
                 base_dir = os.path.join(
                     dir_test_home(), "data", "test_sync_minute_bars"
                 )
                 start = datetime.datetime(2022, 2, 18, 9, 31)
                 actual = {}
-                async for code, bar in Stock.batch_get_min_level_bars_in_range(
-                    ["000001.XSHE", "300001.XSHE", "000001.XSHG"],
-                    FrameType.MIN1,
-                    start,
-                    end.naive,
-                ):
-                    actual[code] = bar
+                with freeze_time("2022-02-18 09:31:00"):
+                    async for code, bar in Stock.batch_get_min_level_bars_in_range(
+                        ["000001.XSHE", "300001.XSHE", "000001.XSHG"],
+                        FrameType.MIN1,
+                        start,
+                        end.naive,
+                    ):
+                        actual[code] = bar
 
                 with open(os.path.join(base_dir, "min_data.pik"), "rb") as f:
                     exp = pickle.load(f)
                     self.assertSetEqual(set(actual.keys()), set(exp.keys()))
                     # fixme: add bars equality
+
             end = arrow.get("2022-02-18 09:32:00")
             task.status = None
-            task.end = end
+            task.end = end.naive
             with mock.patch("arrow.now", return_value=end):
                 # 第二次调用 redis有tail
+                mock_data1 = mock_jq_data("000001_300001_0218_0931_n1.pik")
+                mock_data2 = mock_jq_data("000001_idx_0218_0931_n1.pik")
+                _fetch_bars.side_effect = [mock_data1, mock_data2]
+
                 await syncjobs.sync_minute_bars()
                 self.assertTrue(task.status)
                 self.assertEqual(
@@ -163,7 +176,10 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
     )
     @mock.patch("omega.master.tasks.synctask.mail_notify")
     @mock.patch("omega.master.tasks.synctask.BarsSyncTask.parse_bars_sync_scope")
-    async def test_after_hour_sync_job(self, parse_bars_scope, mail_notify, *args):
+    @mock.patch("omega.worker.tasks.fetchers.fetcher.get_bars_batch")
+    async def test_after_hour_sync_job(
+        self, _fetch_bars, parse_bars_scope, mail_notify, *args
+    ):
         email_content = ""
 
         seclist1 = ["000001.XSHE", "300001.XSHE"]
@@ -197,7 +213,13 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         )
         await task.cleanup(success=True)
         await Stock.reset_cache()
-        print("after_hour_sync_job, normal case")
+
+        mock_data1 = mock_jq_data("000001_300001_0223_1m.pik")
+        mock_data2 = mock_jq_data("000001_300001_0223_1d.pik")
+        mock_data3 = mock_jq_data("000001_idx_0223_1m.pik")
+        mock_data4 = mock_jq_data("000001_idx_0223_1d.pik")
+        _fetch_bars.side_effect = [mock_data1, mock_data2, mock_data3, mock_data4]
+
         with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
             with mock.patch("arrow.now", return_value=end):
                 await syncjobs.after_hour_sync_job()
@@ -205,14 +227,15 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                 # 将redis数据读出来，并序列化之后和准备的文件做对比
                 start = tf.combine_time(end, 9, 31)
                 influx_bars = {}
-                async for code, bars in Stock.batch_get_min_level_bars_in_range(
-                    codes=["000001.XSHE", "300001.XSHE", "000001.XSHG"],
-                    frame_type=FrameType.MIN1,
-                    start=start,
-                    end=end.naive.replace(minute=0),
-                ):
-                    influx_bars[code] = bars
-                    
+                with freeze_time("2022-02-23 15:05:00"):
+                    async for code, bars in Stock.batch_get_min_level_bars_in_range(
+                        codes=["000001.XSHE", "300001.XSHE", "000001.XSHG"],
+                        frame_type=FrameType.MIN1,
+                        start=start,
+                        end=end.naive.replace(minute=0),
+                    ):
+                        influx_bars[code] = bars
+
                 bars1 = pickle.dumps(
                     influx_bars,
                     protocol=cfg.pickle.ver,
@@ -228,19 +251,17 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         print("测试数据为None 时邮件是否正常")
         email_content = ""
         with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
-            with mock.patch(
-                "omega.worker.tasks.fetchers.fetcher.get_bars_batch",
-                return_value=None,
-            ):
-                with mock.patch("arrow.now", return_value=end):
-                    await syncjobs.after_hour_sync_job()
-                    self.assertFalse(task.status)
-                    self.assertIn("Got None Data", email_content)
+            _fetch_bars.side_effect = [None, None, None, None]
+            with mock.patch("arrow.now", return_value=end):
+                await syncjobs.after_hour_sync_job()
+                self.assertFalse(task.status)
+                self.assertIn("Got None Data", email_content)
 
         # 测试超时
         print("测试超时")
         email_content = ""
         with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
+            _fetch_bars.side_effect = [mock_data1, mock_data2, mock_data3, mock_data4]
             with mock.patch("arrow.now", return_value=end):
                 task.timeout = 0
                 await syncjobs.after_hour_sync_job()
@@ -253,6 +274,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         await task.init_state(status=0, worker_count=0)
         task.status = None
         with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
+            _fetch_bars.side_effect = [mock_data1, mock_data2, mock_data3, mock_data4]
             with mock.patch("arrow.now", return_value=end):
                 await syncjobs.after_hour_sync_job()
                 self.assertFalse(task.status)

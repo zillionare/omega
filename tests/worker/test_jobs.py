@@ -8,8 +8,9 @@ import omicron
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from omega.worker import jobs as worker_job
-from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
-from tests import init_test_env, dir_test_home
+from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher
+from tests import dir_test_home, init_test_env
+from tests.demo_fetcher.demo_fetcher import DemoFetcher
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
@@ -26,12 +27,9 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         await omicron.close()
 
     async def create_quotes_fetcher(self):
-        cfg = cfg4py.get_instance()
-        fetcher_info = cfg.quotes_fetchers[0]
-        impl = fetcher_info["impl"]
-        account = fetcher_info["account"]
-        password = fetcher_info["password"]
-        await aq.create_instance(impl, account=account, password=password)
+        self.aq = AbstractQuotesFetcher()
+        instance = DemoFetcher()
+        self.aq._instances.append(instance)
 
     async def test_load_cron_task(self):
         scheduler = AsyncIOScheduler(timezone=cfg.tz)

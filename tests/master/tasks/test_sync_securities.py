@@ -19,9 +19,10 @@ from omega.master.tasks.sync_securities import (
     get_security_sync_date,
     sync_securities_list,
 )
-from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
+from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher
 from omega.worker.tasks.task_utils import cache_init
-from tests import init_test_env
+from tests import init_test_env, mock_jq_data
+from tests.demo_fetcher.demo_fetcher import DemoFetcher
 
 logger = logging.getLogger(__name__)
 cfg = cfg4py.get_instance()
@@ -56,12 +57,9 @@ class TestSyncJobs_Securities(unittest.IsolatedAsyncioTestCase):
         await emit.stop()
 
     async def create_quotes_fetcher(self):
-        cfg = cfg4py.get_instance()
-        fetcher_info = cfg.quotes_fetchers[0]
-        impl = fetcher_info["impl"]
-        account = fetcher_info["account"]
-        password = fetcher_info["password"]
-        await aq.create_instance(impl, account=account, password=password)
+        self.aq = AbstractQuotesFetcher()
+        instance = DemoFetcher()
+        self.aq._instances.append(instance)
 
     async def test_sync_secslist_date1(self, *args):
         # 测试非交易日
@@ -108,7 +106,8 @@ class TestSyncJobs_Securities(unittest.IsolatedAsyncioTestCase):
         return_value=((True, 500000, 1000000)),
     )
     @mock.patch("omega.master.tasks.sec_synctask.mail_notify")
-    async def test_sync_securities_list(self, mail_notify, *args):
+    @mock.patch("tests.demo_fetcher.demo_fetcher.DemoFetcher.get_security_list")
+    async def test_sync_securities_list(self, _sec_list, mail_notify, *args):
         email_content = ""
 
         emit.register(Events.OMEGA_DO_SYNC_SECURITIES, workjobs.sync_security_list)
@@ -134,6 +133,10 @@ class TestSyncJobs_Securities(unittest.IsolatedAsyncioTestCase):
             recs_per_task=2000,
         )
         await task.cleanup(success=True)
+
+        mock_data1 = mock_jq_data("securitylist_0223.pik")
+        _sec_list.side_effect = [mock_data1]
+
         with mock.patch(
             "omega.master.tasks.sync_securities.SecuritySyncTask",
             side_effect=[task],
@@ -160,7 +163,8 @@ class TestSyncJobs_Securities(unittest.IsolatedAsyncioTestCase):
         return_value=((True, 500000, 1000000)),
     )
     @mock.patch("omega.master.tasks.sec_synctask.mail_notify")
-    async def test_sync_securities_list_twice(self, mail_notify, *args):
+    @mock.patch("tests.demo_fetcher.demo_fetcher.DemoFetcher.get_security_list")
+    async def test_sync_securities_list_twice(self, _sec_list, mail_notify, *args):
         email_content = ""
 
         emit.register(Events.OMEGA_DO_SYNC_SECURITIES, workjobs.sync_security_list)
@@ -178,7 +182,7 @@ class TestSyncJobs_Securities(unittest.IsolatedAsyncioTestCase):
 
         mail_notify.side_effect = mail_notify_mock
 
-        # sync_week_bars
+        # 构建两个任务
         task1 = SecuritySyncTask(
             event=Events.OMEGA_DO_SYNC_SECURITIES,
             name="sync_securitylist_test",
@@ -193,8 +197,14 @@ class TestSyncJobs_Securities(unittest.IsolatedAsyncioTestCase):
             timeout=60 * 5,
             recs_per_task=2000,
         )
+        # 清理任务
         await task1.cleanup(success=True)
         await task2.cleanup(success=True)
+
+        # 准备数据
+        mock_data1 = mock_jq_data("securitylist_0223.pik")
+        _sec_list.side_effect = [mock_data1, mock_data1]
+
         with mock.patch(
             "omega.master.tasks.sync_securities.SecuritySyncTask",
             side_effect=[task1, task2],
@@ -203,7 +213,7 @@ class TestSyncJobs_Securities(unittest.IsolatedAsyncioTestCase):
                 "omega.master.tasks.sync_securities.get_security_sync_date",
                 side_effect=get_sync_date_mock,
             ):
-                await sync_securities_list()
+                await sync_securities_list()  # 执行两次任务
                 self.assertTrue(task1.status)
                 self.assertTrue(task2.status)
                 self.assertEqual(
