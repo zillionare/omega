@@ -146,7 +146,7 @@ class BarsSyncTask:
         query = Security.select(end)
         query.types([_type.value])
         codes = await query.eval()
-        return list(set(codes))
+        return list(set(codes))  # 滤掉重复的股票（实际上不太可能重复）
 
     async def send_email(self, error=None):
         subject = f"execution exception for master task {self.name}"

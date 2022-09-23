@@ -56,6 +56,7 @@ async def sync_calendar():
         return None
 
     await TimeFrame.init()
+    logger.info("sync_calendar success.")
 
 
 @cron_work_report()
