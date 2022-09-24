@@ -169,6 +169,7 @@ async def load_cron_task(scheduler):
         "cron",
         hour=9,
         minute="31-59",
+        second=10,
         name=f"{FrameType.MIN1.value}:9:31-59",
     )
     scheduler.add_job(
@@ -176,6 +177,7 @@ async def load_cron_task(scheduler):
         "cron",
         hour=10,
         minute="*",
+        second=10,
         name=f"{FrameType.MIN1.value}:10:*",
     )
     scheduler.add_job(
@@ -183,6 +185,7 @@ async def load_cron_task(scheduler):
         "cron",
         hour=11,
         minute="0-31",  # 0-31，执行32次
+        second=10,
         name=f"{FrameType.MIN1.value}:11:0-31",
     )
     scheduler.add_job(
@@ -190,6 +193,7 @@ async def load_cron_task(scheduler):
         "cron",
         hour="13-14",
         minute="*",
+        second=10,
         name=f"{FrameType.MIN1.value}:13-14:*",
     )
     scheduler.add_job(
@@ -197,13 +201,14 @@ async def load_cron_task(scheduler):
         "cron",
         hour=15,
         minute="0-1",  # 15:00,15:01，执行2次
+        second=10,
         name=f"{FrameType.MIN1.value}:15:00",
     )
 
     scheduler.add_job(
         after_hour_sync_job,
         "cron",
-        hour="15",
+        hour=15,
         minute=5,
         name="after_hour_sync_job",
     )
@@ -214,58 +219,58 @@ async def load_cron_task(scheduler):
         sync_month_bars,
         "cron",
         hour=1,
-        minute=15,
+        minute=5,
         name="sync_month_bars",
     )
     scheduler.add_job(
         sync_week_bars,
         "cron",
         hour=1,
-        minute=25,
+        minute=10,
         name="sync_week_bars",
     )
     scheduler.add_job(
         sync_daily_bars_day,  # 下载日线
         "cron",
         hour=1,
-        minute=35,
+        minute=15,
         name="day_sync_task",
     )
     scheduler.add_job(
         sync_trade_price_limits,
         "cron",
         hour=1,
-        minute="45",  # 同步前一个交易日的涨跌停数据
+        minute=20,  # 同步前一个交易日的涨跌停数据
         name="sync_trade_price_limits",
     )
 
     scheduler.add_job(
         sync_daily_bars_1m,
         "cron",
-        hour=2,
-        minute=0,
+        hour=1,
+        minute=25,
         name="daily_bars_sync",
     )
     scheduler.add_job(
         sync_min_5_15_30_60,
         "cron",
-        hour=2,
-        minute=20,
+        hour=1,
+        minute=40,
         name="sync_min_5_15_30_60",
     )
 
     scheduler.add_job(
         sync_securities_list,
         "cron",
-        hour="8",
-        minute="5",
+        hour=8,
+        minute=5,
         name="sync_securities",  # 聚宽8点更新，写入昨日数据到db，今日数据到cache
     )
     scheduler.add_job(
         sync_xrxd_reports,
         "cron",
-        hour="8",
-        minute="11",
+        hour=8,
+        minute=10,
         name="sync_xrxd",
     )
     scheduler.add_job(
@@ -280,6 +285,5 @@ async def load_cron_task(scheduler):
         "cron",
         hour=9,
         minute="1,31",  # 第一次为了交易界面方便使用，第二次是正确的数据（修正后）
-        second=10,
         name="sync_cache_price_limits",
     )

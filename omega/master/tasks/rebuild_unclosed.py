@@ -57,7 +57,7 @@ async def _rebuild_day_level_unclosed_bars():
     !!!Info:
         最终我们需要实时更新年线和季线。目前数据库还没有同步这两种k线。
     """
-    codes = await Security.select().eval()
+    codes = await Security.select().types(["stock", "index"]).eval()
     end = datetime.datetime.now().date()
     # just to cover one month's day bars at most
     n = 30

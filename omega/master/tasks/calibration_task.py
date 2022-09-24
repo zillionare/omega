@@ -137,6 +137,7 @@ async def sync_daily_bars_1m():
         # 当天的校准启动前，先清除缓存。
         if sync_dt.date() == pre_trade_date:
             await Stock.reset_cache()
+            logger.info("all cached bars deleted.")
 
         task = await get_daily_bars_sync_task(sync_dt, FrameType.MIN1)
         success = await run_daily_bars_sync_task(task)
