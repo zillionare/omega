@@ -33,11 +33,11 @@ async def worker_exit(state, scope, error=None):
     former_error = await cache.sys.hget(state, "error")
     p = cache.sys.pipeline()
     if former_error:
-        p.hmset(state, "error", former_error + "\n" + error)
+        p.hset(state, "error", former_error + "\n" + error)
     else:
-        p.hmset(state, "error", error)
+        p.hset(state, "error", error)
 
-    p.hmset(state, "status", -1)  # 设置状态为失败
+    p.hset(state, "status", -1)  # 设置状态为失败
 
     p.delete(*scope)  # 删除任务队列，让其他没退出的消费者也退出，错误上报至master
     await p.execute()
@@ -67,7 +67,7 @@ def worker_syncbars_task():
                     await cache.sys.hincrby(state, "worker_count")
                     try:
                         ret = await f(params)
-                        await cache.sys.hmset(state, "status", 1)  # 0运行，1成功，-1失败
+                        await cache.sys.hset(state, "status", 1)  # 0运行，1成功，-1失败
                         return ret
                     except exception.WorkerException as e:
                         await worker_exit(state, scope, error=e.msg)

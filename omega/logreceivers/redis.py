@@ -46,9 +46,7 @@ class RedisLogReceiver:
 
         # the redis connection
         self._redis = None
-
-        # the channel returned by redis.subscribe
-        self._channel = None
+        self._pubsub = None
 
         # the loop for listen and dump log
         self._reader_task = None
@@ -108,19 +106,24 @@ class RedisLogReceiver:
         self._fh.close()
         self._fh = None
 
-        await self._redis.unsubscribe(self._channel_name)
-        await self._reader_task
-        self._redis.close()
+        if self._pubsub:
+            await self._pubsub.unsubscribe(self._channel_name)
+            await self._reader_task
+            await self._pubsub.close()
+
+        await self._redis.close()
 
     async def start(self):
-        self._redis = await aioredis.create_redis(self._dsn)
-        res = await self._redis.subscribe(self._channel_name)
-        self._channel = res[0]
+        self._redis = aioredis.from_url(
+            self._dsn, encoding="utf-8", decode_responses=True
+        )
+        self._pubsub = self._redis.pubsub(ignore_subscribe_messages=True)
+        await self._pubsub.subscribe(self._channel_name)
         self._reader_task = asyncio.create_task(self.reader())
 
     async def reader(self):
-        while await self._channel.wait_message():
-            msg = (await self._channel.get()).decode("utf-8")
+        async for msg in self._pubsub.listen():
+            msg = msg.get("data")
             self._write(msg)
 
     @staticmethod

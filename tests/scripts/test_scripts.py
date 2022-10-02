@@ -38,28 +38,20 @@ async def prepare_test_data():
                 f"{bar[0]},{bar[1]:.2f},{bar[2]:.2f},{bar[3]:.2f},{bar[4]:.2f},{bar[5]:.2f},{bar[6]:.2f},{bar[7]:.2f}",
             )
 
-    # unclosed = {
-    #     "000001.XSHE": f"202207180935,7,7.22,6.88,7.04,{1e6},{1e6*7.2},1.0",
-    #     "000002.XSHE": f"202207180935,7,7.22,6.88,7.04,{1e6},{1e6*7.2},1.0",
-    #     "000003.XSHG": f"202207180935,7,7.22,6.88,7.04,{1e6},{1e6*7.2},1.0",
-    # }
-
-    # await cache.security.hmset_dict("bars:5m:unclosed", **unclosed)
-
 
 class ScriptTest(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         await init_test_env()
         await omicron.init()
 
-        await cache.sys.execute("FUNCTION", "FLUSH")
+        await cache.sys.execute_command("FUNCTION", "FLUSH")
         await load_lua_script()
 
     async def asyncTearDown(self) -> None:
         return await omicron.close()
 
     async def test_load_script(self):
-        r = await cache.sys.execute("FUNCTION", "LIST")
+        r = await cache.sys.execute_command("FUNCTION", "LIST")
         funcs = r[0][5][0][:2]
         funcs.extend(r[0][5][1][:2])
         self.assertIn("close_frame", funcs)
@@ -71,7 +63,7 @@ class ScriptTest(unittest.IsolatedAsyncioTestCase):
         await cache.security.delete("bars:5m:000001.XSHE")
 
         for i in range(5):
-            await cache.security.execute(
+            await cache.security.execute_command(
                 "fcall", "update_unclosed", 0, "5m", 202207180931 + i
             )
 
@@ -84,7 +76,9 @@ class ScriptTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(len(unclosed) == 0)
 
         # raise exception
-        with mock.patch.object(cache.security, "execute", side_effect=Exception):
+        with mock.patch.object(
+            cache.security, "execute_command", side_effect=Exception
+        ):
             await close_frame(FrameType.MIN5, datetime.datetime(2022, 7, 18, 9, 35))
 
     async def test_update_unclosed(self):
@@ -98,9 +92,13 @@ class ScriptTest(unittest.IsolatedAsyncioTestCase):
             unclosed["000001.XSHE"],
         )
 
-        await cache.security.execute("fcall", "update_unclosed", 0, "5m", 202207180932)
+        await cache.security.execute_command(
+            "fcall", "update_unclosed", 0, "5m", 202207180932
+        )
 
-        await cache.security.execute("fcall", "update_unclosed", 0, "5m", 202207180933)
+        await cache.security.execute_command(
+            "fcall", "update_unclosed", 0, "5m", 202207180933
+        )
 
         # now unclosed bar should have
         unclosed = await cache.security.hgetall("bars:5m:unclosed")
@@ -108,7 +106,9 @@ class ScriptTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(exp, unclosed["000001.XSHE"])
 
         # error handling
-        with mock.patch.object(cache.security, "execute", side_effect=Exception):
+        with mock.patch.object(
+            cache.security, "execute_command", side_effect=Exception
+        ):
             await update_unclosed_bar(
                 FrameType.MIN5, datetime.datetime(2022, 7, 18, 9, 31)
             )

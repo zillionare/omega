@@ -4,8 +4,7 @@ import logging
 import time
 import traceback
 from functools import wraps
-from threading import Lock
-from typing import Any, AnyStr, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Union
 
 import async_timeout
 import cfg4py
@@ -68,8 +67,8 @@ class SecuritySyncTask:
         rc = await cache.sys.set(
             key,
             self.name,
-            expire=self.timeout + 45,  # 比state的超时时间多15秒
-            exist="SET_IF_NOT_EXIST",
+            ex=self.timeout + 45,  # 比state的超时时间多15秒
+            nx=True,  # SET_IF_NOT_EXIST
         )
         if rc == 1:
             return False
@@ -97,7 +96,7 @@ class SecuritySyncTask:
         key = self._state_key_name()
 
         pl = cache.sys.pipeline()
-        pl.hmset_dict(key, kwargs)
+        pl.hset(key, mapping=kwargs)
 
         pl.expire(key, self.timeout * 2)  # 自动设置超时时间
         await pl.execute()

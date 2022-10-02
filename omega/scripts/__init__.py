@@ -19,7 +19,7 @@ async def load_lua_script():
         with open(path, "r", encoding="utf-8") as f:
             content = f.read()
 
-            r = await cache.sys.execute("FUNCTION", "LOAD", "REPLACE", content)
+            r = await cache.sys.execute_command("FUNCTION", "LOAD", "REPLACE", content)
             print(r)
 
 
@@ -32,7 +32,7 @@ async def update_unclosed_bar(frame_type: FrameType, source_min: Frame):
     """
     source = tf.time2int(source_min)
     try:
-        await cache.security.execute(
+        await cache.security.execute_command(
             "fcall", "update_unclosed", 0, frame_type.value, source
         )
     except Exception as e:
@@ -54,7 +54,9 @@ async def close_frame(frame_type: FrameType, frame: Frame):
     )
 
     try:
-        await cache.security.execute("fcall", "close_frame", 0, frame_type.value, dst)
+        await cache.security.execute_command(
+            "fcall", "close_frame", 0, frame_type.value, dst
+        )
     except Exception as e:
         msg = f"缓存收盘{frame_type}数据失败: {frame}"
         logger.exception(e)

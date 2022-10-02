@@ -56,7 +56,7 @@ async def write_price_limits_to_dfs(
     ):
         queue_name = f"{MINIO_TEMPORAL}.{name}.{typ.value}.{ft.value}"
 
-        data = await cache.temp.lrange(queue_name, 0, -1, encoding=None)
+        data = await cache.temp.lrange(queue_name, 0, -1)
         if not data:  # pragma: no cover
             return
         all_bars = []

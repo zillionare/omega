@@ -98,7 +98,7 @@ async def write_dfs(
         queue_name = f"{MINIO_TEMPORAL}.{name}.{typ.value}.{ft.value}"
 
         # todo: structure/fields of the data? does it contains frametye or code?
-        data = await cache.temp.lrange(queue_name, 0, -1, encoding=None)
+        data = await cache.temp.lrange(queue_name, 0, -1)
         if not data:  # pragma: no cover
             return
 

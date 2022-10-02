@@ -54,6 +54,7 @@ async def sync_xrxd_reports():
         logger.info(f"{task.name}({task.end}), task finished, params: {task.params}")
 
     logger.info("sync_xrxd_reports ends")
+    return success
 
 
 @master_secs_task()
@@ -77,3 +78,4 @@ async def sync_all_xrxd_reports():
         dt = dt.replace(year=next_year)
 
     logger.info("sync_xrxd_reports ends")
+    return True

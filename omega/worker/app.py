@@ -10,6 +10,7 @@ import datetime
 import logging
 import os
 import time
+import traceback
 from typing import List
 
 import cfg4py
@@ -62,12 +63,10 @@ class Omega(object):
         try:
             await omicron.init()
         except Exception as e:
+            traceback.print_exc(e)
             print(
                 'No calendar and securities in cache, make sure you have called "omega init" first:\n',
                 e,
-            )
-            logger.error(
-                'No calendar and securities in cache, make sure you have called "omega init" first:\n'
             )
             time.sleep(5)
             os._exit(1)

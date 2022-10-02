@@ -69,7 +69,8 @@ async def heartbeat():
 
     pid = os.getpid()
     key = "process.master"
-    await omicron.cache.sys.hmset(key, "pid", pid, "heartbeat", time.time())
+    mp = {"pid": pid, "heartbeat": time.time()}
+    await omicron.cache.sys.hset(key, mapping=mp)
 
 
 async def handle_work_heart_beat(params: dict):

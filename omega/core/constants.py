@@ -1,10 +1,6 @@
 # -*- coding: utf-8 -*-
 # @Author   : xiaohuzi
 # @Time     : 2022-01-11 10:24
-import logging
-
-logger = logging.getLogger(__name__)
-
 TASK_PREFIX = "master.task"
 TASK_SECS_PREFIX = "master.task.secs"
 

@@ -110,8 +110,8 @@ class BarsSyncTask:
         rc = await cache.sys.set(
             key,
             self.name,
-            expire=self.timeout + 20,  # 比state的超时时间多10秒
-            exist="SET_IF_NOT_EXIST",
+            ex=self.timeout + 20,  # 比state的超时时间多10秒
+            nx=True,  # SET_IF_NOT_EXIST
         )
         if rc == 1:
             return False
@@ -173,7 +173,7 @@ class BarsSyncTask:
         """初始化任务状态"""
         key = self._state_key_name()
         pl = cache.sys.pipeline()
-        pl.hmset_dict(key, kwargs)
+        pl.hset(key, mapping=kwargs)
         pl.expire(key, self.timeout + 10)  # 增加10秒的超时，确保worker处理完毕
         await pl.execute()
         self.params.update({"state": key})

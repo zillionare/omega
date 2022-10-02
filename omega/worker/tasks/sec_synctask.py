@@ -29,19 +29,19 @@ async def secs_task_exit(state, error=None):
     p = cache.sys.pipeline()
 
     if former_error:
-        p.hmset(state, "error", former_error + "\n" + error)
+        p.hset(state, "error", former_error + "\n" + error)
     else:
-        p.hmset(state, "error", error)
+        p.hset(state, "error", error)
 
-    p.hmset(state, "status", -1)  # 设置状态为失败
+    p.hset(state, "status", -1)  # 设置状态为失败
 
     await p.execute()
 
 
 async def secs_task_done(state, count=1):
     p = cache.sys.pipeline()
-    p.hmset(state, "status", 1)
-    p.hmset(state, "done_count", count)
+    p.hset(state, "status", 1)
+    p.hset(state, "done_count", count)
     await p.execute()
 
 

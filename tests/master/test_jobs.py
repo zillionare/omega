@@ -1,17 +1,20 @@
+import asyncio
 import datetime
 import itertools
 import logging
 import os
 import pickle
 import unittest
+from typing import Dict
 from unittest import mock
 
 import arrow
 import cfg4py
 import omicron
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from coretypes import FrameType
+from coretypes import FrameType, SecurityType
 from freezegun import freeze_time
+from more_itertools import side_effect
 from omicron.dal.cache import cache
 from omicron.dal.influx.influxclient import InfluxClient
 from omicron.models.stock import Stock
@@ -258,26 +261,33 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
                 self.assertIn("Got None Data", email_content)
 
         # 测试超时
+        async def _sync_cache(typ: SecurityType, ft: FrameType, params: Dict):
+            await asyncio.sleep(3)
+
         print("测试超时")
         email_content = ""
         with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
             _fetch_bars.side_effect = [mock_data1, mock_data2, mock_data3, mock_data4]
             with mock.patch("arrow.now", return_value=end):
                 task.timeout = 0
-                await syncjobs.after_hour_sync_job()
+                with mock.patch(
+                    "omega.worker.tasks.synctask.sync_to_cache", side_effect=_sync_cache
+                ):
+                    await syncjobs.after_hour_sync_job()
                 print(email_content)
                 self.assertFalse(task.status)
                 self.assertIn("timeout", email_content)
 
         # 测试重复运行
         print("测试重复运行")
-        await task.init_state(status=0, worker_count=0)
+        await task.is_running()
         task.status = None
         with mock.patch("omega.master.jobs.BarsSyncTask", side_effect=[task]):
             _fetch_bars.side_effect = [mock_data1, mock_data2, mock_data3, mock_data4]
             with mock.patch("arrow.now", return_value=end):
                 await syncjobs.after_hour_sync_job()
                 self.assertFalse(task.status)
+                await task.delete_state()
 
     @mock.patch(
         "omega.master.tasks.synctask.QuotaMgmt.check_quota",
