@@ -201,8 +201,8 @@ class DemoFetcher(QuotesFetcher):
     def get_quota_spare(self):
         return 1000 * 10000
 
-    def get_quota(cls):
-        return 2000 * 10000
+    async def get_quota(cls):
+        return {"spare": 2000 * 10000, "total": 5000 * 10000}
 
     def result_size_limit(self, op: str) -> int:
         return 3000

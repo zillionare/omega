@@ -36,9 +36,9 @@ async def get_security_sync_date():
                 head_str = tail_str = None
             else:
                 head_str = head.strftime("%Y-%m-%d")
-                await cache.sys.set(constants.SECS_SYNC_ARCHIVE_HEAD, head)
+                await cache.sys.set(constants.SECS_SYNC_ARCHIVE_HEAD, head_str)
                 tail_str = tail.strftime("%Y-%m-%d")
-                await cache.sys.set(constants.SECS_SYNC_ARCHIVE_TAIL, tail)
+                await cache.sys.set(constants.SECS_SYNC_ARCHIVE_TAIL, tail_str)
 
         if not head_str or not tail_str:
             logger.info("首次同步，查找最新的交易日, %s", pre_trade_day.strftime("%Y-%m-%d"))

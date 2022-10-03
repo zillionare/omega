@@ -6,6 +6,7 @@ from unittest import mock
 import arrow
 import cfg4py
 import omicron
+from freezegun import freeze_time
 from omicron.dal.cache import cache
 from omicron.dal.influx.influxclient import InfluxClient
 from omicron.models.security import Security
@@ -16,7 +17,11 @@ from omega.core import constants
 from omega.core.events import Events
 from omega.master.tasks.sec_synctask import SecuritySyncTask
 from omega.master.tasks.sync_securities import (
+    delete_temporal_data,
+    get_securities_dfs_filename,
     get_security_sync_date,
+    get_security_sync_task,
+    run_security_sync_task,
     sync_securities_list,
 )
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher
@@ -65,8 +70,8 @@ class TestSyncJobs_Securities(unittest.IsolatedAsyncioTestCase):
         # 测试非交易日
         end = arrow.get("2005-07-09")  # Saturday
         with mock.patch("arrow.now", return_value=end):
-            await cache.sys.set(constants.SECS_SYNC_ARCHIVE_HEAD, "2005-07-07"),
-            await cache.sys.set(constants.SECS_SYNC_ARCHIVE_TAIL, "2005-07-07"),
+            await cache.sys.set(constants.SECS_SYNC_ARCHIVE_HEAD, "2005-07-07")
+            await cache.sys.set(constants.SECS_SYNC_ARCHIVE_TAIL, "2005-07-07")
             async for sync_dt, head, tail in get_security_sync_date():
                 self.assertEqual(sync_dt, datetime.datetime(2005, 7, 8, 0, 0))
                 self.assertEqual(
@@ -80,8 +85,8 @@ class TestSyncJobs_Securities(unittest.IsolatedAsyncioTestCase):
         end = arrow.get("2005-07-12")  # Tuesday
         idx = 1
         with mock.patch("arrow.now", return_value=end):
-            await cache.sys.set(constants.SECS_SYNC_ARCHIVE_HEAD, "2005-07-01"),
-            await cache.sys.set(constants.SECS_SYNC_ARCHIVE_TAIL, "2005-07-07"),
+            await cache.sys.set(constants.SECS_SYNC_ARCHIVE_HEAD, "2005-07-01")
+            await cache.sys.set(constants.SECS_SYNC_ARCHIVE_TAIL, "2005-07-07")
             async for sync_dt, head, tail in get_security_sync_date():
                 if idx == 1:
                     self.assertEqual(sync_dt, datetime.datetime(2005, 7, 8, 0, 0))
@@ -100,6 +105,83 @@ class TestSyncJobs_Securities(unittest.IsolatedAsyncioTestCase):
                     idx += 1
                 else:
                     break
+
+    async def test_sync_secslist_date3(self, *args):
+        # tail和head未初始化的情况
+        await cache.sys.delete(constants.SECS_SYNC_ARCHIVE_HEAD)
+        await cache.sys.delete(constants.SECS_SYNC_ARCHIVE_TAIL)
+
+        with freeze_time("2022-09-08"):
+            with mock.patch(
+                "omega.master.tasks.sync_securities.Security.get_datescope_from_db"
+            ) as _scope:
+                _scope.return_value = (None, None)
+                async for sync_dt, head, tail in get_security_sync_date():
+                    self.assertEqual(sync_dt, datetime.datetime(2022, 9, 7, 0, 0))
+                    break
+
+                dt1 = datetime.date(2005, 1, 4)
+                dt2 = datetime.date(2022, 9, 5)
+                _scope.return_value = (dt1, dt2)
+                async for sync_dt, head, tail in get_security_sync_date():
+                    self.assertEqual(sync_dt, datetime.datetime(2022, 9, 6, 0, 0))
+                    break
+
+            await cache.sys.set(constants.SECS_SYNC_ARCHIVE_HEAD, "2005-01-05")
+            await cache.sys.set(constants.SECS_SYNC_ARCHIVE_TAIL, "2022-09-08")
+            async for sync_dt, head, tail in get_security_sync_date():
+                self.assertEqual(sync_dt, datetime.datetime(2005, 1, 4, 0, 0))
+                break
+
+            await cache.sys.set(constants.SECS_SYNC_ARCHIVE_HEAD, "2005-01-04")
+            await cache.sys.set(constants.SECS_SYNC_ARCHIVE_TAIL, "2022-09-08")
+            _tmp_var = None
+            async for sync_dt, head, tail in get_security_sync_date():
+                _tmp_var = sync_dt
+            self.assertIsNone(_tmp_var)
+
+    async def test_sync_secslist_dfs(self, *args):
+        dt1 = datetime.date(2005, 1, 4)
+        rc = get_securities_dfs_filename(dt1)
+        self.assertEqual(rc, "securities/20050104")
+
+        rc = await delete_temporal_data("xxxxxxx")
+        self.assertIsNone(rc)
+
+    async def test_sync_secslist_runtask_0(self):
+        task = SecuritySyncTask("", "", None)
+        with mock.patch(
+            "omega.master.tasks.sync_securities.SecuritySyncTask.run"
+        ) as _run:
+            _run.return_value = False
+
+            rc = await run_security_sync_task(task)
+            self.assertFalse(rc)
+
+    async def test_sync_secslist_runtask_1(self):
+        dt = datetime.date(2009, 1, 1)
+        rc = await get_security_sync_task(dt)
+        self.assertEqual(rc.recs_per_task, 2000)
+
+        dt = datetime.date(2013, 1, 1)
+        rc = await get_security_sync_task(dt)
+        self.assertEqual(rc.recs_per_task, 3500)
+
+        dt = datetime.date(2016, 1, 1)
+        rc = await get_security_sync_task(dt)
+        self.assertEqual(rc.recs_per_task, 4500)
+
+        dt = datetime.date(2019, 1, 1)
+        rc = await get_security_sync_task(dt)
+        self.assertEqual(rc.recs_per_task, 5500)
+
+        dt = datetime.date(2021, 1, 1)
+        rc = await get_security_sync_task(dt)
+        self.assertEqual(rc.recs_per_task, 6500)
+
+        dt = datetime.date(2022, 1, 1)
+        rc = await get_security_sync_task(dt)
+        self.assertEqual(rc.recs_per_task, 7500)
 
     @mock.patch(
         "omega.master.tasks.synctask.QuotaMgmt.check_quota",

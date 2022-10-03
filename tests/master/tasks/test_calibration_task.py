@@ -1,3 +1,4 @@
+import datetime
 import itertools
 import logging
 import os
@@ -9,6 +10,7 @@ import arrow
 import cfg4py
 import omicron
 from coretypes import FrameType, SecurityType
+from freezegun import freeze_time
 from omicron.dal.cache import cache
 from omicron.dal.influx.influxclient import InfluxClient
 from omicron.models.stock import Stock
@@ -19,7 +21,13 @@ import omega.worker.tasks.synctask as workjobs
 from omega.core import constants
 from omega.core.events import Events
 from omega.master.dfs import Storage
-from omega.master.tasks.calibration_task import get_sync_date, sync_daily_bars_1m
+from omega.master.tasks.calibration_task import (
+    get_daily_bars_sync_task,
+    get_sync_date,
+    sync_daily_bars_1m,
+    sync_daily_bars_day,
+    sync_day_bar_factors,
+)
 from omega.master.tasks.synctask import BarsSyncTask
 from omega.master.tasks.task_utils import get_bars_filename
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher
@@ -111,6 +119,93 @@ class TestSyncJobs_Calibration(unittest.IsolatedAsyncioTestCase):
                 self.assertIsInstance(e, StopAsyncIteration)
             else:
                 self.assertEqual(1, 0)
+
+    async def test_sync_date2(self):
+        # tail和head未初始化的情况
+        key_head = constants.BAR_SYNC_ARCHIVE_HEAD
+        key_tail = constants.BAR_SYNC_ARCHIVE_TAIL
+
+        with freeze_time("2022-09-08"):
+            await cache.sys.set(constants.BAR_SYNC_ARCHIVE_HEAD, "2005-01-04")
+            await cache.sys.set(constants.BAR_SYNC_ARCHIVE_TAIL, "2022-09-08")
+            _tmp_var = None
+            async for sync_dt, head, tail in get_sync_date(key_head, key_tail):
+                _tmp_var = sync_dt
+            self.assertIsNone(_tmp_var)
+
+        await cache.sys.delete(constants.BAR_SYNC_ARCHIVE_HEAD)
+        await cache.sys.delete(constants.BAR_SYNC_ARCHIVE_TAIL)
+
+    async def test_sync_task_params(self):
+        dt = datetime.datetime(2022, 9, 8, 16, 0, 0)
+        rc = await get_daily_bars_sync_task(dt, FrameType.DAY)
+        self.assertEqual(rc.recs_per_sec, 4)
+
+    async def test_sync_task_1m(self):
+        await cache.sys.set(constants.BAR_SYNC_ARCHIVE_HEAD, "2005-01-04")
+        await cache.sys.set(constants.BAR_SYNC_ARCHIVE_TAIL, "2022-09-06")
+        with freeze_time("2022-09-08 15:00:00"):
+            with mock.patch(
+                "omega.master.tasks.calibration_task.run_daily_bars_sync_task"
+            ) as _run:
+                _run.return_value = False
+                rc = await sync_daily_bars_1m()
+                self.assertIsNone(rc)
+
+    async def test_sync_task_day(self):
+        await cache.sys.set(constants.BAR_SYNC_DAY_HEAD, "2005-01-04")
+        await cache.sys.set(constants.BAR_SYNC_DAY_TAIL, "2022-09-06")
+        with freeze_time("2022-09-08 15:00:00"):
+            with mock.patch(
+                "omega.master.tasks.calibration_task.run_daily_bars_sync_task"
+            ) as _run:
+                _run.return_value = False
+                rc = await sync_daily_bars_day()
+                self.assertIsNone(rc)
+
+                _run.return_value = True
+                rc = await sync_daily_bars_day()
+                self.assertIsNone(rc)
+
+        await cache.sys.set(constants.BAR_SYNC_DAY_HEAD, "2005-01-05")
+        await cache.sys.set(constants.BAR_SYNC_DAY_TAIL, "2022-09-07")
+        with freeze_time("2022-09-08 15:00:00"):
+            with mock.patch(
+                "omega.master.tasks.calibration_task.run_daily_bars_sync_task"
+            ) as _run:
+                _run.return_value = True
+                rc = await sync_daily_bars_day()
+                self.assertIsNone(rc)
+
+    @mock.patch("omicron.notify.dingtalk.DingTalkMessage.text")
+    @mock.patch("omicron.notify.mail.mail_notify")
+    async def test_sync_task_day_factor(self, _notify, _ding):
+        with freeze_time("2022-09-04 15:00:00"):
+            rc = await sync_day_bar_factors()
+            self.assertFalse(rc)
+
+        _notify.return_value = True
+        _ding.return_value = True
+
+        with freeze_time("2022-09-08 15:00:00"):
+            with mock.patch(
+                "omega.master.tasks.calibration_task.Security.get_xrxd_info"
+            ) as _xrxd:
+                _xrxd.return_value = False
+                rc = await sync_day_bar_factors()
+                self.assertFalse(rc)
+
+                _xrxd.return_value = True
+                with mock.patch(
+                    "omega.master.tasks.calibration_task.run_daily_bars_sync_task"
+                ) as _run:
+                    _run.return_value = False
+                    rc = await sync_day_bar_factors()
+                    self.assertIsNone(rc)
+
+                    _run.return_value = True
+                    rc = await sync_day_bar_factors()
+                    self.assertTrue(rc)
 
     @mock.patch(
         "omega.master.tasks.synctask.QuotaMgmt.check_quota",

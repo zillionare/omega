@@ -11,7 +11,6 @@ import logging
 import os
 import time
 import traceback
-from typing import List
 
 import cfg4py
 import fire
@@ -91,13 +90,6 @@ class Omega(object):
                 "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             },
         )
-
-
-def get_fetcher_info(fetchers: List, impl: str):
-    for fetcher_info in fetchers:
-        if fetcher_info.get("impl") == impl:
-            return fetcher_info
-    return None
 
 
 def start(impl: str, cfg: dict = None, **fetcher_params):

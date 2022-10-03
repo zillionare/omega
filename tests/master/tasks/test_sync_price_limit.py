@@ -10,6 +10,7 @@ import cfg4py
 import numpy as np
 import omicron
 from coretypes import FrameType, SecurityType
+from freezegun import freeze_time
 from omicron.dal.cache import cache
 from omicron.dal.influx.influxclient import InfluxClient
 from omicron.models.stock import Stock
@@ -22,6 +23,9 @@ from omega.core.events import Events
 from omega.master.dfs import Storage
 from omega.master.tasks.sync_price_limit import (
     get_trade_limit_filename,
+    get_trade_price_limits_sync_date,
+    run_sync_price_limits_task,
+    sync_cache_price_limits,
     sync_trade_price_limits,
 )
 from omega.master.tasks.synctask import BarsSyncTask
@@ -154,3 +158,62 @@ class TestSyncJobs_PriceLimit(unittest.IsolatedAsyncioTestCase):
                     ) as f:
                         local_data = f.read()
                     self.assertEqual(data, local_data)
+
+    async def test_price_limit_task(self):
+        task = BarsSyncTask(
+            "", "taskname", end=None, frame_type=[FrameType.DAY, FrameType.WEEK]
+        )
+        with mock.patch("omega.master.tasks.sync_price_limit.BarsSyncTask.run") as _run:
+            _run.return_value = False
+
+            rc = await run_sync_price_limits_task(task, False)
+            self.assertFalse(rc)
+
+    async def test_price_limit_sync_date(self):
+        key = constants.BAR_SYNC_TRADE_PRICE_TAIL
+        await cache.sys.delete(key)
+        with freeze_time("2022-09-08 10:00:00"):
+            async for sync_dt in get_trade_price_limits_sync_date(key, FrameType.DAY):
+                self.assertEqual(sync_dt, datetime.date(2005, 1, 4))
+                break
+
+        with freeze_time("2022-09-03 10:00:00"):  # weekend
+            async for sync_dt in get_trade_price_limits_sync_date(key, FrameType.DAY):
+                self.assertEqual(sync_dt, datetime.date(2005, 1, 4))
+                break
+
+        await cache.sys.set(key, "2022-09-07")
+        with freeze_time("2022-09-08 10:00:00"):  # 间隔两天
+            _tmp_dt = None
+            async for sync_dt in get_trade_price_limits_sync_date(key, FrameType.DAY):
+                _tmp_dt = sync_dt
+            self.assertIsNone(_tmp_dt)
+
+        await cache.sys.set(key, "2022-09-05")
+        with freeze_time("2022-09-03 10:00:00"):
+            _tmp_dt = None
+            async for sync_dt in get_trade_price_limits_sync_date(key, FrameType.DAY):
+                _tmp_dt = sync_dt
+            self.assertIsNone(_tmp_dt)
+
+    @mock.patch("omega.master.tasks.sync_price_limit.run_sync_price_limits_task")
+    async def test_price_limit_task_2(self, _run):
+        _run.return_value = False
+
+        key = constants.BAR_SYNC_TRADE_PRICE_TAIL
+        await cache.sys.delete(key)
+        with freeze_time("2022-09-08 10:00:00"):
+            rc = await sync_trade_price_limits()
+            self.assertIsNone(rc)
+
+    @mock.patch("omega.master.tasks.sync_price_limit.run_sync_price_limits_task")
+    async def test_price_limit_cache_task(self, _run):
+        _run.return_value = True
+
+        with freeze_time("2022-09-08 09:10:00"):
+            rc = await sync_cache_price_limits()
+            self.assertTrue(rc)
+
+        with freeze_time("2022-09-08 09:31:00"):
+            rc = await sync_cache_price_limits()
+            self.assertTrue(rc)
