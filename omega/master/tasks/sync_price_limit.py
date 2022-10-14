@@ -68,8 +68,9 @@ async def write_price_limits_to_dfs(
 
         # 涨跌停写入inflaxdb 和 cache
         if cache_only:
-            logger.info(f"{typ.value}.{ft.value}, sync data to cache only!")
-            await Stock.save_trade_price_limits(bars, to_cache=True)
+            if typ == SecurityType.STOCK:  # 只缓存股票涨跌停数据
+                logger.info(f"{typ.value}.{ft.value}, sync data to cache only!")
+                await Stock.save_trade_price_limits(bars, to_cache=True)
         else:
             await Stock.save_trade_price_limits(bars, to_cache=False)
 
