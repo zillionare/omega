@@ -10,6 +10,7 @@ import cfg4py
 from cfg4py.config import Config
 from coretypes import Frame, FrameType
 from omicron import cache, tf
+from omicron.models.timeframe import TimeFrame
 
 from omega.core import constants
 from omega.core.events import Events
@@ -162,6 +163,11 @@ async def sync_minute_bars():
     await run_sync_minute_bars_task(task)
 
 
+async def reload_calendar():
+    await TimeFrame.init()
+    logger.info("reload_calendar success.")
+
+
 async def load_cron_task(scheduler):
     # 交易日交易时间段的数据同步任务
     scheduler.add_job(
@@ -211,6 +217,14 @@ async def load_cron_task(scheduler):
         hour=15,
         minute=5,
         name="after_hour_sync_job",
+    )
+
+    scheduler.add_job(
+        reload_calendar,  # 默认1点更新一次全部数据
+        "cron",
+        hour=1,
+        minute=3,
+        name="reload_calendar",
     )
 
     # 以下追赶性质的任务，应该单独执行，不能和日常同步任务混在一起，
