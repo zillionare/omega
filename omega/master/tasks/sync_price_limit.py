@@ -154,14 +154,14 @@ async def sync_trade_price_limits():
 
 @master_syncbars_task()
 async def sync_cache_price_limits():
-    """每天9:01/09:31各同步一次今日涨跌停并写入redis"""
+    """每天9:01/09:16各同步一次今日涨跌停并写入redis"""
     frame_type = FrameType.DAY
 
     now = datetime.datetime.now()
     dt = now.date()  # dt is datetime.date
     if TimeFrame.is_trade_day(dt):
         # 9:01同步一次
-        if now.hour == 9 and now.minute < 15:
+        if now.hour == 9 and now.minute < 10:
             logger.info("9:01, sync price limits first time")
 
             task = await get_month_week_sync_task(
@@ -172,9 +172,9 @@ async def sync_cache_price_limits():
             await run_sync_price_limits_task(task, True)
             return True
 
-        # 9:31再次同步（除权除息等造成的更新）
-        if now.hour == 9 and now.minute > 30:
-            logger.info("9:31, sync price limits second time")
+        # 9:16再次同步（除权除息等造成的更新）
+        if now.hour == 9 and now.minute > 15:
+            logger.info("9:16, sync price limits second time")
 
             task = await get_month_week_sync_task(
                 Events.OMEGA_DO_SYNC_TRADE_PRICE_LIMITS, dt, frame_type

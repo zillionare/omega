@@ -284,7 +284,7 @@ async def load_cron_task(scheduler):
         sync_cache_price_limits,
         "cron",
         hour=9,
-        minute="1,30",  # 第一次为了交易界面方便使用，第二次是正确的数据（修正后）
-        second=30,
+        minute="1,16",  # 第一次为了交易界面方便使用，第二次是正确的数据（修正后）
+        second=10,
         name="sync_cache_price_limits",
     )
