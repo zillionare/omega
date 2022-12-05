@@ -35,9 +35,12 @@ logreceiver:
   max_bytes: 10M
 
 redis:
-  dsn: redis://localhost:6379
+  dsn: redis://${REDIS_HOST}:${REDIS_PORT}
 pickle:
   ver: 4
+
+omega:
+  http_port: 3180
 
 quotes_fetchers:
   - impl: jqadaptor    # there must be a create_instance method in this module
@@ -53,6 +56,9 @@ dfs:
     secret: minioadmin
     secure: false
     bucket: zillionare
+
+zarr:
+  store_path: /tmp/boards.zarr
 
 influxdb:
   url: http://localhost:8086
