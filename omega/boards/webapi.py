@@ -8,7 +8,7 @@ import sys
 import time
 from typing import Any, List, Optional
 
-from boards.board import ConceptBoard, IndustryBoard, combined_filter
+from omega.boards.board import ConceptBoard, IndustryBoard
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +44,52 @@ def new_members(days: int = 10, prot: int = None):
                 print(" ".join(aliases))
     except Exception as e:
         print(e)
+
+
+def combined_filter(
+    industry: str = None, with_concepts: Optional[List[str]] = None, without=[]
+) -> List[str]:
+    """针对行业板块与概念板块的联合筛选
+
+    Args:
+        industry: 返回代码必须包含在这些行业板块内
+        with_concepts: 返回代码必须包含在这些概念内
+        without: 返回代码必须不在这些概念内
+
+    Returns:
+        股票代码列表
+    """
+    if with_concepts is not None:
+        cb = ConceptBoard()
+        cb.init()
+
+        if isinstance(with_concepts, str):
+            with_concepts = [with_concepts]
+
+        if isinstance(without, str):
+            without = [without]
+        concepts_codes = set(cb.filter(with_concepts, without=without))
+    else:
+        concepts_codes = None
+
+    codes = None
+    if industry is not None:
+        ib = IndustryBoard()
+        ib.init()
+
+        codes = ib.filter([industry])
+        if codes is not None:
+            codes = set(codes)
+    else:
+        codes = None
+
+    final_results = []
+    if codes is None or concepts_codes is None:
+        final_results = codes or concepts_codes
+    else:
+        final_results = codes.intersection(concepts_codes)
+
+    return final_results
 
 
 def filter(industry=None, with_concepts: Optional[List[str]] = None, without=[]):
