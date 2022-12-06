@@ -1,5 +1,3 @@
-"""Console script for boards."""
-
 import json
 import logging
 import os
@@ -9,6 +7,7 @@ import time
 from typing import Any, List, Optional
 
 from omega.boards.board import ConceptBoard, IndustryBoard
+from omega.webservice.stockinfo import GlobalStockInfo
 
 logger = logging.getLogger(__name__)
 
@@ -120,30 +119,124 @@ def filter(industry=None, with_concepts: Optional[List[str]] = None, without=[])
         print(code, name)
 
 
-def concepts(code: str):
-    cb = ConceptBoard()
-    cb.init()
-
-    for board in cb.get_boards(code):
-        print(board, cb.get_name(board))
-
-
-def industry(code: str):
-    ib = IndustryBoard()
-    ib.init()
-
-    for board in ib.get_boards(code):
-        print(board, ib.get_name(board))
-
-
 def list_boards(sub: str):
-    if sub == "concepts":
+    result = []
+
+    if sub == "concept":
         cb = ConceptBoard()
-        cb.init()
-        for i, (date, code, name, *_) in enumerate(cb.boards):
-            print(date, code, name)
+        for i, (code, name, count) in enumerate(cb.boards):
+            result.append((code, name, count))
     elif sub == "industry":
         ib = IndustryBoard()
-        ib.init()
-        for i, (date, code, name, *_) in enumerate(ib.boards):
-            print(date, code, name)
+        for i, (code, name, count) in enumerate(ib.boards):
+            result.append((code, name, count))
+
+    return result
+
+
+def concepts_info_by_sec(security: str):
+    # 给定股票名称，返回所属概念信息
+    bl = []
+    result = {"security": security, "bl": bl}
+
+    cb = ConceptBoard()
+    sec = security.split(".")[0]
+    for board in cb.get_boards(sec):
+        bl.append((board, cb.get_name(board)))
+
+    return result
+
+
+def industry_info_by_sec(security: str):
+    # 给定股票名称，返回所属行业信息
+    bl = []
+    result = {"security": security, "bl": bl}
+
+    ib = IndustryBoard()
+    sec = security.split(".")[0]
+    for board in ib.get_boards(sec):
+        bl.append((board, ib.get_name(board)))
+
+    return result
+
+
+def board_fuzzy_match(board_type: str, pattern: str):
+    if board_type == "industry":
+        handler = IndustryBoard()
+    else:
+        handler = ConceptBoard()
+
+    codes = handler.fuzzy_match_board_name(pattern)
+    if not codes:
+        return []
+
+    results = []
+    for _item in codes:
+        _name = handler.get_name(_item)
+        if not _name:
+            continue
+        results.append(f"{_item} {_name}")
+
+    return results
+
+
+def get_board_info_by_id(board_type: str, board_id: str, _mode: int = 0):
+    if board_type == "industry":
+        handler = IndustryBoard()
+    else:
+        handler = ConceptBoard()
+
+    _info = handler.get_board_info(board_id)
+    if not _info:
+        return {}
+
+    if _mode == 0:
+        return {"code": board_id, "name": _info[0], "stocks": _info[1]}
+
+    _list = handler.get_members(board_id, with_name=True)
+    if not _list:
+        return {"code": board_id, "name": _info[0], "stocks": _info[1]}
+    else:
+        return {"code": board_id, "name": _info[0], "stocks": _list}
+
+
+def get_boards_by_sec(board_type: str, security: str):
+    if board_type == "industry":
+        handler = IndustryBoard()
+    else:
+        handler = ConceptBoard()
+
+    bl = handler.get_boards(security)
+    if len(bl) == 0:
+        return []
+
+    result = []
+    for board_id in bl:
+        _info = handler.get_board_info(board_id)
+        if not _info:
+            continue
+        result.append({"code": board_id, "name": _info[0], "stocks": _info[1]})
+
+    return result
+
+
+def board_filter_members(
+    board_type: str, included: List[str], excluded: List[str] = []
+):
+    if board_type == "industry":
+        handler = IndustryBoard()
+    else:
+        handler = ConceptBoard()
+
+    codes = handler.filter(included, without=excluded)
+    if not codes:
+        return []
+
+    stock_list = []
+    for _item in codes:
+        _stock_name = GlobalStockInfo.get_stock_name(_item)
+        if not _stock_name:  # 退市或者北交所的股票忽略
+            continue
+        stock_list.append([_item, _stock_name])
+
+    return stock_list

@@ -5,7 +5,6 @@ import logging
 import os
 import sys
 import time
-import traceback
 
 import cfg4py
 import omicron
@@ -96,16 +95,20 @@ def board_task_entry(action: str):
     fetcher = AKShareFetcher()
     loop = asyncio.get_event_loop()
 
+    logger.info("board_task_entry, action: %s", action)
+
     if action == "sync_industry_bars":
         loop.run_until_complete(fetcher.fetch_day_bars("industry"))
     elif action == "sync_concept_bars":
         loop.run_until_complete(fetcher.fetch_day_bars("concept"))
     elif action == "sync_industry_list":
         loop.run_until_complete(fetcher.fetch_members("industry"))
-    elif action == "sync_industry_list":
+    elif action == "sync_concept_list":
         loop.run_until_complete(fetcher.fetch_members("concept"))
 
     loop.run_until_complete(fetcher.close())
+
+    logger.info("board_task_entry, action: %s, finished", action)
 
 
 if __name__ == "__main__":

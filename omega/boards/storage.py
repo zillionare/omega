@@ -5,7 +5,6 @@ import numpy as np
 from omicron.dal.influx.flux import Flux
 from omicron.dal.influx.serialize import DataframeDeserializer
 from omicron.models import get_influx_client
-from omicron.models.security import Security
 from omicron.models.timeframe import TimeFrame
 
 from omega.boards.board import ConceptBoard, IndustryBoard

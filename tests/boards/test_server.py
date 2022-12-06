@@ -71,7 +71,7 @@ class BoardsServerTest(unittest.IsolatedAsyncioTestCase):
         _tmp_path = cfg.zarr.store_path
         shutil.rmtree(_tmp_path, ignore_errors=True)
 
-        dt = datetime.date(2022, 12, 5)
+        dt = datetime.date(2022, 12, 6)
         rc = await fetch_industry_day_bars(dt)
         self.assertFalse(rc)
 
@@ -93,7 +93,7 @@ class BoardsServerTest(unittest.IsolatedAsyncioTestCase):
         ):
             IndustryBoard.fetch_board_list()
 
-        dt = datetime.date(2022, 12, 5)
+        dt = datetime.date(2022, 12, 6)
         dt2 = datetime.date(2022, 12, 2)
         with mock.patch("omega.boards.server.get_latest_date_from_db") as f1:
             # force error 1

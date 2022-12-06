@@ -160,18 +160,20 @@ class Board:
         valuation = []
         seen_valuation = set()
         boards = cls._store[f"{cls.category}/boards"]
-        total_boars = len(boards)
+        total_boards = len(boards)
         for i, name in enumerate(boards["name"]):
             code = cls.get_code(name)
-
-            if i in range(1, total_boars // 10):
-                logger.info(f"progress for fetching {cls.category} board: {i/10:.0%}")
+            logger.info(
+                f"progress for fetching {cls.category}, {name}: {i+1} / {total_boards}"
+            )
 
             if cls.category == "industry":
                 df = stock_board_industry_cons_ths(symbol=name)
+                _data_size = len(df)
                 df["board"] = code
-                counts.append(len(df))
+                counts.append(_data_size)
                 members.append(df)
+                logger.info("industry %s members fetched: %d", name, _data_size)
 
                 # 记录市值
                 for (
@@ -224,8 +226,11 @@ class Board:
                         )
             else:
                 df = stock_board_concept_cons_ths(symbol=name)
+                _data_size = len(df)
                 df["board"] = code
                 members.append(df)
+                logger.info("industry %s members fetched: %d", name, _data_size)
+
         # for industry board, ak won't return count of the board, had to do by ourself
         if cls.category == "industry":
             cls._store[f"{cls.category}/boards"]["members"] = counts
@@ -303,7 +308,9 @@ class Board:
             indice = np.argwhere(self.latest_members["code"] == code_or_name).flatten()
             return self.latest_members[indice]["board"]
 
-    def get_members(self, code: str, date: datetime.date = None) -> List[str]:
+    def get_members(
+        self, code: str, date: datetime.date = None, with_name: bool = False
+    ) -> List[str]:
         """给定板块代码，返回该板块内所有的股票代码
 
         Args:
@@ -321,7 +328,10 @@ class Board:
         members = self.members_group[date]
         idx = np.argwhere(members["board"] == code).flatten()
         if len(idx):
-            return members[idx]["code"].tolist()
+            if with_name:
+                return [(members[x]["code"], members[x]["name"]) for x in idx]
+            else:
+                return members[idx]["code"].tolist()
         else:
             return None
 
@@ -330,6 +340,14 @@ class Board:
         idx = np.argwhere(self.boards["code"] == code).flatten()
         if len(idx):
             return self.boards[idx]["name"][0]
+        else:
+            return None
+
+    def get_board_info(self, code: str) -> str:
+        """translate code to board name"""
+        idx = np.argwhere(self.boards["code"] == code).flatten()
+        if len(idx):
+            return (self.boards[idx]["name"][0], self.boards[idx]["members"][0])
         else:
             return None
 

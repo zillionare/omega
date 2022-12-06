@@ -90,11 +90,11 @@ async def init():
     # try to load omicron and init redis connection pool
     try:
         await omicron.init()
-        await scripts.load_lua_script()
+        # await scripts.load_lua_script()
 
         # 延时执行未收盘数据的重建。如果omega是在交易时间启动的，这将允许omega先完成分钟线的同步，再进行未收盘数据的重建，从而避免因缺失部分分钟线数据导致的误差。当然，这里的方法并不是完全精确的。
-        execution_time = (arrow.now().shift(minutes=5)).datetime
-        scheduler.add_job(rebuild_unclosed_bars, "date", run_date=execution_time)
+        # execution_time = (arrow.now().shift(minutes=5)).datetime
+        # scheduler.add_job(rebuild_unclosed_bars, "date", run_date=execution_time)
     except Exception as e:
         print(
             'No calendar and securities in cache, make sure you have called "omega init" first:\n',
@@ -108,8 +108,8 @@ async def init():
     await heartbeat()
     scheduler.add_job(heartbeat, "interval", seconds=10)
     # sync securities daily
-    await load_cron_task(scheduler)
-    scheduler.start()
+    # await load_cron_task(scheduler)
+    # scheduler.start()
     logger.info("omega master finished initialization")
 
 

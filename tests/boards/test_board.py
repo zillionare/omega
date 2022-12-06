@@ -63,6 +63,18 @@ class BoardTest(unittest.IsolatedAsyncioTestCase):
         exp = ["002041", "002505", "600108", "600300", "000998"]
         self.assertListEqual(actual, exp)
 
+    async def test_get_members_with_name(self):
+        ib = IndustryBoard()
+        actual = ib.get_members("881101", with_name=True)
+        exp = [
+            ("002041", "登海种业"),
+            ("600265", "ST景谷"),
+            ("000998", "隆平高科"),
+            ("601118", "海南橡胶"),
+            ("600598", "北大荒"),
+        ]
+        self.assertListEqual(exp, actual)
+
     async def test_get_boards(self):
         ib = IndustryBoard()
         actual = ib.get_boards("002041")
@@ -161,3 +173,10 @@ class BoardTest(unittest.IsolatedAsyncioTestCase):
 
             stocks = cb.new_members_in_board(1)
             self.assertDictEqual(stocks, {"300435": exp})
+
+    async def test_get_industry_bars(self):
+        ib = IndustryBoard()
+        dt1 = datetime.date(2022, 12, 5)
+        dt2 = datetime.date(2022, 12, 7)
+        rc = ib.get_industry_bars("种植业与林业", dt1, dt2)
+        self.assertIsNotNone(rc)

@@ -1,6 +1,7 @@
 import datetime
 import logging
 
+import numpy as np
 from omicron.models.timeframe import TimeFrame
 
 from omega.boards.board import ConceptBoard, IndustryBoard
@@ -39,10 +40,8 @@ def sync_board_names(board_type: str):
         logger.info("start sync %s board names...", board_type)
 
         if board_type == "industry":
-            IndustryBoard.init()
             IndustryBoard.fetch_board_list()
         else:
-            ConceptBoard.init()
             ConceptBoard.fetch_board_list()
     except Exception as e:
         logger.exception(e)
@@ -54,7 +53,7 @@ def sync_board_names(board_type: str):
 
 async def fetch_industry_day_bars(dt: datetime.date):
     dt_end = TimeFrame.day_shift(dt, 1)
-    logger.info("start fetch industry board day bars, %s...", dt)
+    logger.info("start fetch industry board day bars, %s (%s)...", dt, dt_end)
 
     try:
         ib = IndustryBoard()
@@ -68,7 +67,7 @@ async def fetch_industry_day_bars(dt: datetime.date):
                 continue
 
             logger.info(
-                "fetch day bars for industry/%s (%d/%d), %s - %s",
+                "fetch day bars for industry/%s (%d/%d), (%s - %s]",
                 _name,
                 i + 1,
                 total_boards,
@@ -113,6 +112,7 @@ async def fetch_industry_day_bars(dt: datetime.date):
                 .astype(board_bars_dtype)
             )
 
+            bars = bars[~np.isnan(bars["open"])]
             await save_board_bars(bars)
             logger.info(
                 "save day bars to influxdb for industry/%s (%s), bars: %d",
@@ -196,6 +196,7 @@ async def fetch_concept_day_bars(dt: datetime.date):
                 .astype(board_bars_dtype)
             )
 
+            bars = bars[~np.isnan(bars["open"])]
             await save_board_bars(bars)
             logger.info(
                 "save day bars to influxdb for concept/%s (%s), bars: %d",
