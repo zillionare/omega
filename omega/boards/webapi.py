@@ -1,3 +1,4 @@
+import datetime
 import json
 import logging
 import os
@@ -6,7 +7,16 @@ import sys
 import time
 from typing import Any, List, Optional
 
+from coretypes import Frame, FrameType
+from omicron.extensions.decimals import math_round
+from omicron.models.timeframe import TimeFrame
+
 from omega.boards.board import ConceptBoard, IndustryBoard
+from omega.boards.storage import (
+    calculate_ma_list,
+    calculate_rsi_list,
+    get_bars_in_range,
+)
 from omega.webservice.stockinfo import GlobalStockInfo
 
 logger = logging.getLogger(__name__)
@@ -124,12 +134,12 @@ def list_boards(sub: str):
 
     if sub == "concept":
         cb = ConceptBoard()
-        for i, (code, name, count) in enumerate(cb.boards):
-            result.append((code, name, count))
+        for i, (_, code, name, count) in enumerate(cb.boards):
+            result.append((code, name, count.item()))
     elif sub == "industry":
         ib = IndustryBoard()
         for i, (code, name, count) in enumerate(ib.boards):
-            result.append((code, name, count))
+            result.append((code, name, count.item()))
 
     return result
 
@@ -191,11 +201,11 @@ def get_board_info_by_id(board_type: str, board_id: str, _mode: int = 0):
         return {}
 
     if _mode == 0:
-        return {"code": board_id, "name": _info[0], "stocks": _info[1]}
+        return {"code": board_id, "name": _info[0], "stocks": _info[1].item()}
 
     _list = handler.get_members(board_id, with_name=True)
     if not _list:
-        return {"code": board_id, "name": _info[0], "stocks": _info[1]}
+        return {"code": board_id, "name": _info[0], "stocks": _info[1].item()}
     else:
         return {"code": board_id, "name": _info[0], "stocks": _list}
 
@@ -215,7 +225,7 @@ def get_boards_by_sec(board_type: str, security: str):
         _info = handler.get_board_info(board_id)
         if not _info:
             continue
-        result.append({"code": board_id, "name": _info[0], "stocks": _info[1]})
+        result.append({"code": board_id, "name": _info[0], "stocks": _info[1].item()})
 
     return result
 
@@ -240,3 +250,57 @@ def board_filter_members(
         stock_list.append([_item, _stock_name])
 
     return stock_list
+
+
+async def get_board_bars_bycount(board_id: str, dt_end: datetime.date, n_bars: int):
+    now = datetime.datetime.now()
+    if not TimeFrame.is_trade_day(now):
+        dt = TimeFrame.day_shift(now, 0)
+    else:
+        dt = now.date()
+
+    # 为了计算MA250，取250+60根
+    _end = dt_end
+    if _end > dt:
+        _end = dt
+    if n_bars >= 120:  # 约定最大n_bars为250
+        _start = TimeFrame.shift(_end, -310, FrameType.DAY)
+    else:
+        _start = TimeFrame.shift(_end, -n_bars - 30, FrameType.DAY)
+
+    board_info = {}
+    sec_data = await get_bars_in_range(board_id, _start, _end)
+    ma_list = await calculate_ma_list(sec_data, more_data=True)
+    rsi_list = await calculate_rsi_list(sec_data)
+    ma_list["rsi6"] = rsi_list
+
+    # 只取最后120个节点
+    for _key in ma_list:
+        _raw_data = ma_list[_key]
+        _count = len(_raw_data)
+        if _count > n_bars:
+            ma_list[_key] = _raw_data[_count - n_bars :]
+
+    k_bars = []
+    for item in sec_data:
+        _date = item["_time"].item()
+        _data = {
+            "frame": _date.strftime("%Y-%m-%d %H:%M:%S"),
+            "data": [
+                math_round(item["open"].item(), 2),
+                math_round(item["close"].item(), 2),
+                math_round(item["low"].item(), 2),
+                math_round(item["high"].item(), 2),
+                math_round(item["volume"].item() / 100, 0),
+                math_round(item["amount"].item() / 10000, 0),
+            ],
+        }
+        k_bars.append(_data)
+    _count = len(k_bars)
+    if _count > n_bars:
+        board_info["bars"] = k_bars[_count - n_bars :]
+    else:
+        board_info["bars"] = k_bars
+    board_info.update(ma_list)
+
+    return board_info

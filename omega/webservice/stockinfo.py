@@ -63,4 +63,9 @@ async def frame_shift(dt: datetime.datetime, ft_str: str, n_count: int):
 
 
 async def get_stock_info(security: str):
-    return await Security.info(security)
+    info = await Security.info(security)
+    _start = info["start"]
+    _end = info["end"]
+    info["start"] = _start.strftime("%Y-%m-%d")
+    info["end"] = _end.strftime("%Y-%m-%d")
+    return info

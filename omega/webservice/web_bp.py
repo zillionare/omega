@@ -8,6 +8,7 @@ from omega.boards.webapi import (
     board_filter_members,
     board_fuzzy_match,
     concepts_info_by_sec,
+    get_board_bars_bycount,
     get_board_info_by_id,
     get_boards_by_sec,
     industry_info_by_sec,
@@ -24,12 +25,12 @@ bp_webapi = Blueprint("web_api_blueprint", url_prefix="/api", strict_slashes=Fal
 async def bp_webapi_frame_shift(request):
     dt_str = request.json.get("dt", None)
     if not dt_str:
-        return {}
+        return response.json({})
     _tmp_dt = arrow.get(dt_str).naive
 
     ft_str = request.json.get("ft", None)
     if not ft_str:
-        return {}
+        return response.json({})
 
     _str = request.json.get("count", None)
     n_count = int(_str)
@@ -94,7 +95,7 @@ async def bp_webapi_board_get_name(request):
     if not pattern or not board_type:
         return response.json([])
 
-    rc = board_fuzzy_match(pattern)
+    rc = board_fuzzy_match(board_type, pattern)
     return response.json(rc)
 
 
@@ -114,6 +115,8 @@ async def bp_webapi_board_get_info(request):
     if not board_type or not board_id:
         return response.json({})
 
+    if _mode is None:
+        _mode = 0
     rc = get_board_info_by_id(board_type, board_id, _mode)
     return response.json(rc)
 
@@ -131,7 +134,8 @@ async def bp_webapi_board_info_by_sec(request):
     if not board_type or not security:
         return response.json([])
 
-    rc = get_boards_by_sec(board_type, security)
+    sec_code = security.split(".")[0]
+    rc = get_boards_by_sec(board_type, sec_code)
     return response.json(rc)
 
 
@@ -147,9 +151,51 @@ async def bp_webapi_board_filter_members(request):
     _included = request.json.get("include_boards")
     _excluded = request.json.get("exclude_boards")
     if not board_type or not _included:
-        return []
+        return response.json([])
+
+    if not isinstance(_included, list):
+        return response.json([])
+    if _excluded:
+        if not isinstance(_excluded, list):
+            return response.json([])
+    else:
+        _excluded = []
 
     rc = board_filter_members(board_type, _included, _excluded)
+    return response.json(rc)
+
+
+@bp_webapi.route("/board/board_bars_by_count", methods=["POST"])
+async def bp_webapi_board_bars_info(request):
+    """获取板块详细信息，K线图和MA数组
+
+    Args:
+        code (str): 股票代码
+        dt_end (datetime.datetime): 结束时间，闭区间
+        n_bars (int): bars的数目
+
+    Returns:
+        {
+            "bars": [(open,high,low,close,volume)],
+            "ma5": [],
+            "ma10": [],
+            "ma20": [],
+        }
+    """
+
+    code = request.json.get("board_id", None)
+    _end = request.json.get("end", None)
+    n_bars = request.json.get("n_bars", None)
+    if not code or not _end or not n_bars:
+        return response.json({})
+
+    dt_end = arrow.get(_end).naive.date()
+    if n_bars > 250:
+        n_bars = 250
+    if n_bars < 5:
+        n_bars = 5
+
+    rc = await get_board_bars_bycount(code, dt_end, n_bars)
     return response.json(rc)
 
 
