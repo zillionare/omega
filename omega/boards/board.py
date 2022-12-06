@@ -4,6 +4,7 @@ import io
 import logging
 import os
 import re
+import time
 from typing import Any, Dict, List, Optional, Set
 
 import akshare as ak
@@ -230,6 +231,9 @@ class Board:
                 df["board"] = code
                 members.append(df)
                 logger.info("industry %s members fetched: %d", name, _data_size)
+
+            # force waiting for 2 seconds
+            time.sleep(2)
 
         # for industry board, ak won't return count of the board, had to do by ourself
         if cls.category == "industry":

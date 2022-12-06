@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import logging
 
@@ -120,6 +121,7 @@ async def fetch_industry_day_bars(dt: datetime.date):
                 code,
                 len(bars),
             )
+            await asyncio.sleep(2)
 
     except Exception as e:
         logger.exception(e)
@@ -204,6 +206,7 @@ async def fetch_concept_day_bars(dt: datetime.date):
                 code,
                 len(bars),
             )
+            await asyncio.sleep(2)
 
     except Exception as e:
         logger.exception(e)
