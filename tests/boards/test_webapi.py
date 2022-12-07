@@ -54,11 +54,11 @@ class BoardsWebAPITest(unittest.IsolatedAsyncioTestCase):
 
             IndustryBoard.init()
             IndustryBoard.fetch_board_list()
-            IndustryBoard.fetch_board_members()
+            IndustryBoard.fetch_board_members(delay=0)
 
             ConceptBoard.init()
             ConceptBoard.fetch_board_list()
-            ConceptBoard.fetch_board_members()
+            ConceptBoard.fetch_board_members(delay=0)
 
             ib = IndustryBoard()
             cb = ConceptBoard()

@@ -177,15 +177,15 @@ class TestSyncJobs_Calibration(unittest.IsolatedAsyncioTestCase):
                 rc = await sync_daily_bars_day()
                 self.assertIsNone(rc)
 
-    @mock.patch("omicron.notify.dingtalk.DingTalkMessage.text")
-    @mock.patch("omicron.notify.mail.mail_notify")
+    @mock.patch("omega.master.tasks.calibration_task.ding")
+    @mock.patch("omega.master.tasks.calibration_task.mail_notify")
     async def test_sync_task_day_factor(self, _notify, _ding):
+        _notify.side_effect = [True]
+        _ding.return_value = True
+
         with freeze_time("2022-09-04 15:00:00"):
             rc = await sync_day_bar_factors()
             self.assertFalse(rc)
-
-        _notify.return_value = True
-        _ding.return_value = True
 
         with freeze_time("2022-09-08 15:00:00"):
             with mock.patch(
@@ -199,13 +199,24 @@ class TestSyncJobs_Calibration(unittest.IsolatedAsyncioTestCase):
                 with mock.patch(
                     "omega.master.tasks.calibration_task.run_daily_bars_sync_task"
                 ) as _run:
-                    _run.return_value = False
-                    rc = await sync_day_bar_factors()
-                    self.assertIsNone(rc)
-
                     _run.return_value = True
                     rc = await sync_day_bar_factors()
                     self.assertTrue(rc)
+
+    @mock.patch("omega.master.tasks.calibration_task.Security.get_xrxd_info")
+    @mock.patch("omega.master.tasks.calibration_task.run_daily_bars_sync_task")
+    async def test_sync_task_day_factor2(self, _run, _xrxd):
+        _xrxd.return_value = True
+        _run.return_value = False
+
+        with freeze_time("2022-09-08 15:00:00"):
+            with mock.patch("omega.master.tasks.calibration_task.ding") as _ding:
+                _ding.return_value = True
+                with mock.patch(
+                    "omega.master.tasks.calibration_task.mail_notify", return_value=True
+                ):
+                    rc = await sync_day_bar_factors()
+                    self.assertIsNone(rc)
 
     @mock.patch(
         "omega.master.tasks.synctask.QuotaMgmt.check_quota",

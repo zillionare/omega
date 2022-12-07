@@ -181,7 +181,7 @@ class Board:
         cls._store[key] = boards
 
     @classmethod
-    def fetch_board_members(cls):
+    def fetch_board_members(cls, delay: int = 3):
         members = []
         counts = []
         valuation = []
@@ -259,7 +259,7 @@ class Board:
                 logger.info("industry %s members fetched: %d", name, _data_size)
 
             # force waiting for 3 seconds
-            time.sleep(3)
+            time.sleep(delay)
 
         # for industry board, ak won't return count of the board, had to do by ourself
         if cls.category == "industry":

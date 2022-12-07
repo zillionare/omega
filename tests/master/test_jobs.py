@@ -169,6 +169,7 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
             "day_sync_task",
             "day_factor_fix_task",
             "sync_cache_price_limits",
+            "reload_calendar",
         }
         print(set([job.name for job in scheduler.get_jobs()]))
         self.assertSetEqual(base, set([job.name for job in scheduler.get_jobs()]))

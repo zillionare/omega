@@ -41,11 +41,11 @@ class BoardTest(unittest.IsolatedAsyncioTestCase):
 
             IndustryBoard.init()
             IndustryBoard.fetch_board_list()
-            IndustryBoard.fetch_board_members()
+            IndustryBoard.fetch_board_members(delay=0)
 
             ConceptBoard.init()
             ConceptBoard.fetch_board_list()
-            ConceptBoard.fetch_board_members()
+            ConceptBoard.fetch_board_members(delay=0)
 
             ib = IndustryBoard()
             cb = ConceptBoard()
@@ -164,7 +164,7 @@ class BoardTest(unittest.IsolatedAsyncioTestCase):
     async def test_new_members_in_board(self, mock_0, mock_1):
         with mock.patch("arrow.now", return_value=arrow.get("2022-05-27")):
             ConceptBoard.fetch_board_list()
-            ConceptBoard.fetch_board_members()
+            ConceptBoard.fetch_board_members(delay=0)
 
             cb = ConceptBoard()
             members = cb.members_group["20220526"]
@@ -173,10 +173,3 @@ class BoardTest(unittest.IsolatedAsyncioTestCase):
 
             stocks = cb.new_members_in_board(1)
             self.assertDictEqual(stocks, {"300435": exp})
-
-    async def test_get_industry_bars(self):
-        ib = IndustryBoard()
-        dt1 = datetime.date(2022, 12, 5)
-        dt2 = datetime.date(2022, 12, 7)
-        rc = ib.get_industry_bars("种植业与林业", dt1, dt2)
-        self.assertIsNotNone(rc)

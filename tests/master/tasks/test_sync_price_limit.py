@@ -210,10 +210,10 @@ class TestSyncJobs_PriceLimit(unittest.IsolatedAsyncioTestCase):
     async def test_price_limit_cache_task(self, _run):
         _run.return_value = True
 
-        with freeze_time("2022-09-08 09:10:00"):
+        with freeze_time("2022-09-08 09:06:00"):
             rc = await sync_cache_price_limits()
             self.assertTrue(rc)
 
-        with freeze_time("2022-09-08 09:31:00"):
+        with freeze_time("2022-09-08 09:17:00"):
             rc = await sync_cache_price_limits()
             self.assertTrue(rc)

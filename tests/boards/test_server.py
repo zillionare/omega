@@ -47,15 +47,11 @@ class BoardsServerTest(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue(rc)
 
     @mock.patch("omega.boards.board.ConceptBoard.fetch_board_list")
-    @mock.patch("omega.boards.board.ConceptBoard.init")
     @mock.patch("omega.boards.board.IndustryBoard.fetch_board_list")
-    @mock.patch("omega.boards.board.IndustryBoard.init")
-    async def test_sync_board_names(self, f11, f12, f23, f24):
+    async def test_sync_board_names(self, f11, f23):
         # just for cov
         f11.return_value = True
-        f12.return_value = True
         f23.return_value = True
-        f24.return_value = True
 
         rc = sync_board_names("industry")
         self.assertTrue(rc)
@@ -101,7 +97,7 @@ class BoardsServerTest(unittest.IsolatedAsyncioTestCase):
 
                 # reading data from industry_item_bars
                 f2.return_value = industry_item_bars
-                rc = await fetch_industry_day_bars(dt)
+                rc = await fetch_industry_day_bars(dt, delay=0)
                 self.assertTrue(rc)
 
     async def test_fetch_concept_day_bars(self):
@@ -146,12 +142,12 @@ class BoardsServerTest(unittest.IsolatedAsyncioTestCase):
             with mock.patch("omega.boards.board.ConceptBoard.get_concept_bars") as f2:
                 # reading data from industry_item_bars
                 f2.return_value = industry_item_bars
-                rc = await fetch_concept_day_bars(dt2)
+                rc = await fetch_concept_day_bars(dt2, delay=0)
                 self.assertTrue(rc)
 
         # test get_latest_date_from_db
         dt = await get_latest_date_from_db("300435")
-        self.assertEqual(dt, datetime.date(2022, 12, 2))
+        self.assertEqual(dt, datetime.date(2022, 12, 5))
 
         # just for cov
         dt = await get_latest_date_from_db("300535")

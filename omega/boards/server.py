@@ -52,7 +52,7 @@ def sync_board_names(board_type: str):
     return True
 
 
-async def fetch_industry_day_bars(dt: datetime.date):
+async def fetch_industry_day_bars(dt: datetime.date, delay: int = 3):
     dt_end = TimeFrame.day_shift(dt, 1)
     logger.info("start fetch industry board day bars, %s (%s)...", dt, dt_end)
 
@@ -120,12 +120,12 @@ async def fetch_industry_day_bars(dt: datetime.date):
             code,
             len(bars),
         )
-        await asyncio.sleep(3)
+        await asyncio.sleep(delay)
 
     return True
 
 
-async def fetch_concept_day_bars(dt: datetime.date):
+async def fetch_concept_day_bars(dt: datetime.date, delay: int = 3):
     logger.info("start fetch concept board day bars, %s...", dt)
 
     cb = ConceptBoard()
@@ -200,7 +200,7 @@ async def fetch_concept_day_bars(dt: datetime.date):
             code,
             len(bars),
         )
-        await asyncio.sleep(3)
+        await asyncio.sleep(delay)
 
     return True
 

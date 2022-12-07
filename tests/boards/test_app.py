@@ -7,15 +7,14 @@ from unittest import mock
 from freezegun import freeze_time
 
 from omega.boards.app import AKShareFetcher, board_task_entry
+from tests import init_test_env
 
 
 class BoardsAppTest(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
-        # await omicron.init()
-        pass
+        await init_test_env()
 
     async def asyncTearDown(self) -> None:
-        # await omicron.close()
         pass
 
     async def test_fetcher_init(self):

@@ -10,7 +10,7 @@ from omega.webservice.stockinfo import frame_count, frame_shift, get_stock_info
 from tests import init_test_env
 
 
-class WebServiceTest(unittest.IsolatedAsyncioTestCase):
+class StockInfoTest(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         await init_test_env()
         await omicron.init()

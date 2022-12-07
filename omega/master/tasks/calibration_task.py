@@ -7,6 +7,8 @@ from omicron.dal import cache
 from omicron.models.security import Security
 from omicron.models.stock import Stock
 from omicron.models.timeframe import TimeFrame
+from omicron.notify.dingtalk import ding
+from omicron.notify.mail import mail_notify
 
 from omega.core import constants
 from omega.core.events import Events
@@ -207,11 +209,7 @@ async def sync_day_bar_factors():
 
     # 发送错误信息
     msg = f"failed to re-download bars:1d for {pre_trade_date}, check log for detailed information"
-    from omicron.notify.dingtalk import DingTalkMessage
-
-    DingTalkMessage.text(msg)
-
-    from omicron.notify.mail import mail_notify
+    ding(msg)
 
     subject = "failed to update factors for bars:1d"
     await mail_notify(subject=subject, body=msg)

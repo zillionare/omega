@@ -63,12 +63,12 @@ class WebSvcBPTest(unittest.IsolatedAsyncioTestCase):
             "omega.boards.board.stock_board_concept_cons_ths",
             side_effect=concept_members,
         ):
-            ConceptBoard.fetch_board_members()
+            ConceptBoard.fetch_board_members(delay=0)
 
         dt2 = datetime.date(2022, 12, 2)
         with mock.patch("omega.boards.board.ConceptBoard.get_concept_bars") as f2:
             f2.return_value = industry_item_bars
-            await fetch_concept_day_bars(dt2)
+            await fetch_concept_day_bars(dt2, delay=0)
 
     async def test_bp_frame_shift(self):
         request = MockRequest()

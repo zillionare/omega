@@ -45,7 +45,7 @@ class BoardsStorageTest(unittest.IsolatedAsyncioTestCase):
         dt2 = datetime.date(2022, 12, 2)
         with mock.patch("omega.boards.board.ConceptBoard.get_concept_bars") as f2:
             f2.return_value = industry_item_bars
-            await fetch_concept_day_bars(dt2)
+            await fetch_concept_day_bars(dt2, delay=0)
 
     async def test_get_latest_date_from_db(self):
         rc = await get_latest_date_from_db("301715")
