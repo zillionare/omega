@@ -176,5 +176,10 @@ class WebSvcBPTest(unittest.IsolatedAsyncioTestCase):
         request = MockRequest()
         await bp_webapi_board_bars_info(request)
 
-        request.json = {"board_type": "concept", "end": "2022-12-05", "n_bars": 121}
+        request.json = {
+            "board_type": "concept",
+            "board_id": "308956",
+            "end": "2022-12-05",
+            "n_bars": 121,
+        }
         await bp_webapi_board_bars_info(request)

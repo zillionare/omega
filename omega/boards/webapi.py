@@ -270,6 +270,9 @@ async def get_board_bars_bycount(board_id: str, dt_end: datetime.date, n_bars: i
 
     board_info = {}
     sec_data = await get_bars_in_range(board_id, _start, _end)
+    if len(sec_data) == 0:
+        return board_info
+
     ma_list = await calculate_ma_list(sec_data, more_data=True)
     rsi_list = await calculate_rsi_list(sec_data)
     ma_list["rsi6"] = rsi_list
