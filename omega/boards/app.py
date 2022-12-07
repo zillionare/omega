@@ -91,22 +91,28 @@ class AKShareFetcher(object):
         return True
 
 
-def board_task_entry(action: str):
+async def main_task(action: str):
     fetcher = AKShareFetcher()
-    loop = asyncio.get_event_loop()
-
-    logger.info("board_task_entry, action: %s", action)
 
     if action == "sync_industry_bars":
-        loop.run_until_complete(fetcher.fetch_day_bars("industry"))
+        await fetcher.fetch_day_bars("industry")
     elif action == "sync_concept_bars":
-        loop.run_until_complete(fetcher.fetch_day_bars("concept"))
+        await fetcher.fetch_day_bars("concept")
     elif action == "sync_industry_list":
-        loop.run_until_complete(fetcher.fetch_members("industry"))
+        await fetcher.fetch_members("industry")
     elif action == "sync_concept_list":
-        loop.run_until_complete(fetcher.fetch_members("concept"))
+        await fetcher.fetch_members("concept")
+    else:
+        logger.info("action: %s not supported", action)
 
-    loop.run_until_complete(fetcher.close())
+    fetcher.close()
+
+
+def board_task_entry(action: str):
+    logger.info("board_task_entry, action: %s", action)
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main_task(action))
 
     logger.info("board_task_entry, action: %s, finished", action)
 

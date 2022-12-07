@@ -10,6 +10,27 @@ from omicron.models.timeframe import TimeFrame
 logger = logging.getLogger(__name__)
 
 
+def convert_ft_from_str(ft_str: str):
+    if ft_str == "1d":
+        ft = FrameType.DAY
+    elif ft_str == "30m":
+        ft = FrameType.MIN30
+    elif ft_str == "1w":
+        ft = FrameType.WEEK
+    elif ft_str == "1m":
+        ft = FrameType.MIN1
+    elif ft_str == "5m":
+        ft = FrameType.MIN5
+    elif ft_str == "60m":
+        ft = FrameType.MIN60
+    elif ft_str == "1M":
+        ft = FrameType.MONTH
+    else:
+        raise ValueError("not supported")
+
+    return ft
+
+
 # 今日股票清单
 class GlobalStockInfo:
     _stocks = None
@@ -35,31 +56,29 @@ class GlobalStockInfo:
 
 
 async def frame_shift(dt: datetime.datetime, ft_str: str, n_count: int):
-    ft = FrameType.DAY
-    if ft_str == "1d":
-        ft = FrameType.DAY
-    elif ft_str == "5m":
-        ft = FrameType.MIN5
-    elif ft_str == "30m":
-        ft = FrameType.MIN30
-    elif ft_str == "60m":
-        ft = FrameType.MIN60
-    elif ft_str == "1w":
-        ft = FrameType.WEEK
-    elif ft_str == "1M":
-        ft = FrameType.MONTH
-    else:
-        raise ValueError("not supported")
-
+    ft = convert_ft_from_str(ft_str)
     if ft >= FrameType.DAY:
         _tmp_dt = datetime.date(dt.year, dt.month, dt.day)
     else:
         _tmp_dt = TimeFrame.floor(dt, ft)
     rc = TimeFrame.shift(_tmp_dt, n_count, ft)
     if hasattr(rc, "date"):
-        return {"result": rc.strftime("%Y-%m-%d %H:%M:%S")}
+        return {"dt": rc.strftime("%Y-%m-%d %H:%M:%S")}
     else:
-        return {"result": rc.strftime("%Y-%m-%d")}
+        return {"dt": rc.strftime("%Y-%m-%d")}
+
+
+async def frame_count(start: datetime.datetime, end: datetime.datetime, ft_str: str):
+    ft = convert_ft_from_str(ft_str)
+    if ft >= FrameType.DAY:
+        dt_start = datetime.date(start.year, start.month, start.day)
+        dt_end = datetime.date(end.year, end.month, end.day)
+    else:
+        dt_start = TimeFrame.floor(start, ft)
+        dt_end = TimeFrame.floor(end, ft)
+
+    rc = TimeFrame.count_frames(dt_start, dt_end, ft)
+    return {"count": rc}
 
 
 async def get_stock_info(security: str):

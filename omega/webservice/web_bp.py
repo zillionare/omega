@@ -1,7 +1,6 @@
 import logging
 
 import arrow
-import cfg4py
 from sanic import Blueprint, Sanic, response
 
 from omega.boards.webapi import (
@@ -14,7 +13,7 @@ from omega.boards.webapi import (
     industry_info_by_sec,
     list_boards,
 )
-from omega.webservice.stockinfo import frame_shift, get_stock_info
+from omega.webservice.stockinfo import frame_count, frame_shift, get_stock_info
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +35,24 @@ async def bp_webapi_frame_shift(request):
     n_count = int(_str)
 
     rc = await frame_shift(_tmp_dt, ft_str, n_count)
+    return response.json(rc)
+
+
+@bp_webapi.route("/timeframe/frame_count", methods=["POST"])
+async def bp_webapi_frame_count(request):
+    dt1_str = request.json.get("start", None)
+    dt2_str = request.json.get("end", None)
+    if not dt1_str or not dt2_str:
+        return response.json({})
+
+    _tmp_dt1 = arrow.get(dt1_str).naive
+    _tmp_dt2 = arrow.get(dt2_str).naive
+
+    ft_str = request.json.get("ft", None)
+    if not ft_str:
+        return response.json({})
+
+    rc = await frame_count(_tmp_dt1, _tmp_dt2, ft_str)
     return response.json(rc)
 
 
