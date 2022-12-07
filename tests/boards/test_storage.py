@@ -10,12 +10,7 @@ from omicron.models import get_influx_client
 
 from omega.boards.board import ConceptBoard
 from omega.boards.server import fetch_concept_day_bars
-from omega.boards.storage import (
-    calculate_ma_list,
-    calculate_rsi_list,
-    get_bars_in_range,
-    get_latest_date_from_db,
-)
+from omega.boards.storage import get_bars_in_range, get_latest_date_from_db
 from omega.boards.webapi import get_board_bars_bycount
 from tests import init_test_env
 from tests.boards import concept_names, industry_item_bars, industry_names

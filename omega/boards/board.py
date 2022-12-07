@@ -232,8 +232,8 @@ class Board:
                 members.append(df)
                 logger.info("industry %s members fetched: %d", name, _data_size)
 
-            # force waiting for 2 seconds
-            time.sleep(2)
+            # force waiting for 3 seconds
+            time.sleep(3)
 
         # for industry board, ak won't return count of the board, had to do by ourself
         if cls.category == "industry":

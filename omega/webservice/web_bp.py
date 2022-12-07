@@ -59,6 +59,8 @@ async def bp_webapi_frame_count(request):
 @bp_webapi.route("/stock/info", methods=["POST"])
 async def bp_admin_stock_info(request):
     security = request.json.get("security")
+    if not security:
+        return response.json({})
     rc = await get_stock_info(security)
     return response.json(rc)
 

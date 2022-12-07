@@ -105,7 +105,7 @@ async def main_task(action: str):
     else:
         logger.info("action: %s not supported", action)
 
-    fetcher.close()
+    await fetcher.close()
 
 
 def board_task_entry(action: str):
