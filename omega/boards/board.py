@@ -64,6 +64,32 @@ def stock_board_concept_name_ths():
             return data
 
 
+@retry(Exception, tries=5, backoff=2, delay=30, logger=logger)
+def stock_board_industry_index_ths(name, start, end):
+    logger.info("fetching industry board bars for %s", name)
+    with contextlib.redirect_stderr(io.StringIO()):
+        data = ak.stock_board_industry_index_ths(name, start, end)
+        if data is None or len(data) == 0:
+            logger.warning("no industry bars fetched from ths")
+            raise ValueError("empty result")
+        else:
+            return data
+
+
+@retry(Exception, tries=5, backoff=2, delay=30, logger=logger)
+def stock_board_concept_hist_ths(board_name, target_year):
+    logger.info("fetching concept board bars for %s", board_name)
+    with contextlib.redirect_stderr(io.StringIO()):
+        data = ak.stock_board_concept_hist_ths(
+            symbol=board_name, start_year=target_year
+        )
+        if data is None or len(data) == 0:
+            logger.warning("no concept bars fetched from ths")
+            raise ValueError("empty result")
+        else:
+            return data
+
+
 class Board:
     """行业板块及概念板块基类
 
@@ -431,7 +457,11 @@ class Board:
         else:
             end = f"{end.year}{end.month:02}{end.day:02}"
 
-        return ak.stock_board_industry_index_ths(name, start, end)
+        try:
+            return stock_board_industry_index_ths(name, start, end)
+        except Exception as e:
+            logger.exception(e)
+            return []
 
     def get_concept_bars(self, board_name: str, end: datetime.date):
         """获取概念板块的日线指数数据
@@ -444,9 +474,7 @@ class Board:
         """
         target_year = f"{end.year}"
         try:
-            return ak.stock_board_concept_hist_ths(
-                symbol=board_name, start_year=target_year
-            )
+            return stock_board_concept_hist_ths(board_name, target_year)
         except Exception as e:
             logger.exception(e)
             return []

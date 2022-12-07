@@ -56,76 +56,71 @@ async def fetch_industry_day_bars(dt: datetime.date):
     dt_end = TimeFrame.day_shift(dt, 1)
     logger.info("start fetch industry board day bars, %s (%s)...", dt, dt_end)
 
-    try:
-        ib = IndustryBoard()
-        boards = ib.boards
-        total_boards = len(ib.boards)
-        for i, code in enumerate(boards["code"]):
-            _name = ib.get_name(code)
-            # 获取db中的最后一条记录时间
-            latest_dt = await get_latest_date_from_db(code)
-            if latest_dt == dt:
-                continue
+    ib = IndustryBoard()
+    boards = ib.boards
+    total_boards = len(ib.boards)
+    for i, code in enumerate(boards["code"]):
+        _name = ib.get_name(code)
+        # 获取db中的最后一条记录时间
+        latest_dt = await get_latest_date_from_db(code)
+        if latest_dt == dt:
+            continue
 
+        logger.info(
+            "fetch day bars for industry/%s (%d/%d), (%s - %s]",
+            _name,
+            i + 1,
+            total_boards,
+            latest_dt,
+            dt,
+        )
+        df = ib.get_industry_bars(_name, latest_dt, dt_end)
+        if len(df) == 0:
             logger.info(
-                "fetch day bars for industry/%s (%d/%d), (%s - %s]",
-                _name,
-                i + 1,
-                total_boards,
-                latest_dt,
-                dt,
-            )
-            df = ib.get_industry_bars(_name, latest_dt, dt_end)
-            if len(df) == 0:
-                logger.info(
-                    "no industry bars fetched from website for %s/%s, skip...",
-                    code,
-                    _name,
-                )
-                continue
-
-            df = df.rename(
-                columns={
-                    "日期": "frame",
-                    "开盘价": "open",
-                    "最高价": "high",
-                    "最低价": "low",
-                    "收盘价": "close",
-                    "成交量": "volume",
-                    "成交额": "amount",
-                }
-            )
-            df.insert(0, "code", f"{code}.THS")
-            bars = (
-                df[
-                    [
-                        "code",
-                        "frame",
-                        "open",
-                        "high",
-                        "low",
-                        "close",
-                        "volume",
-                        "amount",
-                    ]
-                ]
-                .to_records(index=False)
-                .astype(board_bars_dtype)
-            )
-
-            bars = bars[~np.isnan(bars["open"])]
-            await save_board_bars(bars)
-            logger.info(
-                "save day bars to influxdb for industry/%s (%s), bars: %d",
-                _name,
+                "no industry bars fetched from website for %s/%s, skip...",
                 code,
-                len(bars),
+                _name,
             )
-            await asyncio.sleep(3)
+            continue
 
-    except Exception as e:
-        logger.exception(e)
-        return False
+        df = df.rename(
+            columns={
+                "日期": "frame",
+                "开盘价": "open",
+                "最高价": "high",
+                "最低价": "low",
+                "收盘价": "close",
+                "成交量": "volume",
+                "成交额": "amount",
+            }
+        )
+        df.insert(0, "code", f"{code}.THS")
+        bars = (
+            df[
+                [
+                    "code",
+                    "frame",
+                    "open",
+                    "high",
+                    "low",
+                    "close",
+                    "volume",
+                    "amount",
+                ]
+            ]
+            .to_records(index=False)
+            .astype(board_bars_dtype)
+        )
+
+        bars = bars[~np.isnan(bars["open"])]
+        await save_board_bars(bars)
+        logger.info(
+            "save day bars to influxdb for industry/%s (%s), bars: %d",
+            _name,
+            code,
+            len(bars),
+        )
+        await asyncio.sleep(3)
 
     return True
 
@@ -133,84 +128,79 @@ async def fetch_industry_day_bars(dt: datetime.date):
 async def fetch_concept_day_bars(dt: datetime.date):
     logger.info("start fetch concept board day bars, %s...", dt)
 
-    try:
-        cb = ConceptBoard()
-        boards = cb.boards
-        total_boards = len(cb.boards)
-        for i, code in enumerate(boards["code"]):
-            _name = cb.get_name(code)
-            _added_dt = cb.get_created_time(code)
-            if _added_dt and _added_dt == dt:
-                logger.info("skip new added board: %s/%s", _name, code)
-                continue
+    cb = ConceptBoard()
+    boards = cb.boards
+    total_boards = len(cb.boards)
+    for i, code in enumerate(boards["code"]):
+        _name = cb.get_name(code)
+        _added_dt = cb.get_created_time(code)
+        if _added_dt and _added_dt == dt:
+            logger.info("skip new added board: %s/%s", _name, code)
+            continue
 
-            # 获取db中的最后一条记录时间
-            latest_dt = await get_latest_date_from_db(code)
-            if latest_dt == dt:
-                continue
+        # 获取db中的最后一条记录时间
+        latest_dt = await get_latest_date_from_db(code)
+        if latest_dt == dt:
+            continue
 
+        logger.info(
+            "fetch day bars for concept/%s (%d/%d), %s - %s",
+            _name,
+            i + 1,
+            total_boards,
+            latest_dt,
+            dt,
+        )
+        df = cb.get_concept_bars(_name, dt)
+        if len(df) == 0:
             logger.info(
-                "fetch day bars for concept/%s (%d/%d), %s - %s",
-                _name,
-                i + 1,
-                total_boards,
-                latest_dt,
-                dt,
-            )
-            df = cb.get_concept_bars(_name, dt)
-            if len(df) == 0:
-                logger.info(
-                    "no concept bars fetched from website for %s/%s, skip...",
-                    code,
-                    _name,
-                )
-                continue
-            new_df = df[df["日期"] > latest_dt]
-            if len(new_df) == 0:
-                continue
-
-            new_df = new_df.rename(
-                columns={
-                    "日期": "frame",
-                    "开盘价": "open",
-                    "最高价": "high",
-                    "最低价": "low",
-                    "收盘价": "close",
-                    "成交量": "volume",
-                    "成交额": "amount",
-                }
-            )
-            new_df.insert(0, "code", f"{code}.THS")
-            bars = (
-                new_df[
-                    [
-                        "code",
-                        "frame",
-                        "open",
-                        "high",
-                        "low",
-                        "close",
-                        "volume",
-                        "amount",
-                    ]
-                ]
-                .to_records(index=False)
-                .astype(board_bars_dtype)
-            )
-
-            bars = bars[~np.isnan(bars["open"])]
-            await save_board_bars(bars)
-            logger.info(
-                "save day bars to influxdb for concept/%s (%s), bars: %d",
-                _name,
+                "no concept bars fetched from website for %s/%s, skip...",
                 code,
-                len(bars),
+                _name,
             )
-            await asyncio.sleep(3)
+            continue
+        new_df = df[df["日期"] > latest_dt]
+        if len(new_df) == 0:
+            continue
 
-    except Exception as e:
-        logger.exception(e)
-        return False
+        new_df = new_df.rename(
+            columns={
+                "日期": "frame",
+                "开盘价": "open",
+                "最高价": "high",
+                "最低价": "low",
+                "收盘价": "close",
+                "成交量": "volume",
+                "成交额": "amount",
+            }
+        )
+        new_df.insert(0, "code", f"{code}.THS")
+        bars = (
+            new_df[
+                [
+                    "code",
+                    "frame",
+                    "open",
+                    "high",
+                    "low",
+                    "close",
+                    "volume",
+                    "amount",
+                ]
+            ]
+            .to_records(index=False)
+            .astype(board_bars_dtype)
+        )
+
+        bars = bars[~np.isnan(bars["open"])]
+        await save_board_bars(bars)
+        logger.info(
+            "save day bars to influxdb for concept/%s (%s), bars: %d",
+            _name,
+            code,
+            len(bars),
+        )
+        await asyncio.sleep(3)
 
     return True
 

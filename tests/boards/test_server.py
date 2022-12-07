@@ -66,16 +66,7 @@ class BoardsServerTest(unittest.IsolatedAsyncioTestCase):
         rc = sync_board_names("industry")
         self.assertFalse(rc)
 
-    async def test_fetch_industry_day_bars1(self):
-        cfg = cfg4py.get_instance()
-        _tmp_path = cfg.zarr.store_path
-        shutil.rmtree(_tmp_path, ignore_errors=True)
-
-        dt = datetime.date(2022, 12, 6)
-        rc = await fetch_industry_day_bars(dt)
-        self.assertFalse(rc)
-
-    async def test_fetch_industry_day_bars2(self):
+    async def test_fetch_industry_day_bars(self):
         name = "board_bars_1d"
         client = get_influx_client()
         await client.drop_measurement(name)
@@ -113,16 +104,7 @@ class BoardsServerTest(unittest.IsolatedAsyncioTestCase):
                 rc = await fetch_industry_day_bars(dt)
                 self.assertTrue(rc)
 
-    async def test_fetch_concept_day_bars1(self):
-        cfg = cfg4py.get_instance()
-        _tmp_path = cfg.zarr.store_path
-        shutil.rmtree(_tmp_path, ignore_errors=True)
-
-        dt = datetime.date(2022, 12, 5)
-        rc = await fetch_concept_day_bars(dt)
-        self.assertFalse(rc)
-
-    async def test_fetch_concept_day_bars2(self):
+    async def test_fetch_concept_day_bars(self):
         name = "board_bars_1d"
         client = get_influx_client()
         await client.drop_measurement(name)
