@@ -134,11 +134,11 @@ def list_boards(sub: str):
 
     if sub == "concept":
         cb = ConceptBoard()
-        for i, (_, code, name, count) in enumerate(cb.boards):
+        for i, (_, name, code, count) in enumerate(cb.boards):
             result.append((code, name, count.item()))
     elif sub == "industry":
         ib = IndustryBoard()
-        for i, (code, name, count) in enumerate(ib.boards):
+        for i, (name, code, count) in enumerate(ib.boards):
             result.append((code, name, count.item()))
 
     return result
