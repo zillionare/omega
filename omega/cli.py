@@ -131,7 +131,7 @@ def main():
         {
             "init": run(first_init),
             "worker": run(start_worker),
-            "webservice": run(start_webservice()),
+            "webservice": run(start_webservice),
         }
     )
 
