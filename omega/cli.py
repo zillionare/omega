@@ -101,6 +101,21 @@ async def start_worker():
     print("Omega worker process started ...")
 
 
+async def start_webservice():
+    print("prepare to start Omega webservice process ...")
+
+    subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "omega.webservice.app",
+        ],
+        stdout=subprocess.DEVNULL,
+    )
+
+    print("Omega webservice process started ...")
+
+
 def run(func):
     def wrapper(*args, **kwargs):
         asyncio.run(func(*args, **kwargs))
@@ -116,6 +131,7 @@ def main():
         {
             "init": run(first_init),
             "worker": run(start_worker),
+            "webservice": run(start_webservice()),
         }
     )
 
