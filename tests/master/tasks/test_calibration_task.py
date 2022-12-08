@@ -206,15 +206,28 @@ class TestSyncJobs_Calibration(unittest.IsolatedAsyncioTestCase):
     @mock.patch("omega.master.tasks.calibration_task.Security.get_xrxd_info")
     @mock.patch("omega.master.tasks.calibration_task.run_daily_bars_sync_task")
     async def test_sync_task_day_factor2(self, _run, _xrxd):
-        _xrxd.return_value = True
-        _run.return_value = False
+        async def mock_func(p1, **kwargs):
+            return True
+
+        async def mock_func2(p1, **kwargs):
+            return False
+
+        async def mail_notify_mock(subject, body, **kwargs):
+            return True
+
+        _xrxd.side_effect = mock_func
+        _run.side_effect = mock_func2
+
+        def mock_ding(p1, **kwargs):
+            return False
 
         with freeze_time("2022-09-08 15:00:00"):
             with mock.patch("omega.master.tasks.calibration_task.ding") as _ding:
-                _ding.return_value = True
+                _ding.side_effect = mock_ding
                 with mock.patch(
-                    "omega.master.tasks.calibration_task.mail_notify", return_value=True
-                ):
+                    "omega.master.tasks.calibration_task.mail_notify"
+                ) as _notify:
+                    _notify.side_effect = mail_notify_mock
                     rc = await sync_day_bar_factors()
                     self.assertIsNone(rc)
 
