@@ -64,7 +64,7 @@ def stock_board_concept_name_ths():
             return data
 
 
-@retry(Exception, tries=5, backoff=2, delay=30, logger=logger)
+@retry(Exception, tries=1, backoff=2, delay=5, logger=logger)
 def stock_board_industry_index_ths(name, start, end):
     logger.info("fetching industry board bars for %s", name)
     with contextlib.redirect_stderr(io.StringIO()):
@@ -76,7 +76,7 @@ def stock_board_industry_index_ths(name, start, end):
             return data
 
 
-@retry(Exception, tries=5, backoff=2, delay=30, logger=logger)
+@retry(Exception, tries=1, backoff=2, delay=5, logger=logger)
 def stock_board_concept_hist_ths(board_name, target_year):
     logger.info("fetching concept board bars for %s", board_name)
     with contextlib.redirect_stderr(io.StringIO()):

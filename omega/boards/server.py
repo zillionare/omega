@@ -74,6 +74,9 @@ async def fetch_industry_day_bars(dt: datetime.date, delay: int = 3):
             latest_dt,
             dt,
         )
+
+        await asyncio.sleep(delay)
+
         df = ib.get_industry_bars(_name, latest_dt, dt_end)
         if len(df) == 0:
             logger.info(
@@ -82,8 +85,11 @@ async def fetch_industry_day_bars(dt: datetime.date, delay: int = 3):
                 _name,
             )
             continue
+        new_df = df[df["日期"] > latest_dt]
+        if len(new_df) == 0:
+            continue
 
-        df = df.rename(
+        new_df = new_df.rename(
             columns={
                 "日期": "frame",
                 "开盘价": "open",
@@ -94,9 +100,9 @@ async def fetch_industry_day_bars(dt: datetime.date, delay: int = 3):
                 "成交额": "amount",
             }
         )
-        df.insert(0, "code", f"{code}.THS")
+        new_df.insert(0, "code", f"{code}.THS")
         bars = (
-            df[
+            new_df[
                 [
                     "code",
                     "frame",
@@ -120,7 +126,6 @@ async def fetch_industry_day_bars(dt: datetime.date, delay: int = 3):
             code,
             len(bars),
         )
-        await asyncio.sleep(delay)
 
     return True
 
@@ -151,6 +156,9 @@ async def fetch_concept_day_bars(dt: datetime.date, delay: int = 3):
             latest_dt,
             dt,
         )
+
+        await asyncio.sleep(delay)
+
         df = cb.get_concept_bars(_name, dt)
         if len(df) == 0:
             logger.info(
@@ -200,7 +208,6 @@ async def fetch_concept_day_bars(dt: datetime.date, delay: int = 3):
             code,
             len(bars),
         )
-        await asyncio.sleep(delay)
 
     return True
 
