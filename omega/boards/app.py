@@ -43,8 +43,6 @@ class AKShareFetcher(object):
         await omicron.close()
 
     async def fetch_day_bars(self, _type: str):
-        await self.init()
-
         # 显式初始化一次存储对象
         boards_init()
 
@@ -70,8 +68,6 @@ class AKShareFetcher(object):
         return True
 
     async def fetch_members(self, _type: str):
-        await self.init()
-
         # 显式初始化一次存储对象
         boards_init()
 
@@ -93,6 +89,7 @@ class AKShareFetcher(object):
 
 async def main_task(action: str):
     fetcher = AKShareFetcher()
+    await fetcher.init()
 
     if action == "sync_industry_bars":
         await fetcher.fetch_day_bars("industry")
