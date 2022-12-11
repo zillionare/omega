@@ -255,15 +255,15 @@ class Board:
                 df = stock_board_concept_cons_ths(symbol=name)
                 _data_size = len(df)
                 df["board"] = code
+                counts.append(_data_size)  # 更新成员数
                 members.append(df)
-                logger.info("industry %s members fetched: %d", name, _data_size)
+                logger.info("concept %s members fetched: %d", name, _data_size)
 
             # force waiting for 3 seconds
             time.sleep(delay)
 
-        # for industry board, ak won't return count of the board, had to do by ourself
-        if cls.category == "industry":
-            cls._store[f"{cls.category}/boards"]["members"] = counts
+        # 板块列表获取时，成员数不准确，此时更新为实际的数目
+        cls._store[f"{cls.category}/boards"]["members"] = counts
 
         # Notice: without calendar, we'll duplicate valuation/members in case of today is holiday
         today = arrow.now().format("YYYYMMDD")

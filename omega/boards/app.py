@@ -52,12 +52,6 @@ class AKShareFetcher(object):
 
         dt = TimeFrame.day_shift(now, 0)
 
-        # sync board name first
-        rc = sync_board_names(_type)
-        if not rc:
-            ding("sync %s board names failed." % _type)
-            return False
-
         if _type == "industry":
             # get day bars for industry items
             await fetch_industry_day_bars(dt)
