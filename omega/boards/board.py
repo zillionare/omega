@@ -196,6 +196,7 @@ class Board:
 
             if cls.category == "industry":
                 df = stock_board_industry_cons_ths(symbol=name)
+                df = df[df["代码"] != "暂无成份股数据"]
                 _data_size = len(df)
                 df["board"] = code
                 counts.append(_data_size)
@@ -253,6 +254,7 @@ class Board:
                         )
             else:
                 df = stock_board_concept_cons_ths(symbol=name)
+                df = df[df["代码"] != "暂无成份股数据"]
                 _data_size = len(df)
                 df["board"] = code
                 counts.append(_data_size)  # 更新成员数
