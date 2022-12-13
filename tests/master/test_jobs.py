@@ -14,7 +14,6 @@ import omicron
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from coretypes import FrameType, SecurityType
 from freezegun import freeze_time
-from more_itertools import side_effect
 from omicron.dal.cache import cache
 from omicron.dal.influx.influxclient import InfluxClient
 from omicron.models.stock import Stock
