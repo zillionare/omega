@@ -13,14 +13,12 @@ from omega.webservice.web_bp import (
     bp_admin_stock_info,
     bp_webapi_board_bars_info,
     bp_webapi_board_filter_members,
+    bp_webapi_board_fuzzy_match_name,
     bp_webapi_board_get_info,
-    bp_webapi_board_get_name,
     bp_webapi_board_info_by_sec,
     bp_webapi_board_list,
-    bp_webapi_cb_list_by_sec,
     bp_webapi_frame_count,
     bp_webapi_frame_shift,
-    bp_webapi_ib_list_by_sec,
 )
 from tests import init_test_env
 from tests.boards import concept_members, concept_names, industry_item_bars
@@ -115,28 +113,12 @@ class WebSvcBPTest(unittest.IsolatedAsyncioTestCase):
         request.json = {"board_type": "concept"}
         await bp_webapi_board_list(request)
 
-    async def test_bp_ib_list_by_sec(self):
+    async def test_bp_board_match_name(self):
         request = MockRequest()
-        await bp_webapi_ib_list_by_sec(request)
-
-        request.json = {"security": "000001.XSHE"}
-        with mock.patch("omega.webservice.web_bp.industry_info_by_sec") as f:
-            f.return_value = {}
-            await bp_webapi_ib_list_by_sec(request)
-
-    async def test_bp_cb_list_by_sec(self):
-        request = MockRequest()
-        await bp_webapi_cb_list_by_sec(request)
-
-        request.json = {"security": "002041.XSHE"}
-        await bp_webapi_cb_list_by_sec(request)
-
-    async def test_bp_board_get_name(self):
-        request = MockRequest()
-        await bp_webapi_board_get_name(request)
+        await bp_webapi_board_fuzzy_match_name(request)
 
         request.json = {"board_type": "concept", "pattern": "电"}
-        await bp_webapi_board_get_name(request)
+        await bp_webapi_board_fuzzy_match_name(request)
 
     async def test_bp_board_get_info(self):
         request = MockRequest()

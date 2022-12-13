@@ -79,8 +79,8 @@ async def bp_webapi_board_list(request):
     return response.json(rc)
 
 
-@bp_webapi.route("/board/get_name", methods=["POST"])
-async def bp_webapi_board_get_name(request):
+@bp_webapi.route("/board/fuzzy_match_name", methods=["POST"])
+async def bp_webapi_board_fuzzy_match_name(request):
     """模糊匹配板块或概念名称（中文）
 
     返回值：

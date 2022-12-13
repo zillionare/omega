@@ -190,23 +190,31 @@ async def load_cron_task(scheduler):
         sync_minute_bars,
         "cron",
         hour=11,
-        minute="0-31",  # 0-31，执行32次
+        minute="0-30",  # 0-30，执行31次
         second=10,
-        name=f"{FrameType.MIN1.value}:11:0-31",
+        name=f"{FrameType.MIN1.value}:11:0-30",
     )
     scheduler.add_job(
         sync_minute_bars,
         "cron",
-        hour="13-14",
+        hour=13,
+        minute="1-59",
+        second=10,
+        name=f"{FrameType.MIN1.value}:13:1-59",
+    )
+    scheduler.add_job(
+        sync_minute_bars,
+        "cron",
+        hour=14,
         minute="*",
         second=10,
-        name=f"{FrameType.MIN1.value}:13-14:*",
+        name=f"{FrameType.MIN1.value}:14:*",
     )
     scheduler.add_job(
         sync_minute_bars,
         "cron",
         hour=15,
-        minute="0-1",  # 15:00,15:01，执行2次
+        minute=0,  # 15:00, 执行1次
         second=10,
         name=f"{FrameType.MIN1.value}:15:00",
     )
