@@ -5,14 +5,11 @@ from typing import Any, List, Optional
 
 from coretypes import FrameType
 from omicron.extensions.decimals import math_round
+from omicron.models.board import Board
 from omicron.models.timeframe import TimeFrame
 
 from omega.boards.board import ConceptBoard, IndustryBoard
-from omega.boards.storage import (
-    calculate_ma_list,
-    calculate_rsi_list,
-    get_bars_in_range,
-)
+from omega.boards.storage import calculate_ma_list, calculate_rsi_list
 from omega.webservice.stockinfo import GlobalStockInfo
 
 logger = logging.getLogger(__name__)
@@ -140,32 +137,6 @@ def list_boards(sub: str):
     return result
 
 
-def concepts_info_by_sec(security: str):
-    # 给定股票名称，返回所属概念信息
-    bl = []
-    result = {"security": security, "bl": bl}
-
-    cb = ConceptBoard()
-    sec = security.split(".")[0]
-    for board in cb.get_boards(sec):
-        bl.append((board, cb.get_name(board)))
-
-    return result
-
-
-def industry_info_by_sec(security: str):
-    # 给定股票名称，返回所属行业信息
-    bl = []
-    result = {"security": security, "bl": bl}
-
-    ib = IndustryBoard()
-    sec = security.split(".")[0]
-    for board in ib.get_boards(sec):
-        bl.append((board, ib.get_name(board)))
-
-    return result
-
-
 def board_fuzzy_match(board_type: str, pattern: str):
     if board_type == "industry":
         handler = IndustryBoard()
@@ -265,7 +236,7 @@ async def get_board_bars_bycount(board_id: str, dt_end: datetime.date, n_bars: i
         _start = TimeFrame.shift(_end, -n_bars - 30, FrameType.DAY)
 
     board_info = {}
-    sec_data = await get_bars_in_range(board_id, _start, _end)
+    sec_data = await Board.get_bars_in_range(board_id, _start, _end)
     if len(sec_data) == 0:
         return board_info
 
@@ -282,7 +253,7 @@ async def get_board_bars_bycount(board_id: str, dt_end: datetime.date, n_bars: i
 
     k_bars = []
     for item in sec_data:
-        _date = item["_time"].item()
+        _date = item["frame"].item()
         _data = {
             "frame": _date.strftime("%Y-%m-%d %H:%M:%S"),
             "data": [

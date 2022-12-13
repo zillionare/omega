@@ -3,14 +3,11 @@ import datetime
 import logging
 
 import numpy as np
+from coretypes import Frame, FrameType, bars_dtype_with_code
+from omicron.models.board import Board
 from omicron.models.timeframe import TimeFrame
 
 from omega.boards.board import ConceptBoard, IndustryBoard
-from omega.boards.storage import (
-    board_bars_dtype,
-    get_latest_date_from_db,
-    save_board_bars,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +59,7 @@ async def fetch_industry_day_bars(dt: datetime.date, delay: int = 3):
     for i, code in enumerate(boards["code"]):
         _name = ib.get_name(code)
         # 获取db中的最后一条记录时间
-        latest_dt = await get_latest_date_from_db(code)
+        latest_dt = await Board.get_last_date_of_bars(code)
         if latest_dt == dt:
             continue
 
@@ -101,6 +98,7 @@ async def fetch_industry_day_bars(dt: datetime.date, delay: int = 3):
             }
         )
         new_df.insert(0, "code", f"{code}.THS")
+        new_df["factor"] = 1
         bars = (
             new_df[
                 [
@@ -112,14 +110,15 @@ async def fetch_industry_day_bars(dt: datetime.date, delay: int = 3):
                     "close",
                     "volume",
                     "amount",
+                    "factor",
                 ]
             ]
             .to_records(index=False)
-            .astype(board_bars_dtype)
+            .astype(bars_dtype_with_code)
         )
 
         bars = bars[~np.isnan(bars["open"])]
-        await save_board_bars(bars)
+        await Board.save_bars(bars)
         logger.info(
             "save day bars to influxdb for industry/%s (%s), bars: %d",
             _name,
@@ -144,7 +143,7 @@ async def fetch_concept_day_bars(dt: datetime.date, delay: int = 3):
             continue
 
         # 获取db中的最后一条记录时间
-        latest_dt = await get_latest_date_from_db(code)
+        latest_dt = await Board.get_last_date_of_bars(code)
         if latest_dt == dt:
             continue
 
@@ -183,6 +182,7 @@ async def fetch_concept_day_bars(dt: datetime.date, delay: int = 3):
             }
         )
         new_df.insert(0, "code", f"{code}.THS")
+        new_df["factor"] = 1
         bars = (
             new_df[
                 [
@@ -194,14 +194,15 @@ async def fetch_concept_day_bars(dt: datetime.date, delay: int = 3):
                     "close",
                     "volume",
                     "amount",
+                    "factor",
                 ]
             ]
             .to_records(index=False)
-            .astype(board_bars_dtype)
+            .astype(bars_dtype_with_code)
         )
 
         bars = bars[~np.isnan(bars["open"])]
-        await save_board_bars(bars)
+        await Board.save_bars(bars)
         logger.info(
             "save day bars to influxdb for concept/%s (%s), bars: %d",
             _name,

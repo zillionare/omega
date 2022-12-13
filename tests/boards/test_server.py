@@ -8,6 +8,7 @@ import cfg4py
 import omicron
 from freezegun import freeze_time
 from omicron.models import get_influx_client
+from omicron.models.board import Board
 
 from omega.boards.board import ConceptBoard, IndustryBoard
 from omega.boards.server import (
@@ -17,7 +18,6 @@ from omega.boards.server import (
     fetch_industry_day_bars,
     sync_board_names,
 )
-from omega.boards.storage import get_latest_date_from_db
 from tests import init_test_env
 from tests.boards import concept_names, industry_item_bars, industry_names
 
@@ -82,7 +82,7 @@ class BoardsServerTest(unittest.IsolatedAsyncioTestCase):
 
         dt = datetime.date(2022, 12, 6)
         dt2 = datetime.date(2022, 12, 2)
-        with mock.patch("omega.boards.server.get_latest_date_from_db") as f1:
+        with mock.patch("omicron.models.board.Board.get_last_date_of_bars") as f1:
             # force error 1
             f1.return_value = dt
             rc = await fetch_industry_day_bars(dt)
@@ -92,7 +92,7 @@ class BoardsServerTest(unittest.IsolatedAsyncioTestCase):
             with mock.patch("omega.boards.board.IndustryBoard.get_industry_bars") as f2:
                 # force error 2
                 f2.return_value = []
-                rc = await fetch_industry_day_bars(dt)
+                rc = await fetch_industry_day_bars(dt, delay=0)
                 self.assertTrue(rc)
 
                 # reading data from industry_item_bars
@@ -120,7 +120,7 @@ class BoardsServerTest(unittest.IsolatedAsyncioTestCase):
 
         dt = datetime.date(2022, 12, 5)
         dt2 = datetime.date(2022, 12, 2)
-        with mock.patch("omega.boards.server.get_latest_date_from_db") as f1:
+        with mock.patch("omicron.models.board.Board.get_last_date_of_bars") as f1:
             # 时间相等
             f1.return_value = dt2
             rc = await fetch_concept_day_bars(dt2)
@@ -130,13 +130,13 @@ class BoardsServerTest(unittest.IsolatedAsyncioTestCase):
             with mock.patch("omega.boards.board.ConceptBoard.get_concept_bars") as f2:
                 # 取不到数据
                 f2.return_value = []
-                rc = await fetch_concept_day_bars(datetime.date(2022, 5, 25))
+                rc = await fetch_concept_day_bars(datetime.date(2022, 5, 25), delay=0)
                 self.assertTrue(rc)
 
                 # reading data from industry_item_bars
                 f2.return_value = industry_item_bars
                 # 数据时间太旧
-                rc = await fetch_concept_day_bars(dt2)
+                rc = await fetch_concept_day_bars(dt2, delay=0)
                 self.assertTrue(rc)
             f1.return_value = datetime.date(2022, 11, 30)
             with mock.patch("omega.boards.board.ConceptBoard.get_concept_bars") as f2:
@@ -146,11 +146,11 @@ class BoardsServerTest(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue(rc)
 
         # test get_latest_date_from_db
-        dt = await get_latest_date_from_db("300435")
+        dt = await Board.get_last_date_of_bars("300435")
         self.assertEqual(dt, datetime.date(2022, 12, 5))
 
         # just for cov
-        dt = await get_latest_date_from_db("300535")
+        dt = await Board.get_last_date_of_bars("300535")
         self.assertLess(dt, datetime.date(2022, 12, 2))
 
     async def test_fetch_board_members(self):

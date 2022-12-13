@@ -6,11 +6,9 @@ from sanic import Blueprint, Sanic, response
 from omega.boards.webapi import (
     board_filter_members,
     board_fuzzy_match,
-    concepts_info_by_sec,
     get_board_bars_bycount,
     get_board_info_by_id,
     get_boards_by_sec,
-    industry_info_by_sec,
     list_boards,
 )
 from omega.webservice.stockinfo import frame_count, frame_shift, get_stock_info
@@ -78,26 +76,6 @@ async def bp_webapi_board_list(request):
         return response.json([])
 
     rc = list_boards(board_type)
-    return response.json(rc)
-
-
-@bp_webapi.route("/board/industry_list_by_sec", methods=["POST"])
-async def bp_webapi_ib_list_by_sec(request):
-    security = request.json.get("security", None)
-    if not security:
-        return response.json({})
-
-    rc = industry_info_by_sec(security)
-    return response.json(rc)
-
-
-@bp_webapi.route("/board/concept_list_by_sec", methods=["POST"])
-async def bp_webapi_cb_list_by_sec(request):
-    security = request.json.get("security", None)
-    if not security:
-        return response.json({})
-
-    rc = concepts_info_by_sec(security)
     return response.json(rc)
 
 
