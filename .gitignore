@@ -112,3 +112,4 @@ dev.env
 
 mydemo.py
 .tox_env
+omega/config/schema.py

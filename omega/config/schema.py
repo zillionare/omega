@@ -44,25 +44,7 @@ class Config(object):
         ver: Optional[int] = None
 
     class omega:
-        home: Optional[str] = None
-
-        class jobs:
-            port: Optional[int] = None
-
-        class urls:
-            quotes_server: Optional[str] = None
-
-            archive: Optional[str] = None
-
-        heartbeat: Optional[int] = None
-
-        class sync:
-            security_list: Optional[str] = None
-
-            calendar: Optional[str] = None
-
-            class bars:
-                cat: Optional[list] = None
+        http_port: Optional[int] = None
 
     quotes_fetchers: Optional[list] = None
 
@@ -81,6 +63,9 @@ class Config(object):
             secure: Optional[bool] = None
 
             bucket: Optional[str] = None
+
+    class zarr:
+        store_path: Optional[str] = None
 
     class influxdb:
         url: Optional[str] = None

@@ -35,7 +35,7 @@ logreceiver:
   max_bytes: 10M
 
 redis:
-  dsn: redis://${REDIS_HOST}:${REDIS_PORT}
+  dsn: redis://127.0.0.1:6379
 pickle:
   ver: 4
 
