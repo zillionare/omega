@@ -61,9 +61,9 @@ class BoardsStorageTest(unittest.IsolatedAsyncioTestCase):
 
         dt1 = datetime.date(2022, 1, 1)
         dt2 = datetime.date(2022, 12, 31)
-        bars = await Board.get_bars_in_range("300435.THS", dt1, dt2)
+        bars = await Board.get_bars_in_range("300435", dt1, dt2)
         self.assertIsNotNone(bars)
 
         dt3 = datetime.date(2022, 12, 5)
-        rc = await get_board_bars_bycount("300435.THS", dt3, 251)
+        rc = await get_board_bars_bycount("300435", dt3, 251)
         self.assertIsNotNone(rc)

@@ -90,7 +90,7 @@ def stock_board_concept_hist_ths(board_name, target_year):
             return data
 
 
-class Board:
+class BaseBoard:
     """行业板块及概念板块基类
 
     数据组织：
@@ -574,11 +574,11 @@ class Board:
         return final_result
 
 
-class IndustryBoard(Board):
+class IndustryBoard(BaseBoard):
     category = "industry"
 
 
-class ConceptBoard(Board):
+class ConceptBoard(BaseBoard):
     category = "concept"
 
     def find_new_concept_boards(self, days=10) -> pd.DataFrame:

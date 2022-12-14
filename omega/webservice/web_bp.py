@@ -192,8 +192,7 @@ async def bp_webapi_board_bars_info(request):
     if n_bars < 5:
         n_bars = 5
 
-    _code = f"{code}.THS"
-    rc = await get_board_bars_bycount(_code, dt_end, n_bars)
+    rc = await get_board_bars_bycount(code, dt_end, n_bars)
     return response.json(rc)
 
 
