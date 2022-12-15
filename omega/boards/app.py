@@ -76,7 +76,10 @@ class AKShareFetcher(object):
             return False
 
         # get day bars for board items
-        await fetch_board_members(_type)
+        rc = await fetch_board_members(_type)
+        if not rc:
+            ding(f"fetch members for {_type} failed")
+            return False
 
         return True
 

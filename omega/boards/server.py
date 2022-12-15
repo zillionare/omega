@@ -223,5 +223,7 @@ async def fetch_board_members(board_type: str):
             ConceptBoard.fetch_board_members()
     except Exception as e:
         logger.exception(e)
+        return False
 
     logger.info("sync %s board members finished...", board_type)
+    return True
