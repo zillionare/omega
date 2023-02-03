@@ -49,6 +49,15 @@ async def start_logging():
         return receiver
 
 
+async def on_logger_exit():
+    print("omega logger service is shutdowning...")
+
+    if receiver is not None:
+        await receiver.stop()
+
+    print("omega logger service shutdowned successfully")
+
+
 async def check_running():
     """检查master process是否已经运行。
 
@@ -58,8 +67,8 @@ async def check_running():
         await omicron.cache.init()
         success = await omicron.cache.sys.setnx(PROC_LOCK_OMEGA_MASTER, 1)
         if not success:
-            print("omega master is already running, exiting...")
-            os._exit(1)
+            print("omega master is already running...")
+            # os._exit(1)
     finally:
         await omicron.cache.close()
 
@@ -84,7 +93,7 @@ async def init():
 
     await check_running()
     # logger receiver使用单独的redis配置项，可以先行启动
-    await start_logging()
+    # await start_logging()
     logger.info("init omega-master process with config at %s", config_dir)
 
     # try to load omicron and init redis connection pool
@@ -150,5 +159,26 @@ def start():  # pragma: no cover
     loop.close()
 
 
+def start_logger():
+    logger.info("starting omega logger service ...")
+    loop = asyncio.get_event_loop()
+
+    for s in {signal.SIGINT, signal.SIGTERM, signal.SIGQUIT}:
+        loop.add_signal_handler(s, functools.partial(stop, loop))
+
+    loop.create_task(start_logging())
+    try:
+        loop.run_forever()
+    finally:
+        loop.run_until_complete(on_logger_exit())
+
+    loop.close()
+
+
 if __name__ == "__main__":
-    fire.Fire({"start": start})
+    fire.Fire(
+        {
+            "start": start,
+            "logger": start_logger,
+        }
+    )
