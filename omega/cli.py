@@ -132,6 +132,19 @@ async def start_logger():
     print("Omega logger process started ...")
 
 
+async def import_local_data():
+    print("正在初始化系统数据...")
+
+    config_dir = get_config_dir()
+    cfg4py.init(config_dir, False)
+
+    from omega.dataimporter.datascanner import data_importer
+
+    await data_importer()
+
+    print("系统数据初始化完毕...")
+
+
 def run(func):
     def wrapper(*args, **kwargs):
         asyncio.run(func(*args, **kwargs))
@@ -149,6 +162,7 @@ def main():
             "worker": run(start_worker),
             "webservice": run(start_webservice),
             "logger": run(start_logger),
+            "importdata": run(import_local_data),
         }
     )
 
