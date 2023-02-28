@@ -1,15 +1,10 @@
 import datetime
-import glob
 import logging
-import os
 import pickle
 
-import aioredis
 import arrow
 import cfg4py
-import numpy as np
-from coretypes import FrameType, bars_dtype
-from omicron.models.timeframe import TimeFrame
+from coretypes import FrameType
 
 cfg = cfg4py.get_instance()
 logger = logging.getLogger(__name__)
@@ -50,7 +45,6 @@ async def load_calendar(redis, base_dir: str):
 
 
 async def load_security_list(redis, base_dir: str, ts: datetime.date):
-    # files = glob.glob("")
     target_file = f"{base_dir}/redis_seclist.pik"
     with open(target_file, "rb") as f:
         key = "security:latest_date"

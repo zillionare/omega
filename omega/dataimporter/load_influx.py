@@ -49,54 +49,149 @@ dtype_bars_day = [
 
 def decode_sec_code(code_c: int):
     if code_c > 2000000:
-        return f"{code_c}.XSHG"
+        _tmp = f"{code_c}.XSHG"
+        return _tmp[1:]
     else:
-        return f"{code_c}.XSHE"
+        _tmp = f"{code_c}.XSHE"
+        return _tmp[1:]
 
 
 def decode_board_code(code_c: int):
     return f"{code_c}.THS"
 
 
-async def save_sec_xrxd_info(records):
-    measurement = "security_xrxd_reports"
-    client = get_influx_client()
-    # _time, code, info
-    report_list = np.array(records, dtype=dtype_sec_list)
-    await client.save(report_list, measurement, time_key="_time", tag_keys=["code"])
-
-
 async def save_sec_list(records):
     measurement = "security_list"
     client = get_influx_client()
     # _time, code, info
-    report_list = np.array(records, dtype=dtype_sec_list)
+
+    converted_list = []
+    for x in records:
+        code = decode_sec_code(x["code"])
+        converted_list.append((x["_time"], code, x["info"]))
+
+    report_list = np.array(converted_list, dtype=dtype_sec_list)
     await client.save(report_list, measurement, time_key="_time", tag_keys=["code"])
+    logger.info("%d records saved into %s", len(report_list), measurement)
 
 
-async def save_board_bars(records):
-    measurement = "board_bars_1d"
+async def save_sec_xrxd_info(records):
+    measurement = "security_xrxd_reports"
     client = get_influx_client()
-    report_list = np.array(records, dtype=dtype_bars_min)
-    await client.save(report_list, measurement, time_key="frame", tag_keys=["code"])
+    # _time, code, info
 
+    converted_list = []
+    for x in records:
+        code = decode_sec_code(x["code"])
+        converted_list.append((x["_time"], code, x["info"]))
 
-async def save_bars_30m(records):
-    measurement = "stock_bars_30m"
-    client = get_influx_client()
-    report_list = np.array(records, dtype=dtype_bars_min)
-    await client.save(report_list, measurement, time_key="frame", tag_keys=["code"])
+    report_list = np.array(converted_list, dtype=dtype_sec_list)
+    await client.save(report_list, measurement, time_key="_time", tag_keys=["code"])
+    logger.info("%d records saved into %s", len(report_list), measurement)
 
 
 async def save_bars_1d(records):
     measurement = "stock_bars_1d"
     client = get_influx_client()
-    report_list = np.array(records, dtype=dtype_bars_day)
+
+    converted_list = []
+    for x in records:
+        code = decode_sec_code(x["code"])
+        converted_list.append(
+            (
+                x["frame"],
+                code,
+                x["open"],
+                x["close"],
+                x["high"],
+                x["low"],
+                x["high_limit"],
+                x["low_limit"],
+                x["volume"],
+                x["amount"],
+                x["factor"],
+            )
+        )
+
+    report_list = np.array(converted_list, dtype=dtype_bars_day)
     await client.save(report_list, measurement, time_key="frame", tag_keys=["code"])
+    logger.info("%d records saved into %s", len(report_list), measurement)
 
 
 async def save_bars_week_month(records, ft: FrameType):
     measurement = "stock_bars_%s" % ft.value
     client = get_influx_client()
-    report_list = np.array(records, dtype=dtype_bars_min)
+
+    converted_list = []
+    for x in records:
+        code = decode_sec_code(x["code"])
+        converted_list.append(
+            (
+                x["frame"],
+                code,
+                x["open"],
+                x["high"],
+                x["low"],
+                x["close"],
+                x["volume"],
+                x["amount"],
+                x["factor"],
+            )
+        )
+
+    report_list = np.array(converted_list, dtype=dtype_bars_min)
     await client.save(report_list, measurement, time_key="frame", tag_keys=["code"])
+    logger.info("%d records saved into %s", len(report_list), measurement)
+
+
+async def save_bars_30m(records):
+    measurement = "stock_bars_30m"
+    client = get_influx_client()
+
+    converted_list = []
+    for x in records:
+        code = decode_sec_code(x["code"])
+        converted_list.append(
+            (
+                x["frame"],
+                code,
+                x["open"],
+                x["high"],
+                x["low"],
+                x["close"],
+                x["volume"],
+                x["amount"],
+                x["factor"],
+            )
+        )
+
+    report_list = np.array(converted_list, dtype=dtype_bars_min)
+    await client.save(report_list, measurement, time_key="frame", tag_keys=["code"])
+    logger.info("%d records saved into %s", len(report_list), measurement)
+
+
+async def save_board_bars(records):
+    measurement = "board_bars_1d"
+    client = get_influx_client()
+    await client.drop_measurement(measurement)
+
+    converted_list = []
+    for x in records:
+        code = decode_board_code(x["code"])
+        converted_list.append(
+            (
+                x["frame"],
+                code,
+                x["open"],
+                x["high"],
+                x["low"],
+                x["close"],
+                x["volume"],
+                x["amount"],
+                x["factor"],
+            )
+        )
+
+    report_list = np.array(converted_list, dtype=dtype_bars_min)
+    await client.save(report_list, measurement, time_key="frame", tag_keys=["code"])
+    logger.info("%d records saved into %s", len(report_list), measurement)
