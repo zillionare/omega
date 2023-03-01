@@ -60,6 +60,17 @@ def decode_board_code(code_c: int):
     return f"{code_c}.THS"
 
 
+async def clear_all_tables():
+    client = get_influx_client()
+    await client.drop_measurement("security_list")
+    await client.drop_measurement("security_xrxd_reports")
+    await client.drop_measurement("board_bars_1d")
+    await client.drop_measurement("board_bars_1w")
+    await client.drop_measurement("board_bars_1M")
+    await client.drop_measurement("board_bars_30m")
+    await client.drop_measurement("board_bars_1d")
+
+
 async def save_sec_list(records):
     measurement = "security_list"
     client = get_influx_client()
@@ -173,7 +184,6 @@ async def save_bars_30m(records):
 async def save_board_bars(records):
     measurement = "board_bars_1d"
     client = get_influx_client()
-    await client.drop_measurement(measurement)
 
     converted_list = []
     for x in records:

@@ -18,6 +18,7 @@ from omega.dataimporter.load_cache import (
     read_timestamp,
 )
 from omega.dataimporter.load_influx import (
+    clear_all_tables,
     save_bars_1d,
     save_bars_30m,
     save_bars_week_month,
@@ -75,6 +76,7 @@ async def data_importer():
     """
 
     base_folder = cfg.omega.local_data
+    logger.info("local data folder: %s", base_folder)
 
     rc = await load_cache_data(base_folder)
     if rc != 0:
@@ -86,41 +88,46 @@ async def data_importer():
     await omicron.init()
 
     logger.info("loading influx records...")
+
+    # await clear_all_tables()
+
     # begin to import influx records
-    #  files = glob.glob(f"{base_folder}/seclist_*.pik")
-    files = []
+    files = glob.glob(f"{base_folder}/seclist_*.pik")
     for fname in files:
         logger.info("loading sec list file: %s", fname)
         with open(fname, "rb") as f:
             records = pickle.load(f)
             await save_sec_list(records)
 
-    # files = glob.glob(f"{base_folder}/sec_xrxd_*.pik")
-    files = []
+    files = glob.glob(f"{base_folder}/sec_xrxd_*.pik")
     for fname in files:
         logger.info("loading sec xrxd info file: %s", fname)
         with open(fname, "rb") as f:
             records = pickle.load(f)
             await save_sec_xrxd_info(records)
 
-    # files = glob.glob(f"{base_folder}/bars_1d_2023_h1.pik")
-    files = []
+    files = glob.glob(f"{base_folder}/bars_1d_*.pik")
     for fname in files:
         logger.info("loading bars:1d info file: %s", fname)
         with open(fname, "rb") as f:
             records = pickle.load(f)
             await save_bars_1d(records)
 
-    # files = glob.glob(f"{base_folder}/bars_1w_2023.pik")
-    files = []
+    files = glob.glob(f"{base_folder}/bars_1w_*.pik")
     for fname in files:
         logger.info("loading bars:1w info file: %s", fname)
         with open(fname, "rb") as f:
             records = pickle.load(f)
             await save_bars_week_month(records, FrameType.WEEK)
 
-    # files = glob.glob(f"{base_folder}/bars_30m_2023_q1.pik")
-    files = []
+    files = glob.glob(f"{base_folder}/bars_1M_*.pik")
+    for fname in files:
+        logger.info("loading bars:1M info file: %s", fname)
+        with open(fname, "rb") as f:
+            records = pickle.load(f)
+            await save_bars_week_month(records, FrameType.MONTH)
+
+    files = glob.glob(f"{base_folder}/bars_30m_*.pik")
     for fname in files:
         logger.info("loading bars:30m info file: %s", fname)
         with open(fname, "rb") as f:
@@ -128,8 +135,7 @@ async def data_importer():
             await save_bars_30m(records)
 
     logger.info("loading board info...")
-    files = glob.glob(f"{base_folder}/board_2023.pik")
-    # files = []
+    files = glob.glob(f"{base_folder}/board_*.pik")
     for fname in files:
         logger.info("loading board bars info file: %s", fname)
         with open(fname, "rb") as f:
@@ -137,5 +143,8 @@ async def data_importer():
             await save_board_bars(records)
 
     # import board zarr files
+    # dst: store_path: /zillionare/boards.zarr
+    dst_folder = cfg.zarr.store_path
+    logger.info("copy zarr data to %s", dst_folder)
 
     return True
