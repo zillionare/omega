@@ -16,6 +16,7 @@ from omega.dataimporter.load_cache import (
     load_calendar,
     load_security_list,
     read_timestamp,
+    set_cache_ts_for_records,
 )
 from omega.dataimporter.load_influx import (
     clear_all_tables,
@@ -31,26 +32,12 @@ cfg = cfg4py.get_instance()
 logger = logging.getLogger(__name__)
 
 
-async def load_cache_data(base_folder: dir):
-    # check redis
-    redis = aioredis.from_url(
-        cfg.redis.dsn, encoding="utf-8", decode_responses=True, db=1
-    )
-
+async def load_cache_data(base_folder, redis, latest_ts):
     # 检查calendar:1d的长度，正常大于4000
     count = await redis.llen("calendar:1d")
     if count and count > 4800:
         logger.info("calendar info found in redis, skip importing")
         return 0
-
-    logger.info("begin to import local data...")
-    file = path.normpath(path.join(base_folder, "timestamp.txt"))
-
-    # 读取文件中的时间戳，比如2023.2.10
-    latest_ts = read_timestamp(file)
-    if not latest_ts:
-        logger.error("no timestamp found in local folder, exit...")
-        return -1
 
     # 加载redis的核心数据
     try:
@@ -63,32 +50,10 @@ async def load_cache_data(base_folder: dir):
         if redis:
             await redis.close()
 
-    return 0
+    return 1
 
 
-async def data_importer():
-    """重建数据的步骤
-    1. 判断redis中是否有日历和证券列表，如果没有，从本地文件读取所有的历史数据，并导入，并恢复redis中的各项时间指针
-    2. 判断redis中是否有时间指针，如果没有，重新创建全部数据
-    3. 重建数据时，对分钟线的时间指针强行设定为最新时刻
-    4. 没有配置聚宽账号时，跳过所有数据的同步动作
-    5. 时间指针有head选项的，统一指向2005.1.4，tail选项指向历史数据的最后时间，比如2023.2.10
-    """
-
-    base_folder = cfg.omega.local_data
-    logger.info("local data folder: %s", base_folder)
-
-    rc = await load_cache_data(base_folder)
-    if rc != 0:
-        logger.error("failed to load cache data first.")
-        os._exit(1)
-
-    # load omicron
-    logger.info("loading omicron...")
-    await omicron.init()
-
-    logger.info("loading influx records...")
-
+async def load_influx_data(base_folder, redis, latest_ts):
     # await clear_all_tables()
 
     # begin to import influx records
@@ -142,9 +107,60 @@ async def data_importer():
             records = pickle.load(f)
             await save_board_bars(records)
 
-    # import board zarr files
-    # dst: store_path: /zillionare/boards.zarr
-    dst_folder = cfg.zarr.store_path
-    logger.info("copy zarr data to %s", dst_folder)
+    logger.info("setting timestamp for influx records...")
+    await set_cache_ts_for_records(redis, latest_ts)
 
-    return True
+
+async def data_importer():
+    """重建数据的步骤
+    1. 判断redis中是否有日历和证券列表，如果没有，从本地文件读取所有的历史数据，并导入，并恢复redis中的各项时间指针
+    2. 判断redis中是否有时间指针，如果没有，重新创建全部数据
+    3. 重建数据时，对分钟线的时间指针强行设定为最新时刻
+    4. 没有配置聚宽账号时，跳过所有数据的同步动作
+    5. 时间指针有head选项的，统一指向2005.1.4，tail选项指向历史数据的最后时间，比如2023.2.10
+    """
+
+    base_folder = cfg.omega.local_data
+    logger.info("local data folder: %s", base_folder)
+
+    # 读取文件中的时间戳，比如2023.2.10
+    file = path.normpath(path.join(base_folder, "timestamp.txt"))
+    latest_ts = read_timestamp(file)
+    if not latest_ts:
+        logger.error("no timestamp found in local folder, exit...")
+        return -1
+
+    redis0 = aioredis.from_url(
+        cfg.redis.dsn, encoding="utf-8", decode_responses=True, db=0
+    )
+
+    redis1 = aioredis.from_url(
+        cfg.redis.dsn, encoding="utf-8", decode_responses=True, db=1
+    )
+
+    try:
+        logger.info("begin to import local data...")
+
+        rc = await load_cache_data(base_folder, redis1, latest_ts)
+        if rc == 0:
+            logger.info("data in cache and influx found, skip loading")
+            return 0
+
+        # load omicron
+        logger.info("loading omicron...")
+        await omicron.init()
+
+        logger.info("loading influx records...")
+        await load_influx_data(base_folder, redis0, latest_ts)
+
+        # import board zarr files
+        # dst: store_path: /zillionare/boards.zarr
+        dst_folder = cfg.zarr.store_path
+        logger.info("copy zarr data to %s", dst_folder)
+    finally:
+        if redis0:
+            await redis0.close()
+        if redis1:
+            await redis1.close()
+
+    return 0

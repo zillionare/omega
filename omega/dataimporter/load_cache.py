@@ -5,6 +5,7 @@ import pickle
 import arrow
 import cfg4py
 from coretypes import FrameType
+from omicron.models.timeframe import TimeFrame
 
 cfg = cfg4py.get_instance()
 logger = logging.getLogger(__name__)
@@ -59,3 +60,30 @@ async def load_security_list(redis, base_dir: str, ts: datetime.date):
         await pl.execute()
 
     logger.info("security:all loaded: %s", target_file)
+
+
+async def set_cache_ts_for_records(redis, ts: datetime.date):
+    ts_str = ts.strftime("%Y-%m-%d")
+
+    # security list
+    await redis.set("jobs.secs_sync.archive.head", "2005-01-04")
+    await redis.set("jobs.secs_sync.archive.tail", ts_str)
+
+    # bars:1d
+    await redis.set("jobs.bars_sync.day.head", "2005-01-04")
+    await redis.set("jobs.bars_sync.day.tail", ts_str)
+
+    # bars:1d
+    await redis.set("jobs.bars_sync.archive.head", "2005-01-04")
+    await redis.set("jobs.bars_sync.archive.tail", ts_str)
+
+    await redis.set("jobs.bars_sync.min_5_15_30_60.tail", ts_str)
+    await redis.set("jobs.bars_sync.trade_price.tail", ts_str)
+
+    week_ts = TimeFrame.week_shift(ts, 0)
+    await redis.set("jobs.bars_sync.week.tail", week_ts.strftime("%Y-%m-%d"))
+
+    month_ts = TimeFrame.month_shift(ts, 0)
+    await redis.set("jobs.bars_sync.month.tail", month_ts.strftime("%Y-%m-%d"))
+
+    logger.info("all timestamp for influx records are set in cache.")
