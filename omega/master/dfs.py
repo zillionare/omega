@@ -90,6 +90,9 @@ class Storage:
 class MinioStorage(AbstractStorage):
     def __init__(self, bucket=None, readonly=False):
         """初始化minio连接，检查bucket 是否存在"""
+        if cfg.dfs.minio.access.startswith("ERROR"):
+            return None
+
         self.client = Minio(
             endpoint=f"{cfg.dfs.minio.host}:{cfg.dfs.minio.port}",
             access_key=cfg.dfs.minio.access,
@@ -106,6 +109,9 @@ class MinioStorage(AbstractStorage):
 
     def create_bucket(self):
         # 调用make_bucket来创建一个存储桶。
+        if self.client is None:
+            return
+
         exists = self.client.bucket_exists(self.bucket)
         if not exists:
             self.client.make_bucket(self.bucket)
@@ -114,6 +120,9 @@ class MinioStorage(AbstractStorage):
 
     async def delete_bucket(self):
         """删除bucket"""
+        if self.client is None:
+            return
+
         self.client.remove_bucket(self.bucket)
 
     @retry(stop_max_attempt_number=5)
@@ -122,6 +131,9 @@ class MinioStorage(AbstractStorage):
         filename: str,
         bar: bytes,
     ):
+        if self.client is None:
+            return None
+
         # filename = self.get_filename(prefix, dt, frame_type)
         data = io.BytesIO(bar)
         ret = self.client.put_object(self.bucket, filename, data, length=len(bar))
@@ -129,9 +141,15 @@ class MinioStorage(AbstractStorage):
         return ret
 
     async def read(self, filename: str) -> np.array:
+        if self.client is None:
+            return None
+
         response = self.client.get_object(self.bucket, filename)
         return response.read()
 
     async def delete(self, filename: str):
+        if self.client is None:
+            return False
+
         self.client.remove_object(self.bucket, filename)
         return True
