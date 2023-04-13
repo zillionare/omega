@@ -152,11 +152,6 @@ async def data_importer():
 
         logger.info("loading influx records...")
         await load_influx_data(base_folder, redis0, latest_ts)
-
-        # import board zarr files
-        # dst: store_path: /zillionare/boards.zarr
-        dst_folder = cfg.zarr.store_path
-        logger.info("copy zarr data to %s", dst_folder)
     finally:
         if redis0:
             await redis0.close()
