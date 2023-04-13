@@ -80,6 +80,12 @@ async def set_cache_ts_for_records(redis, ts: datetime.date):
     await redis.set("jobs.bars_sync.min_5_15_30_60.tail", ts_str)
     await redis.set("jobs.bars_sync.trade_price.tail", ts_str)
 
+    now = datetime.datetime.now()
+    min_ts = TimeFrame.day_shift(now, -1)
+    # 减少分钟线下载开销，强制对齐到上一个交易日结束
+    ts_min_str = min_ts.strftime("%Y-%m-%d 15:00:00")
+    await redis.set("master.bars_sync.minute.tail", ts_min_str)
+
     week_ts = TimeFrame.week_shift(ts, 0)
     await redis.set("jobs.bars_sync.week.tail", week_ts.strftime("%Y-%m-%d"))
 

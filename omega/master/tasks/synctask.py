@@ -333,12 +333,30 @@ class BarsSyncTask:
         return list(set(failed))
 
 
+def _check_fetcher_cfg():
+    # 若无正确的fetcher配置，拒绝启动worker进程
+    cfg = cfg4py.get_instance()
+
+    if not cfg.quotes_fetchers:  # 无数据子项（仅节点）
+        return False
+
+    fetcher = cfg.quotes_fetchers[0]
+    password = fetcher.get("password")
+    if password.startswith("ERROR"):  # 无密码配置
+        return False
+
+    return True
+
+
 def master_syncbars_task():
     def inner(f):
         @wraps(f)
         async def decorated_function():
             """装饰所有生产者"""
             try:
+                if not _check_fetcher_cfg():
+                    return None
+
                 ret = await f()
                 return ret
             except Exception as e:  # pragma: no cover
