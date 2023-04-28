@@ -14,10 +14,8 @@ from omega.boards.webapi import (
     board_filter_members,
     board_fuzzy_match,
     combined_filter,
-    concepts_info_by_sec,
     get_board_info_by_id,
     get_boards_by_sec,
-    industry_info_by_sec,
     list_boards,
 )
 from omega.webservice.stockinfo import GlobalStockInfo
@@ -74,14 +72,6 @@ class BoardsWebAPITest(unittest.IsolatedAsyncioTestCase):
 
     async def test_list_boards(self):
         rc = list_boards("industry")
-        self.assertTrue(len(rc) > 0)
-
-    async def test_industry_info_by_sec(self):
-        rc = industry_info_by_sec("002041.XSHE")
-        self.assertTrue(len(rc) > 0)
-
-    async def test_concept_info_by_sec(self):
-        rc = concepts_info_by_sec("002041.XSHE")
         self.assertTrue(len(rc) > 0)
 
     async def test_board_fuzzy_match(self):

@@ -12,7 +12,6 @@ import rlog
 
 import omega
 from omega.core.constants import PROC_LOCK_OMEGA_MASTER
-from omega.master.app import start_logging
 from tests import init_test_env
 
 
@@ -64,6 +63,8 @@ class AppTest(unittest.IsolatedAsyncioTestCase):
             formatter=logging.Formatter(fmt),
         )
         redis_logger.addHandler(handler)
+
+        from omega.master.app import start_logging
 
         receiver = await start_logging()
         msg = "redis log receiving should be ready"
