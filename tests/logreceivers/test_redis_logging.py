@@ -3,6 +3,7 @@ import logging
 import os
 import shutil
 import unittest
+from unittest import mock
 
 import rlog
 
@@ -12,7 +13,7 @@ from tests import init_test_env
 
 class TestRedisLogging(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
-        self.cfg = init_test_env()
+        self.cfg = await init_test_env()
 
     async def test_redis_logging(self):
         # remove handlers set by config file, if there is.
@@ -52,3 +53,15 @@ class TestRedisLogging(unittest.IsolatedAsyncioTestCase):
             content = f.readlines()[0]
             msg = content.split("|")[1]
             self.assertEqual(" this is 2th test log\n", msg)
+
+        # test if we can not create specified directory
+        with mock.patch("os.makedirs", side_effect=OSError):
+            receiver = RedisLogReceiver(
+                dsn="redis://localhost:6379",
+                channel_name=channel,
+                filename="/tmp/omega.log",
+                max_bytes=20,
+                backup_count=2,
+            )
+            self.assertEqual(receiver._filename, "omega.log")
+            self.assertEqual(receiver._dir, "/tmp")

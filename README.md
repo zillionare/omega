@@ -5,7 +5,7 @@
 [![CI Status](https://github.com/zillionare/omega/actions/workflows/release.yml/badge.svg?branch=release)](https://github.com/zillionare/omega)
 [![Code Coverage](https://img.shields.io/codecov/c/github/zillionare/omega)](https://app.codecov.io/gh/zillionare/omega)
 [![ReadtheDos](https://readthedocs.org/projects/omega/badge/?version=latest)](https://omega.readthedocs.io/en/latest/?badge=latest)
-[![Dowloads](https://pepy.tech/badge/zillionare-omega)](https://pepy.tech/project/zillionare-omega)
+[![Downloads](https://pepy.tech/badge/zillionare-omega)](https://pepy.tech/project/zillionare-omega)
 [![License](https://img.shields.io/badge/License-MIT.svg)](https://opensource.org/licenses/MIT)
 [![Style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 

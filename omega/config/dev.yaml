@@ -1,9 +1,77 @@
+logging:
+  version: 1
+  disable_existing_loggers: false
+  formatters:
+    default:
+      format: '%(asctime)s %(levelname)-1.1s %(process)d %(name)s:%(funcName)s:%(lineno)s | %(message)s'
+  handlers:
+    console:
+      class: logging.StreamHandler
+      formatter: default
+    redis:
+      class: rlog.RedisHandler
+      formatter: default
+      host: localhost
+      port: 6379
+      channel: omega.log
+  loggers:
+    apscheduler:
+      level: INFO
+    pyemit:
+      level: INFO
+  root:
+    handlers:
+      - redis
+    level: INFO
+
+tz: Asia/Shanghai
+
+logreceiver:
+  klass: omega.logging.receiver.redis.RedisLogReceiver
+  dsn: redis://localhost:6379
+  channel: omega.log
+  filename: /tmp/log/zillionare/omega.log
+  backup_count: 7
+  max_bytes: 10M
+
+redis:
+  dsn: redis://127.0.0.1:6379
+pickle:
+  ver: 4
+
 omega:
-  sync:
-    bars:
-      - frame: '1d'
-        start: '2020-12-1'
-        delay: 0 # delay * seconds after the frame is done
-        include: 000001.XSHE
-      - frame: '30m'
-        include: 000001.XSHG 000001.XSHE
+  http_port: 3180
+
+quotes_fetchers:
+  - impl: jqadaptor    # there must be a create_instance method in this module
+    account: test
+    password: test
+
+dfs:
+  engine: minio
+  minio:
+    host: localhost
+    port: 9000
+    access: minioadmin
+    secret: minioadmin
+    secure: false
+    bucket: zillionare
+
+zarr:
+  store_path: /tmp/boards.zarr
+
+influxdb:
+  url: http://localhost:8086
+  token: my-token
+  org: my-org
+  bucket_name: my-bucket
+  enable_compress: true
+  max_query_size: 15000
+
+notify:
+    mail_from: ${MAIL_FROM}
+    mail_to:
+        - ${MAIL_TO}
+    mail_server: ${MAIL_SERVER}
+    dingtalk_access_token: ${DINGTALK_ACCESS_TOKEN}
+    dingtalk_secret: ${DINGTALK_SECRET}

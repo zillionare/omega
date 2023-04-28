@@ -40,32 +40,53 @@ class Config(object):
     class redis:
         dsn: Optional[str] = None
 
-    class postgres:
-        dsn: Optional[str] = None
-
-        enabled: Optional[bool] = None
-
     class pickle:
         ver: Optional[int] = None
 
     class omega:
-        home: Optional[str] = None
-
-        class jobs:
-            port: Optional[int] = None
-
-        class urls:
-            quotes_server: Optional[str] = None
-
-            archive: Optional[str] = None
-
-        heartbeat: Optional[int] = None
-
-        class sync:
-            security_list: Optional[str] = None
-
-            calendar: Optional[str] = None
-
-            bars: Optional[list] = None
+        http_port: Optional[int] = None
 
     quotes_fetchers: Optional[list] = None
+
+    class dfs:
+        engine: Optional[str] = None
+
+        class minio:
+            host: Optional[str] = None
+
+            port: Optional[int] = None
+
+            access: Optional[str] = None
+
+            secret: Optional[str] = None
+
+            secure: Optional[bool] = None
+
+            bucket: Optional[str] = None
+
+    class zarr:
+        store_path: Optional[str] = None
+
+    class influxdb:
+        url: Optional[str] = None
+
+        token: Optional[str] = None
+
+        org: Optional[str] = None
+
+        bucket_name: Optional[str] = None
+
+        enable_compress: Optional[bool] = None
+
+        max_query_size: Optional[int] = None
+
+    class notify:
+        mail_from: Optional[str] = None
+
+        mail_to: Optional[list] = None
+
+        mail_server: Optional[str] = None
+
+        dingtalk_access_token: Optional[str] = None
+
+        dingtalk_secret: Optional[str] = None

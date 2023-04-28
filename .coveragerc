@@ -1,10 +1,11 @@
 [run]
 omit =
     */sanity.py
-    */app.py
     */cli.py
     */config/*
-    omega/interfaces/*
+    */sync_funds.py
+    omega/worker/__main__.py
+    omega/master/__main__.py
 [report]
 exclude_lines =
     pragma: no cover
