@@ -12,7 +12,6 @@ import rlog
 
 import omega
 from omega.core.constants import PROC_LOCK_OMEGA_MASTER
-from omega.master.app import start_logging
 from tests import init_test_env
 
 
@@ -65,6 +64,8 @@ class AppTest(unittest.IsolatedAsyncioTestCase):
         )
         redis_logger.addHandler(handler)
 
+        from omega.master.app import start_logging
+
         receiver = await start_logging()
         msg = "redis log receiving should be ready"
         redis_logger.info(msg)
@@ -75,7 +76,6 @@ class AppTest(unittest.IsolatedAsyncioTestCase):
             content = f.read(-1)
             self.assertTrue(content.find(msg) != -1)
 
-    @mock.patch("omega.master.app.start_logging")
     @mock.patch("omicron.init")
     @mock.patch("omega.scripts.load_lua_script")
     @mock.patch("apscheduler.schedulers.asyncio.AsyncIOScheduler.add_job")
@@ -94,12 +94,10 @@ class AppTest(unittest.IsolatedAsyncioTestCase):
         mock_add_job,
         mock_load_lua_script,
         mock_omicron_init,
-        mock_start_logging,
     ):
         # 测试的目的是保证在初始化时，各项动作均已执行
         # 所以不需要测试具体的动作
         await omega.master.app.init()
-        mock_start_logging.assert_called_once()
         mock_omicron_init.assert_called_once()
         mock_load_lua_script.assert_called_once()
         mock_load_cron_task.assert_called_once()

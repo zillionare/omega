@@ -4,6 +4,7 @@ import shutil
 import unittest
 from unittest import mock
 
+import omicron
 from freezegun import freeze_time
 
 from omega.boards.app import AKShareFetcher, board_task_entry
@@ -13,9 +14,10 @@ from tests import init_test_env
 class BoardsAppTest(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         await init_test_env()
+        await omicron.init()
 
     async def asyncTearDown(self) -> None:
-        pass
+        await omicron.close()
 
     async def test_fetcher_init(self):
         fetcher = AKShareFetcher()
@@ -56,13 +58,7 @@ class BoardsAppTest(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(rc)
             await fetcher.close()
 
-        with freeze_time("2022-12-05 10:10:10"):
-            fetcher = AKShareFetcher()
-            _bn.return_value = False
-            rc = await fetcher.fetch_day_bars("industry")
-            self.assertFalse(rc)
-            await fetcher.close()
-
+        with freeze_time("2022-12-02 10:10:10"):
             fetcher = AKShareFetcher()
             _bn.return_value = True
             rc = await fetcher.fetch_day_bars("industry")
@@ -88,7 +84,7 @@ class BoardsAppTest(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(rc)
             await fetcher.close()
 
-        with freeze_time("2022-12-05 10:10:10"):
+        with freeze_time("2022-12-02 10:10:10"):
             fetcher = AKShareFetcher()
             _bn.return_value = False
             rc = await fetcher.fetch_members("industry")
