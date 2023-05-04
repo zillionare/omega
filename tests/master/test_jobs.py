@@ -154,8 +154,9 @@ class TestSyncJobs(unittest.IsolatedAsyncioTestCase):
         base = {
             "daily_bars_sync",
             "1m:10:*",
-            "1m:11:0-31",
-            "1m:13-14:*",
+            "1m:11:0-30",
+            "1m:13:1-59",
+            "1m:14:*",
             "sync_trade_price_limits",
             "1m:15:00",
             "after_hour_sync_job",

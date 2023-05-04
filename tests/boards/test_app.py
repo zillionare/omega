@@ -17,7 +17,7 @@ class BoardsAppTest(unittest.IsolatedAsyncioTestCase):
         await omicron.init()
 
     async def asyncTearDown(self) -> None:
-        pass
+        await omicron.close()
 
     async def test_fetcher_init(self):
         fetcher = AKShareFetcher()
