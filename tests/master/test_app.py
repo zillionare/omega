@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import subprocess
 import sys
 import unittest
 from unittest import mock
@@ -11,7 +10,6 @@ import psutil
 import rlog
 
 import omega
-from omega.core.constants import PROC_LOCK_OMEGA_MASTER
 from tests import init_test_env
 
 
@@ -109,43 +107,3 @@ class AppTest(unittest.IsolatedAsyncioTestCase):
         mock_emit_start.assert_called_once()
         mock_emit_register.assert_called_once()
         mock_heartbeat.assert_called()
-
-    async def test_start(self):
-        await omicron.cache.sys.delete(PROC_LOCK_OMEGA_MASTER)
-        # 测试能否在本机正常启动，退出时能否释放锁
-        proc = subprocess.Popen(
-            [sys.executable, "-m", "omega.master.app", "start"], shell=False
-        )
-
-        # do the check
-        for _ in range(60):
-            result = await omicron.cache.sys.get(PROC_LOCK_OMEGA_MASTER)
-            if result:
-                break
-            await asyncio.sleep(0.5)
-        else:  # failed to start omega master in 30 seconds
-            self.assertTrue(False)
-
-        # kill proc, check if the lock is released
-        await asyncio.sleep(0.5)
-        self.assertTrue(find_process("omega.master"))
-        proc.terminate()
-        proc.wait()
-        for _ in range(60):
-            result = await omicron.cache.sys.get(PROC_LOCK_OMEGA_MASTER)
-            if result is None:
-                break
-            await asyncio.sleep(0.5)
-        else:
-            self.assertTrue(False)
-
-        # 无法启动
-        await omicron.cache.sys.set(PROC_LOCK_OMEGA_MASTER, 1)
-        proc = subprocess.Popen(
-            [sys.executable, "-m", "omega.master.app", "start"],
-        )
-
-        await asyncio.sleep(3)
-        _pid = find_process("omega.master")
-        self.assertTrue(_pid != proc.pid)
-        await omicron.cache.sys.delete(PROC_LOCK_OMEGA_MASTER)

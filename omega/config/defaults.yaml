@@ -48,16 +48,6 @@ quotes_fetchers:
     account: ${JQ_ACCOUNT}
     password: ${JQ_PASSWORD}
 
-dfs:
-  engine: minio
-  minio:
-    host: ${MINIO_HOST}
-    port: ${MINIO_PORT}
-    access: ${MINIO_ACCESS}
-    secret: ${MINIO_SECRET}
-    secure: false
-    bucket: zillionare
-
 zarr:
   store_path: /zillionare/boards.zarr
 

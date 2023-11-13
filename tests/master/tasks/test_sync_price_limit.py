@@ -20,9 +20,7 @@ from pyemit import emit
 import omega.worker.tasks.synctask as workjobs
 from omega.core import constants
 from omega.core.events import Events
-from omega.master.dfs import Storage
 from omega.master.tasks.sync_price_limit import (
-    get_trade_limit_filename,
     get_trade_price_limits_sync_date,
     run_sync_price_limits_task,
     sync_cache_price_limits,
@@ -111,9 +109,6 @@ class TestSyncJobs_PriceLimit(unittest.IsolatedAsyncioTestCase):
         mock_data2 = mock_jq_data("000001_idx_0218_limit.pik")
         _fetch_bars.side_effect = [mock_data1, mock_data2]
 
-        dfs = Storage()
-        await dfs.delete(get_trade_limit_filename(SecurityType.INDEX, end.naive))
-        await dfs.delete(get_trade_limit_filename(SecurityType.STOCK, end.naive))
         with mock.patch(
             "omega.master.tasks.sync_other_bars.BarsSyncTask",
             side_effect=[task],
@@ -128,11 +123,8 @@ class TestSyncJobs_PriceLimit(unittest.IsolatedAsyncioTestCase):
                     await cache.sys.get(constants.BAR_SYNC_TRADE_PRICE_TAIL),
                     "2022-02-18",
                 )
-                # todo inflaxdb读出来看对不对
-                base_dir = os.path.join(
-                    dir_test_home(), "data", "test_sync_trade_price_limits"
-                )
-                # 从dfs查询 并对比
+
+                # 从inflaxdb读出来看对不对
                 actual = await Stock.get_trade_price_limits(
                     code="000001.XSHE", begin=end.naive.date(), end=end.naive.date()
                 )
@@ -148,16 +140,6 @@ class TestSyncJobs_PriceLimit(unittest.IsolatedAsyncioTestCase):
                 np.testing.assert_array_almost_equal(
                     actual["low_limit"], exp["low_limit"], decimal=2
                 )
-
-                # dfs读出来
-                for typ in [SecurityType.STOCK, SecurityType.INDEX]:
-                    filename = get_trade_limit_filename(typ, end.naive)
-                    data = await dfs.read(filename)
-                    with open(
-                        os.path.join(base_dir, f"dfs_{typ.value}.pik"), "rb"
-                    ) as f:
-                        local_data = f.read()
-                    self.assertEqual(data, local_data)
 
     async def test_price_limit_task(self):
         task = BarsSyncTask(

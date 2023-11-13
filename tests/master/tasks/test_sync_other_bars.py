@@ -19,7 +19,6 @@ from pyemit import emit
 import omega.worker.tasks.synctask as workjobs
 from omega.core import constants
 from omega.core.events import Events
-from omega.master.dfs import Storage
 from omega.master.tasks.sync_other_bars import (
     get_month_week_sync_date,
     sync_min_5_15_30_60,
@@ -27,7 +26,6 @@ from omega.master.tasks.sync_other_bars import (
     sync_week_bars,
 )
 from omega.master.tasks.synctask import BarsSyncTask
-from omega.master.tasks.task_utils import get_bars_filename
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher
 from omega.worker.tasks.task_utils import cache_init
 from tests import (
@@ -133,9 +131,6 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
             recs_per_sec=2,
         )
         await task.cleanup(success=True)
-        dfs = Storage()
-        await dfs.delete(get_bars_filename(SecurityType.INDEX, end, FrameType.WEEK))
-        await dfs.delete(get_bars_filename(SecurityType.STOCK, end, FrameType.WEEK))
 
         mock_data1 = mock_jq_data("000001_300001_0218_1w.pik")
         mock_data2 = mock_jq_data("000001_idx_0218_1w.pik")
@@ -153,7 +148,7 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
                 )
                 base_dir = os.path.join(dir_test_home(), "data", "test_sync_week_bars")
 
-                # 从dfs查询 并对比
+                # 从db查询 并对比
                 actual = {}
                 start = tf.shift(end, -1, FrameType.WEEK)  # original n
                 async for code, bars in Stock.batch_get_day_level_bars_in_range(
@@ -171,24 +166,6 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
                 self.assertSetEqual(set(actual.keys()), set(expected.keys()))
                 for code in actual.keys():
                     assert_bars_equal(actual[code], expected[code])
-
-                expected_keys = [
-                    set(["000001.XSHE", "300001.XSHE"]),
-                    set(["000001.XSHG"]),
-                ]
-
-                for i, (typ, ft) in enumerate(
-                    itertools.product(
-                        [SecurityType.STOCK, SecurityType.INDEX], [FrameType.WEEK]
-                    )
-                ):
-                    filename = get_bars_filename(typ, end, ft)
-                    data = await dfs.read(filename)
-                    actual = pickle.loads(data)
-
-                    self.assertSetEqual(set(actual.keys()), expected_keys[i])
-                    for code in expected_keys[i]:
-                        assert_bars_equal(actual[code], expected[code])
 
     @mock.patch(
         "omega.master.tasks.synctask.QuotaMgmt.check_quota",
@@ -228,9 +205,6 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
             recs_per_sec=2,
         )
         await task.cleanup(success=True)
-        dfs = Storage()
-        await dfs.delete(get_bars_filename(SecurityType.INDEX, end, FrameType.MONTH))
-        await dfs.delete(get_bars_filename(SecurityType.STOCK, end, FrameType.MONTH))
 
         mock_data1 = mock_jq_data("000001_300001_0128_1M.pik")
         mock_data2 = mock_jq_data("000001_idx_0128_1M.pik")
@@ -247,7 +221,7 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
                     await cache.sys.get(constants.BAR_SYNC_MONTH_TAIL), "2022-01-28"
                 )
                 base_dir = os.path.join(dir_test_home(), "data", "test_sync_month_bars")
-                # 从dfs查询 并对比
+                # 从db查询 并对比
                 actual = {}
                 start = tf.shift(end, -1, FrameType.MONTH)
                 async for code, bars in Stock.batch_get_day_level_bars_in_range(
@@ -265,23 +239,6 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
                 self.assertSetEqual(set(expected.keys()), set(actual.keys()))
                 for code in expected.keys():
                     assert_daybars_equal(expected[code], actual[code])
-
-                expected_keys = [
-                    set(["000001.XSHE", "300001.XSHE"]),
-                    set(["000001.XSHG"]),
-                ]
-                for i, (typ, ft) in enumerate(
-                    itertools.product(
-                        [SecurityType.STOCK, SecurityType.INDEX], [FrameType.MONTH]
-                    )
-                ):
-                    filename = get_bars_filename(typ, end, ft)
-                    data = await dfs.read(filename)
-                    actual = pickle.loads(data)
-
-                    self.assertSetEqual(set(actual.keys()), expected_keys[i])
-                    for code in expected_keys[i]:
-                        assert_daybars_equal(expected[code], actual[code])
 
     @mock.patch(
         "omega.master.tasks.synctask.QuotaMgmt.check_quota",
@@ -323,13 +280,6 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
             recs_per_sec=48 + 16 + 8 + 4,
         )
 
-        dfs = Storage()
-
-        for typ, ft in itertools.product(
-            [SecurityType.STOCK, SecurityType.INDEX], frame_type
-        ):
-            await dfs.delete(get_bars_filename(typ, end.naive, ft))
-
         await task.cleanup(success=True)
         await cache.sys.delete(constants.BAR_SYNC_OTHER_MIN_TAIL)
 
@@ -359,28 +309,12 @@ class TestSyncJobs_OtherBars(unittest.IsolatedAsyncioTestCase):
             with mock.patch("arrow.now", return_value=end):
                 await sync_min_5_15_30_60()
                 self.assertTrue(task.status)
-                base_dir_jq = os.path.join(dir_test_home(), "jq_data")
                 base_dir_local = os.path.join(dir_test_home(), "local_data")
-                for typ, ft in itertools.product(
-                    [SecurityType.STOCK, SecurityType.INDEX],
-                    frame_type,
-                ):
-                    # dfs读出来
-                    filename = get_bars_filename(typ, end.naive, ft)
-                    data = await dfs.read(filename)
 
-                    _prefix = "000001_300001_0218"
-                    if typ == SecurityType.INDEX:
-                        _prefix = "000001_idx_0218"
-                    with open(
-                        os.path.join(base_dir_jq, f"{_prefix}_{ft.value}.pik"), "rb"
-                    ) as f:
-                        local_data = f.read()
-                    self.assertEqual(data, local_data)
                 for ft, n_bars in zip(
                     frame_type, (240 // 5, 240 // 15, 240 // 30, 240 // 60)
                 ):
-                    # 从dfs查询 并对比
+                    # 改从db读出
                     influx_bars = {}
                     start = tf.shift(end, -n_bars, ft)
                     async for code, bar in Stock.batch_get_min_level_bars_in_range(

@@ -16,7 +16,6 @@ from omicron.models.timeframe import TimeFrame
 from omega.core import constants
 from omega.core.constants import MINIO_TEMPORAL
 from omega.core.events import Events
-from omega.master.dfs import Storage
 from omega.master.tasks.sync_other_bars import get_month_week_sync_task
 from omega.master.tasks.synctask import BarsSyncTask, master_syncbars_task
 from omega.master.tasks.task_utils import delete_temporal_bars
@@ -44,9 +43,9 @@ async def write_price_limits_to_dfs(
         dt: 写入dfs的日期，用来作为文件名
     Returns:
     """
-    dfs = Storage()
-    if dfs is None:  # pragma: no cover
-        return
+
+    # 移除minio代码
+    # dfs = Storage()
 
     # clear cache if necessory: cache only, or dt = date_in_cache
     await Stock.reset_price_limits_cache(cache_only, dt)
@@ -74,8 +73,9 @@ async def write_price_limits_to_dfs(
         else:
             await Stock.save_trade_price_limits(bars, to_cache=False)
 
-            binary = pickle.dumps(bars, protocol=cfg.pickle.ver)
-            await dfs.write(get_trade_limit_filename(typ, dt), binary)
+            # 移除minio代码
+            # await dfs.write(get_trade_limit_filename(typ, dt), binary)
+
             await cache.temp.delete(queue_name)
 
 

@@ -39,17 +39,6 @@ class Omega(object):
         self.inherit_cfg = cfg or {}
         self.scheduler = AsyncIOScheduler(timezone="Asia/Shanghai")
 
-    async def first_load_data(self, *args):  # 从零开始初始化数据
-        logger.info("first_load_data %s", self.__class__.__name__)
-
-        cfg4py.init(get_config_dir(), False)
-        cfg4py.update_config(self.inherit_cfg)
-
-        await AbstractQuotesFetcher.create_instance(self.fetcher_impl, **self.params)
-        await omicron.cache.init()
-        await cache_init()
-        logger.info("<<< init %s process done", self.__class__.__name__)
-
     async def init(self, *args):
         logger.info("init %s", self.__class__.__name__)
 
@@ -135,11 +124,6 @@ def start(impl: str, cfg: dict = None, **fetcher_params):
     loop.run_until_complete(omega.init())
     logger.info("omega worker 启动")
     loop.run_forever()
-
-
-async def init_data(impl: str, cfg: dict = None, **fetcher_params):
-    omega = Omega(impl, cfg, **fetcher_params)
-    await omega.first_load_data()
 
 
 if __name__ == "__main__":

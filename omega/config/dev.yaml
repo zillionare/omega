@@ -48,16 +48,6 @@ quotes_fetchers:
     account: test
     password: test
 
-dfs:
-  engine: minio
-  minio:
-    host: localhost
-    port: 9000
-    access: minioadmin
-    secret: minioadmin
-    secure: false
-    bucket: zillionare
-
 zarr:
   store_path: /tmp/boards.zarr
 

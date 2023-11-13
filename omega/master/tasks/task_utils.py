@@ -12,7 +12,6 @@ from omicron.models.timeframe import TimeFrame
 
 from omega.core import constants
 from omega.core.constants import MINIO_TEMPORAL
-from omega.master.dfs import Storage
 
 logger = logging.getLogger(__name__)
 cfg: Config = cfg4py.get_instance()
@@ -88,9 +87,8 @@ async def write_dfs(
 
     """
 
-    dfs = Storage()
-    if dfs is None:  # pragma: no cover
-        return
+    # 移除minio服务
+    # dfs = Storage()
 
     for typ, ft in itertools.product(
         [SecurityType.STOCK, SecurityType.INDEX], frame_type
@@ -120,19 +118,9 @@ async def write_dfs(
             len(binary),
             filename,
         )
-        await dfs.write(filename, binary)
-        # todo: let worker do the resample
-        # if resample and ft == FrameType.MIN1 and 1 == 0:
-        #     for to_frame in (
-        #         FrameType.MIN5,
-        #         FrameType.MIN15,
-        #         FrameType.MIN30,
-        #         FrameType.MIN60,
-        #     ):
-        #         # we need to support batch resample here
-        #         resampled = Stock.resample(all_bars, FrameType.MIN1, to_frame)
-        #         resampled_binary = pickle.dumps(resampled, protocol=cfg.pickle.ver)
-        #         await dfs.write(get_bars_filename(typ, dt, to_frame), resampled_binary)
+
+        # 移除minio服务
+        # await dfs.write(filename, binary)
 
         await cache.temp.delete(queue_name)
 

@@ -16,7 +16,6 @@ from pyemit import emit
 
 from omega import scripts
 from omega.config import get_config_dir
-from omega.core.constants import PROC_LOCK_OMEGA_MASTER
 from omega.core.events import Events
 from omega.logreceivers.redis import RedisLogReceiver
 from omega.master.jobs import load_cron_task
@@ -58,21 +57,6 @@ async def on_logger_exit():
     print("omega logger service shutdowned successfully")
 
 
-async def check_running():
-    """检查master process是否已经运行。
-
-    只允许全局运行一个master进程。如果已在运行中，本进程将退出。
-    """
-    try:
-        await omicron.cache.init()
-        success = await omicron.cache.sys.setnx(PROC_LOCK_OMEGA_MASTER, 1)
-        if not success:
-            print("omega master is already running...")
-            # os._exit(1)
-    finally:
-        await omicron.cache.close()
-
-
 async def heartbeat():
     global scheduler
 
@@ -91,7 +75,6 @@ async def handle_work_heart_beat(params: dict):
 async def init():
     global scheduler
 
-    await check_running()
     # logger receiver使用单独的redis配置项，可以先行启动
     # await start_logging()
     logger.info("init omega-master process with config at %s", config_dir)
@@ -125,11 +108,6 @@ async def init():
 async def on_exit():
     """退出omega master进程，释放非锁资源。"""
     print("omega master is shutdowning...")
-
-    try:
-        await omicron.cache.sys.delete(PROC_LOCK_OMEGA_MASTER)
-    except Exception:
-        pass
 
     if receiver is not None:
         await receiver.stop()

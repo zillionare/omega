@@ -20,7 +20,6 @@ from pyemit import emit
 import omega.worker.tasks.synctask as workjobs
 from omega.core import constants
 from omega.core.events import Events
-from omega.master.dfs import Storage
 from omega.master.tasks.calibration_task import (
     get_daily_bars_sync_task,
     get_sync_date,
@@ -29,7 +28,6 @@ from omega.master.tasks.calibration_task import (
     sync_day_bar_factors,
 )
 from omega.master.tasks.synctask import BarsSyncTask
-from omega.master.tasks.task_utils import get_bars_filename
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher
 from omega.worker.tasks.task_utils import cache_init
 from tests import dir_test_home, init_test_env, mock_jq_data
@@ -269,12 +267,6 @@ class TestSyncJobs_Calibration(unittest.IsolatedAsyncioTestCase):
             recs_per_sec=240 + 4,
         )
         await task.cleanup(success=True)
-        # 清除dfs数据
-        dfs = Storage()
-        for typ, ft in itertools.product(
-            [SecurityType.STOCK, SecurityType.INDEX], frame_type
-        ):
-            await dfs.delete(get_bars_filename(typ, end.naive, ft))
 
         mock_data1 = mock_jq_data("000001_300001_0223_1m.pik")
         mock_data2 = mock_jq_data("000001_idx_0223_1m.pik")
@@ -285,27 +277,10 @@ class TestSyncJobs_Calibration(unittest.IsolatedAsyncioTestCase):
         ):
             with mock.patch("arrow.now", return_value=end):
                 await sync_daily_bars_1m()
-                base_dir_jq = os.path.join(dir_test_home(), "jq_data")
                 base_dir_local = os.path.join(dir_test_home(), "local_data")
-                for typ, ft in itertools.product(
-                    [SecurityType.STOCK, SecurityType.INDEX],
-                    frame_type,
-                ):
-                    # dfs读出来
-                    filename = get_bars_filename(typ, end.naive, ft)
-                    data = await dfs.read(filename)
 
-                    _prefix = "000001_300001_0223"
-                    if typ == SecurityType.INDEX:
-                        _prefix = "000001_idx_0223"
-                    with open(
-                        os.path.join(base_dir_jq, f"{_prefix}_{ft.value}.pik"), "rb"
-                    ) as f:
-                        local_data = f.read()
-
-                    self.assertEqual(data, local_data)
                 for ft, n_bars in zip(frame_type, (240, 1)):
-                    # 从dfs查询 并对比
+                    # 从db查询 并对比
                     influx_bars = {}
                     start = tf.shift(end, -n_bars + 1, ft)
                     if ft in tf.minute_level_frames:

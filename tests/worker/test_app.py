@@ -7,7 +7,7 @@ import cfg4py
 import omicron
 
 from omega.worker.abstract_quotes_fetcher import AbstractQuotesFetcher as aq
-from omega.worker.app import Omega, init_data, start
+from omega.worker.app import Omega, start
 from tests import init_test_env
 
 
@@ -24,19 +24,6 @@ class WorkerAppTest(unittest.IsolatedAsyncioTestCase):
         account = "account"
         password = "passwd"
         await aq.create_instance(impl, account=account, password=password)
-
-    async def test_init_data(self):
-        impl = "tests.demo_fetcher"
-        account = "account"
-        password = "passwd"
-        rc = await init_data(impl, cfg=None, account=account, password=password)
-        self.assertIsNone(rc)
-
-        omega = Omega(impl, cfg=None, account=account, password=password)
-        with mock.patch("omega.worker.app.emit.emit") as f:
-            f.return_value = True
-            rc = await omega.heart_beat()
-            self.assertIsNone(rc)
 
     @mock.patch("asyncio.unix_events._UnixSelectorEventLoop.run_until_complete")
     @mock.patch("asyncio.unix_events._UnixSelectorEventLoop.run_forever")

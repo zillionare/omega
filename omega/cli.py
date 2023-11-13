@@ -50,32 +50,6 @@ def print_title(msg):
     print(colored("".join(["-"] * len(msg)), "green"))
 
 
-async def first_init(service: str = ""):
-    print(f"正在初始化系统数据 {colored(service, 'green')}...")
-
-    config_dir = get_config_dir()
-    cfg4py.init(config_dir, False)
-
-    from omega.worker.app import init_data
-
-    if not cfg.quotes_fetchers:  # 无数据子项（仅节点），直接退出
-        print("系统数据初始化错误，请配置正确的quotes_fetcher...")
-        return
-
-    fetcher = cfg.quotes_fetchers[0]
-    impl = fetcher.get("impl")
-    account = fetcher.get("account")
-    password = fetcher.get("password")
-
-    if password.startswith("ERROR"):
-        print("系统数据初始化错误，请配置正确的quotes_fetcher...")
-        return
-
-    await init_data(impl, account=account, password=password)
-
-    print(f"系统数据初始化完毕 {colored(service, 'green')}...")
-
-
 async def start_worker():
     print("prepare to start Omega worker process ...")
 
@@ -167,7 +141,6 @@ def main():
     warnings.simplefilter("ignore")
     fire.Fire(
         {
-            "init": run(first_init),
             "worker": run(start_worker),
             "webservice": run(start_webservice),
             "logger": run(start_logger),

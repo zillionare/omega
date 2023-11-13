@@ -29,6 +29,3 @@ TRADE_PRICE_LIMITS = "trade_price_limits"
 # securities sync
 SECS_SYNC_ARCHIVE_HEAD = "jobs.secs_sync.archive.head"
 SECS_SYNC_ARCHIVE_TAIL = "jobs.secs_sync.archive.tail"
-
-# 分布式锁，比如进程锁
-PROC_LOCK_OMEGA_MASTER = "proc:lock:omega:master"

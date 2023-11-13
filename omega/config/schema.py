@@ -48,22 +48,6 @@ class Config(object):
 
     quotes_fetchers: Optional[list] = None
 
-    class dfs:
-        engine: Optional[str] = None
-
-        class minio:
-            host: Optional[str] = None
-
-            port: Optional[int] = None
-
-            access: Optional[str] = None
-
-            secret: Optional[str] = None
-
-            secure: Optional[bool] = None
-
-            bucket: Optional[str] = None
-
     class zarr:
         store_path: Optional[str] = None
 
