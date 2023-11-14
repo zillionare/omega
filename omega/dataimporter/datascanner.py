@@ -39,6 +39,11 @@ async def load_cache_data(base_folder, redis, latest_ts):
         logger.info("calendar info found in redis, skip importing")
         return 0
 
+    # extract data
+    execfile = path.normpath(path.join(base_folder, "restore.sh"))
+    logger.info("extract data from 7z: %s", execfile)
+    os.system(execfile)
+
     # 加载redis的核心数据
     try:
         logger.info("loading calendar...")
