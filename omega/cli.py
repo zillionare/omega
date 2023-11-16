@@ -115,6 +115,22 @@ async def start_logger():
     print("Omega logger process started ...")
 
 
+async def start_realprice_stock():
+    print("prepare to start Omega real price process for stock ...")
+
+    subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "omega.akshareprice.app",
+            "stock",
+        ],
+        stdout=subprocess.DEVNULL,
+    )
+
+    print("Omega stock price process started ...")
+
+
 async def import_local_data():
     print("正在初始化系统数据...")
 
@@ -145,6 +161,7 @@ def main():
             "webservice": run(start_webservice),
             "logger": run(start_logger),
             "importdata": run(import_local_data),
+            "stock_price": run(start_realprice_stock),
         }
     )
 

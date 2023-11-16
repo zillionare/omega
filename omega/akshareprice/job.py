@@ -86,71 +86,6 @@ async def start_cron_task():
     scheduler.start()
 
 
-def load_cron_task_idx(scheduler):
-    scheduler.add_job(
-        fetch_idx_price_from_akshare,
-        "cron",
-        hour=9,
-        minute=25,
-        second=10,
-        name="fetch_index_price_task",
-    )
-
-    scheduler.add_job(
-        fetch_idx_price_from_akshare,
-        "cron",
-        hour=9,
-        minute="30-59",
-        second="*/5",
-        name="fetch_index_price_task",
-    )
-    scheduler.add_job(
-        fetch_idx_price_from_akshare,
-        "cron",
-        hour=10,
-        second="*/5",
-        name="fetch_index_price_task",
-    )
-    scheduler.add_job(
-        fetch_idx_price_from_akshare,
-        "cron",
-        hour=11,
-        minute="0-29",
-        second="*/5",
-        name="fetch_index_price_task",
-    )
-    scheduler.add_job(
-        fetch_idx_price_from_akshare,
-        "cron",
-        hour=11,
-        minute=30,
-        second=10,
-        name="fetch_index_price_task",
-    )
-
-    scheduler.add_job(
-        fetch_idx_price_from_akshare,
-        "cron",
-        hour="13-14",
-        second="*/5",
-        name="fetch_index_price_task",
-    )
-    scheduler.add_job(
-        fetch_idx_price_from_akshare,
-        "cron",
-        hour=15,
-        minute=0,
-        second=10,
-        name="fetch_index_price_task",
-    )
-
-
-async def start_cron_task_idx():
-    scheduler = AsyncIOScheduler(timezone="Asia/Shanghai")
-    load_cron_task_idx(scheduler)
-    scheduler.start()
-
-
 def get_akshare_data_em():
     try:
         all_secs = ak.stock_zh_a_spot_em()
@@ -228,20 +163,6 @@ async def fetch_price_from_akshare():
     if _seq_num % 2 == 0:  # running at 0, 10, 20, 30, 40, 50
         logger.info("%s side: %s", running_mode, now)
         await process_stock_price()
-
-    return True
-
-
-async def fetch_idx_price_from_akshare():
-    # cfg = cfg4py.get_instance()
-    running_mode = "server"
-
-    now = datetime.datetime.now()
-    if now.weekday() >= 5:  # 周末不运行
-        return True
-
-    seconds = now.second
-    _seq_num = seconds / 5
 
     if _seq_num % 4 == 0:  # running at 0, 20, 40
         logger.info("%s side for index: %s", running_mode, now)

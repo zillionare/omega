@@ -7,7 +7,7 @@ import sys
 import cfg4py
 
 from omega.akshareprice.datasync import init_redis_connection
-from omega.akshareprice.job import start_cron_task, start_cron_task_idx
+from omega.akshareprice.job import start_cron_task
 from omega.config import get_config_dir
 
 cfg = cfg4py.get_instance()
@@ -36,9 +36,6 @@ def run(action: str):
 
     if action == "stock":
         loop.run_until_complete(start_cron_task())
-        loop.run_forever()
-    elif action == "index":
-        loop.run_until_complete(start_cron_task_idx())
         loop.run_forever()
     else:
         logger.info("action: %s not supported", action)
