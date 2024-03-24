@@ -3,12 +3,10 @@ import logging
 import os
 import pickle
 
-import aioredis
 import cfg4py
 import numpy as np
 from coretypes import FrameType, bars_dtype
 from numpy.testing import assert_array_almost_equal, assert_array_equal
-from omicron.models.timeframe import TimeFrame
 
 from omega.config import get_config_dir
 

@@ -18,10 +18,19 @@ async def _rebuild_min_level_unclosed_bars():
     keys = await cache.security.keys("bars:1m:*")
 
     errors = 0
+    no_first_bars = 0
     for key in keys:
         try:
             sec = key.split(":")[2]
             bars = await Stock._get_cached_bars_n(sec, 240, FrameType.MIN1, end)
+            first_frame = bars[0]["frame"].item()
+            if no_first_bars > 50:
+                logger.warning("超过50支个股在缓存中没有09:31的分钟线，zillionare刚安装，还没来得及同步？")
+                DingTalkMessage.text("重建分钟级缓存数据时，超过50支个股在缓存中没有09:31的分钟线，zillionare刚安装，还没来得及同步？")
+                return False
+            if first_frame.hour() != 9 and first_frame.minute() != 31:
+                no_first_bars += 1
+                continue
         except Exception as e:
             logger.exception(e)
             logger.warning("failed to get cached bars for %s", sec)
@@ -49,6 +58,7 @@ async def _rebuild_min_level_unclosed_bars():
 
     if errors > 0:
         DingTalkMessage.text(f"重建分钟级缓存数据时，出现{errors}个错误。")
+    return True
 
 
 async def _rebuild_day_level_unclosed_bars():
@@ -101,5 +111,6 @@ async def rebuild_unclosed_bars():
 
     后续未收盘数据的更新，将在每个分钟线同步完成后，调用lua脚本进行。
     """
-    await _rebuild_min_level_unclosed_bars()
-    await _rebuild_day_level_unclosed_bars()
+    success = await _rebuild_min_level_unclosed_bars()
+    if success:
+        await _rebuild_day_level_unclosed_bars()

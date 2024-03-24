@@ -138,15 +138,17 @@ async def get_secs_for_sync(limit: int, n_bars: int, name: str):
 
     Returns:
 
+    
     """
     while True:
-        step = limit // n_bars  # 根据 单次api允许获取的条数 和一共多少根k线 计算每次最多可以获取多少个股票的
+        step = limit // n_bars # 根据单次api允许获取的条数 和一共多少根k线 计算每次最多可以获取多少个股票的
         p = cache.sys.pipeline()
         p.lrange(name, 0, step - 1)
         p.ltrim(name, step, -1)
         secs, _ = await p.execute()
-        if not len(secs):
+        if len(secs) == 0:
             break
+        logger.info("get %s secs for sync %s", len(secs), name)
         yield secs
 
 
